@@ -229,6 +229,7 @@ import {
   lateProviderResourceLease,
   leaseIsLive,
   INITIAL_LEASE_STATE,
+  REGISTERED_LEASE_STATE,
   absentProvisioningLease,
   completedLeaseCleanup,
   expiredWorkspaceProvisioningLease,
@@ -242,7 +243,6 @@ import {
   providerProjectForConfig,
   providerRegionForConfig,
   retainUnresolvedProviderResource,
-  terminalizeManualProviderCleanup,
 } from "./lease-lifecycle";
 import { DurableObjectLeaseRepository, type LeaseRepository } from "./lease-repository";
 import {
@@ -364,7 +364,6 @@ import {
   readyPoolBorrowDeadline,
   returnedReadyPoolEntry,
   staleReadyPoolEntry,
-  withoutReadyPoolBorrow,
 } from "./ready-pool-lifecycle";
 import {
   INITIAL_RUN_PHASE,
@@ -1228,7 +1227,6 @@ export class FleetCoordinator {
         const now = new Date().toISOString();
         const completed: LeaseRecord = {
           ...lease,
-          state: "active",
           updatedAt: now,
           cloudID: result.server.cloudID,
           serverID: result.server.id,
@@ -1239,7 +1237,7 @@ export class FleetCoordinator {
           ...(result.server.region ? { region: result.server.region } : {}),
           ...(result.image ? { image: result.image } : {}),
         };
-        clearProvisioningRecoveryMetadata(completed);
+        finalizedProvisioningLease(completed);
         if (result.cost) {
           completed.estimatedHourlyUSD = result.cost.hourlyUSD;
           completed.maxEstimatedUSD = result.cost.maxUSD;
@@ -7715,7 +7713,7 @@ export class FleetCoordinator {
       idleTimeoutSeconds,
       estimatedHourlyUSD: 0,
       maxEstimatedUSD: 0,
-      state: "active",
+      state: REGISTERED_LEASE_STATE,
       createdAt: existing?.createdAt || nowISO,
       registeredAt: existing?.registeredAt || nowISO,
       updatedAt: nowISO,

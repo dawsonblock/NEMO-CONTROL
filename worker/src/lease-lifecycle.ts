@@ -33,14 +33,33 @@ export const INITIAL_LEASE_STATE: LeaseState = "provisioning";
 /** The state an externally created (registered) lease is recorded in. */
 export const REGISTERED_LEASE_STATE: LeaseState = "active";
 
-/** Released, expired, and failed are terminal: no provider authority. */
-export function isTerminalLeaseState(state: LeaseState): boolean {
-  return state === "released" || state === "expired" || state === "failed";
-}
-
-/** Live leases are the only ones that may hold provider resources. */
+/**
+ * Live leases are the only ones that may hold provider resources. This is
+ * the predicate to use for provider authority — "live" and "terminal" are
+ * NOT complements in this lifecycle, because a `failed` lease can be
+ * recovered while a `released` or `expired` one cannot.
+ */
 export function leaseIsLive(lease: LeaseRecord): boolean {
   return lease.state === "active" || lease.state === "provisioning";
+}
+
+/**
+ * A recoverable failure: the provider resource is gone or unproven, but
+ * recovery may return the lease to `active` or `provisioning` when it
+ * proves the workspace exists. It is NOT terminal in the sense of
+ * "irreversibly ended".
+ */
+export function isRecoverableLeaseFailure(state: LeaseState): boolean {
+  return state === "failed";
+}
+
+/**
+ * Irreversibly ended: no transition may return the lease to a live state.
+ * Release intent can still be recorded on such a record — that is
+ * evidence, not resurrection.
+ */
+export function isIrreversiblyEnded(state: LeaseState): boolean {
+  return state === "released" || state === "expired";
 }
 
 export function isRegisteredLease(lease: LeaseRecord): boolean {
@@ -445,9 +464,12 @@ export function expiredWorkspaceProvisioningLease(
  * idempotent re-application of the same transition) and are therefore
  * not listed.
  *
- * A terminal lease may still record release intent — that is evidence,
- * not resurrection — and a retryable failure may return to `active` or
- * `provisioning` when recovery proves the workspace exists.
+ * The vocabulary has three distinct concepts, and the table follows them:
+ *   - live (`provisioning`, `active`) — may hold a provider resource;
+ *   - recoverable failure (`failed`) — recovery may return it to live;
+ *   - irreversibly ended (`released`, `expired`) — never returns to live,
+ *     though release intent can still be recorded on it as evidence.
+ * Calling `failed` "terminal" was wrong: it is not irreversibly ended.
  */
 const legalLeaseTransitions: Record<LeaseState, readonly LeaseState[]> = {
   provisioning: ["active", "failed", "released", "expired"],
@@ -535,4 +557,45 @@ export function completedLeaseCleanup(lease: LeaseRecord, at: string): void {
   delete lease.providerKeyCleanupID;
   delete lease.cleanupStartedAt;
   delete lease.cleanupClaimExpiresAt;
+}
+
+/** Canceled while provisioning: released, keeping the unresolved-resource evidence. */
+export function canceledProvisioningLease(
+  lease: LeaseRecord,
+  input: { retain: boolean; keep?: boolean | undefined; at: number },
+): LeaseRecord {
+  const at = new Date(input.at).toISOString();
+  return {
+    ...lease,
+    state: "released",
+    releasedAt: at,
+    endedAt: at,
+    updatedAt: at,
+    releaseDeletesServer: !input.retain,
+    ...(input.keep === undefined ? {} : { keep: input.keep }),
+    provisioningResourceMayExist: true,
+  };
+}
+
+/** Canceled while a provisioning claim was live: released with its unresolved-resource evidence. */
+export function canceledProvisioningClaimLease(lease: LeaseRecord, at: string): void {
+  lease.state = "released";
+  lease.releaseDeletesServer = true;
+  lease.provisioningResourceMayExist = true;
+  lease.updatedAt = new Date(at).toISOString();
+}
+
+/** Provisioning candidates exhausted after verified cleanup. */
+export function exhaustedProvisioningLease(
+  lease: LeaseRecord,
+  input: { canceled: boolean; at: string },
+): void {
+  lease.state = input.canceled ? "released" : "failed";
+  lease.endedAt = input.at;
+  lease.updatedAt = input.at;
+  lease.provisioningResourceMayExist = false;
+  lease.releaseDeletesServer = true;
+  if (!input.canceled) {
+    lease.failureError = "provisioning candidates exhausted after verified cleanup";
+  }
 }

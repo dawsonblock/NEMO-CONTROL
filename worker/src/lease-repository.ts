@@ -8,7 +8,6 @@
  * state change goes through a semantic operation here, and each
  * operation persists exactly the transition it names.
  */
-import type { LeaseConfig } from "./config";
 import {
   activatedLease,
   clearProvisioningRecoveryMetadata,
@@ -20,9 +19,8 @@ import {
   retainUnresolvedProviderResource,
   sameLeaseIncarnation,
   terminalizeManualProviderCleanup,
-  type LeaseState,
 } from "./lease-lifecycle";
-import type { LeaseRecord, ProviderMachine } from "./types";
+import type { LeaseRecord } from "./types";
 
 export function leaseKey(leaseID: string): string {
   return `lease:${leaseID}`;
@@ -32,6 +30,15 @@ export function leaseKey(leaseID: string): string {
 export interface LeaseStorageView {
   get<T>(key: string, options?: { noCache?: boolean }): Promise<T | undefined>;
   put<T>(key: string, value: T, options?: { noCache?: boolean }): Promise<void>;
+}
+
+/**
+ * The transactional surface the repository requires. A transition must be
+ * able to reload, validate, and persist atomically: a read-then-write
+ * pair with an await in between is not a guarantee, it is a hope.
+ */
+export interface LeaseRepositoryStorage extends LeaseStorageView {
+  transaction<T>(closure: (txn: LeaseStorageView) => Promise<T>): Promise<T>;
 }
 
 /** Evidence restored when a release must keep its original dispatch. */
@@ -110,15 +117,15 @@ export class LeaseTransitionRefused extends Error {
 }
 
 export class DurableObjectLeaseRepository implements LeaseRepository {
-  constructor(private readonly storage: LeaseStorageView) {}
+  constructor(private readonly storage: LeaseRepositoryStorage) {}
 
   /**
-   * Reload the record and prove the caller's expectation still holds:
-   * same incarnation, same state, and — applying the transition to a
-   * probe copy of the reloaded record — a resulting state the lifecycle
-   * defines from there. Every state-changing operation routes through
-   * this, so a caller holding a stale record, or a terminal one, can
-   * never transition a record someone else has moved.
+   * Run one transition inside a storage transaction: reload the record,
+   * prove the caller's expectation still holds (same incarnation, same
+   * state, and — probing the transition against the reloaded record — a
+   * resulting state the lifecycle defines from there), apply it, and
+   * persist. Reload, validation, and write are one atomic unit, so a
+   * concurrent writer cannot interleave between the check and the write.
    *
    * The check is on the RESULTING state, not a named target: a
    * liveness-guarded transition (unresolved-resource evidence, manual
@@ -127,41 +134,49 @@ export class DurableObjectLeaseRepository implements LeaseRepository {
    * transition that would move a terminal record back to a live state is
    * refused.
    *
-   * The transition itself is then applied to the CALLER's record, not
-   * the reloaded one, so a flow that edited fields before transitioning
-   * persists exactly those edits — the reload exists to validate, not to
-   * replace the caller's work.
-   *
-   * Callers that need mutual exclusion against concurrent flows still
-   * hold their own serialization boundary; this makes the transition
-   * itself safe regardless, rather than relying on the caller to be
-   * correct about what it is transitioning.
+   * The transition itself is applied to the CALLER's record, so a flow
+   * that edited fields before transitioning persists exactly those edits.
    */
-  private async assertTransition(
+  /**
+   * Test seam: a hook that runs after a transaction's reload, before its
+   * write. Production never sets it; the adversarial serialization test
+   * uses it to prove a paused writer cannot lose an update.
+   */
+  afterTransactionRead: (() => Promise<void>) | undefined;
+
+  private async transition(
     expected: LeaseRecord,
-    apply: (lease: LeaseRecord) => LeaseRecord,
-  ): Promise<void> {
-    const current = await this.loadLease(expected.id);
-    if (!current) {
-      throw new LeaseTransitionRefused(`lease ${expected.id} is missing`);
-    }
-    if (!sameLeaseIncarnation(current, leaseIncarnation(expected))) {
-      throw new LeaseTransitionRefused(`lease ${expected.id} incarnation changed`);
-    }
-    if (current.state !== expected.state) {
-      throw new LeaseTransitionRefused(
-        `lease ${expected.id} state changed from ${expected.state} to ${current.state}`,
-      );
-    }
-    const resulting = apply(structuredClone(current));
-    if (
-      resulting.state !== current.state &&
-      !isLegalLeaseTransition(current.state, resulting.state)
-    ) {
-      throw new LeaseTransitionRefused(
-        `lease ${expected.id} may not move from ${current.state} to ${resulting.state}`,
-      );
-    }
+    probe: (lease: LeaseRecord) => LeaseRecord,
+    apply: () => LeaseRecord,
+    options?: { noCache?: boolean },
+  ): Promise<LeaseRecord> {
+    return this.storage.transaction(async (txn) => {
+      const current = await txn.get<LeaseRecord>(leaseKey(expected.id));
+      await this.afterTransactionRead?.();
+      if (!current) {
+        throw new LeaseTransitionRefused(`lease ${expected.id} is missing`);
+      }
+      if (!sameLeaseIncarnation(current, leaseIncarnation(expected))) {
+        throw new LeaseTransitionRefused(`lease ${expected.id} incarnation changed`);
+      }
+      if (current.state !== expected.state) {
+        throw new LeaseTransitionRefused(
+          `lease ${expected.id} state changed from ${expected.state} to ${current.state}`,
+        );
+      }
+      const resulting = probe(structuredClone(current));
+      if (
+        resulting.state !== current.state &&
+        !isLegalLeaseTransition(current.state, resulting.state)
+      ) {
+        throw new LeaseTransitionRefused(
+          `lease ${expected.id} may not move from ${current.state} to ${resulting.state}`,
+        );
+      }
+      const next = apply();
+      await txn.put(leaseKey(next.id), next, options);
+      return next;
+    });
   }
 
   async loadLease(leaseID: string, options?: { noCache?: boolean }): Promise<LeaseRecord | null> {
@@ -173,93 +188,111 @@ export class DurableObjectLeaseRepository implements LeaseRepository {
    * released incarnation reactivated for a new create attempt).
    */
   async activateLease(lease: LeaseRecord, input: ActivateLeaseInput): Promise<LeaseRecord> {
-    await this.assertTransition(lease, (probe) => {
-      activatedLease(probe, input.at);
-      return probe;
-    });
-    activatedLease(lease, input.at);
-    await this.storage.put(leaseKey(lease.id), lease);
-    return lease;
+    return this.transition(
+      lease,
+      (probe) => {
+        activatedLease(probe, input.at);
+        return probe;
+      },
+      () => {
+        activatedLease(lease, input.at);
+        return lease;
+      },
+    );
   }
 
   async releaseLease(lease: LeaseRecord, input: ReleaseLeaseInput): Promise<LeaseRecord> {
-    await this.assertTransition(lease, (probe) =>
-      finalizedReleasedLease(probe, input.deleteServer, input.keep),
+    return this.transition(
+      lease,
+      (probe) => finalizedReleasedLease(probe, input.deleteServer, input.keep),
+      () => {
+        const next = finalizedReleasedLease(lease, input.deleteServer, input.keep);
+        if (input.restoreDispatchEvidence) {
+          const evidence = input.restoreDispatchEvidence;
+          next.provisioningRequestStartedAt = evidence.provisioningRequestStartedAt;
+          if (evidence.provisioningCoordinatorVersion) {
+            next.provisioningCoordinatorVersion = evidence.provisioningCoordinatorVersion;
+          }
+          if (evidence.provisioningRequestSettledAt) {
+            next.provisioningRequestSettledAt = evidence.provisioningRequestSettledAt;
+          }
+          if (evidence.provisioningRecoveryObservedAt) {
+            next.provisioningRecoveryObservedAt = evidence.provisioningRecoveryObservedAt;
+          }
+          if (evidence.provisioningRecoveryMissingSince) {
+            next.provisioningRecoveryMissingSince = evidence.provisioningRecoveryMissingSince;
+          }
+          next.releaseDeletesServer = true;
+          next.provisioningResourceMayExist = true;
+          next.provisioningFailureRetryable = true;
+        }
+        if (input.cleanupClaim) {
+          next.releaseDeletesServer = true;
+          next.cleanupStartedAt = input.cleanupClaim.startedAt;
+          next.cleanupClaimExpiresAt = input.cleanupClaim.expiresAt;
+        }
+        if (input.finalize) {
+          clearProvisioningRecoveryMetadata(next);
+          delete next.providerKeyCleanupPending;
+          delete next.providerKeyCleanupID;
+        }
+        return next;
+      },
     );
-    const next = finalizedReleasedLease(lease, input.deleteServer, input.keep);
-    if (input.restoreDispatchEvidence) {
-      const evidence = input.restoreDispatchEvidence;
-      next.provisioningRequestStartedAt = evidence.provisioningRequestStartedAt;
-      if (evidence.provisioningCoordinatorVersion) {
-        next.provisioningCoordinatorVersion = evidence.provisioningCoordinatorVersion;
-      }
-      if (evidence.provisioningRequestSettledAt) {
-        next.provisioningRequestSettledAt = evidence.provisioningRequestSettledAt;
-      }
-      if (evidence.provisioningRecoveryObservedAt) {
-        next.provisioningRecoveryObservedAt = evidence.provisioningRecoveryObservedAt;
-      }
-      if (evidence.provisioningRecoveryMissingSince) {
-        next.provisioningRecoveryMissingSince = evidence.provisioningRecoveryMissingSince;
-      }
-      next.releaseDeletesServer = true;
-      next.provisioningResourceMayExist = true;
-      next.provisioningFailureRetryable = true;
-    }
-    if (input.cleanupClaim) {
-      next.releaseDeletesServer = true;
-      next.cleanupStartedAt = input.cleanupClaim.startedAt;
-      next.cleanupClaimExpiresAt = input.cleanupClaim.expiresAt;
-    }
-    if (input.finalize) {
-      clearProvisioningRecoveryMetadata(next);
-      delete next.providerKeyCleanupPending;
-      delete next.providerKeyCleanupID;
-    }
-    await this.storage.put(leaseKey(next.id), next);
-    return next;
   }
 
   async retainUnresolvedLease(
     lease: LeaseRecord,
     input: UnresolvedLeaseInput,
   ): Promise<LeaseRecord> {
-    await this.assertTransition(lease, (probe) => {
-      retainUnresolvedProviderResource(probe, input.message, input.at);
-      return probe;
-    });
-    retainUnresolvedProviderResource(lease, input.message, input.at);
-    await this.storage.put(leaseKey(lease.id), lease);
-    return lease;
+    return this.transition(
+      lease,
+      (probe) => {
+        retainUnresolvedProviderResource(probe, input.message, input.at);
+        return probe;
+      },
+      () => {
+        retainUnresolvedProviderResource(lease, input.message, input.at);
+        return lease;
+      },
+    );
   }
 
   async expireLeaseForManualCleanup(
     lease: LeaseRecord,
     input: ManualExpiryInput,
   ): Promise<LeaseRecord> {
-    await this.assertTransition(lease, (probe) => {
-      terminalizeManualProviderCleanup(probe, input.error, input.at);
-      return probe;
-    });
-    terminalizeManualProviderCleanup(lease, input.error, input.at);
-    await this.storage.put(leaseKey(lease.id), lease);
-    return lease;
+    return this.transition(
+      lease,
+      (probe) => {
+        terminalizeManualProviderCleanup(probe, input.error, input.at);
+        return probe;
+      },
+      () => {
+        terminalizeManualProviderCleanup(lease, input.error, input.at);
+        return lease;
+      },
+    );
   }
 
   async expireRegisteredLease(lease: LeaseRecord, input: LeaseExpiryInput): Promise<LeaseRecord> {
-    await this.assertTransition(lease, (probe) => expiredRegisteredLease(probe, input.at));
-    const next = expiredRegisteredLease(lease, input.at);
-    await this.storage.put(leaseKey(next.id), next, { noCache: true });
-    return next;
+    return this.transition(
+      lease,
+      (probe) => expiredRegisteredLease(probe, input.at),
+      () => expiredRegisteredLease(lease, input.at),
+      { noCache: true },
+    );
   }
 
   async failUnprovisionedExpiredLease(
     lease: LeaseRecord,
     input: LeaseExpiryInput,
   ): Promise<LeaseRecord> {
-    await this.assertTransition(lease, (probe) => failedUnprovisionedExpiryLease(probe, input.at));
-    const next = failedUnprovisionedExpiryLease(lease, input.at);
-    await this.storage.put(leaseKey(next.id), next, { noCache: true });
-    return next;
+    return this.transition(
+      lease,
+      (probe) => failedUnprovisionedExpiryLease(probe, input.at),
+      () => failedUnprovisionedExpiryLease(lease, input.at),
+      { noCache: true },
+    );
   }
 }

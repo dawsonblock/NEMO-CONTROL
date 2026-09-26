@@ -5,8 +5,9 @@ import {
   LEASE_STATES,
   clearProvisioningRecoveryMetadata,
   finalizedReleasedLease,
+  isIrreversiblyEnded,
+  isRecoverableLeaseFailure,
   isRegisteredLease,
-  isTerminalLeaseState,
   leaseCleanupIsUnresolved,
   leaseHeartbeatStateError,
   leaseIsLive,
@@ -59,18 +60,19 @@ const serverFixture = (overrides: Partial<ProviderMachine> = {}): ProviderMachin
   }) as ProviderMachine;
 
 describe("lease state predicates", () => {
-  it("classifies every state as live or terminal exactly once", () => {
+  it("separates live, recoverable-failure, and irreversibly-ended states", () => {
     const rows = LEASE_STATES.map((state) => ({
       state,
       live: leaseIsLive(leaseFixture({ state })),
-      terminal: isTerminalLeaseState(state),
+      recoverable: isRecoverableLeaseFailure(state),
+      ended: isIrreversiblyEnded(state),
     }));
     expect(rows).toEqual([
-      { state: "provisioning", live: true, terminal: false },
-      { state: "active", live: true, terminal: false },
-      { state: "released", live: false, terminal: true },
-      { state: "expired", live: false, terminal: true },
-      { state: "failed", live: false, terminal: true },
+      { state: "provisioning", live: true, recoverable: false, ended: false },
+      { state: "active", live: true, recoverable: false, ended: false },
+      { state: "released", live: false, recoverable: false, ended: true },
+      { state: "expired", live: false, recoverable: false, ended: true },
+      { state: "failed", live: false, recoverable: true, ended: false },
     ]);
   });
 

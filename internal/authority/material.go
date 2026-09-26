@@ -25,21 +25,57 @@ var ErrGrantMaterialUnverified = errors.New("grant material could not be verifie
 // BROADEN authority — corrupted security metadata must deny instead.
 
 // decodeCapabilitiesJSON decodes a stored capability list strictly.
+//
+// The issuer always writes a canonical encoding (`json.Marshal`), so the
+// stored text must equal the canonical re-encoding of what it decodes
+// to. Blank, whitespace, and non-canonical text are unverifiable, and a
+// decode failure must never become an empty list — an empty capability
+// list is the wildcard, so a permissive decode would BROADEN authority.
+//
+// `null` remains valid: it is how `json.Marshal` encodes an empty list
+// (the column default is `[]`). Distinguishing an issued wildcard from
+// material corrupted into `null` is impossible under that convention;
+// removing the convention is a compatibility-breaking change.
 func decodeCapabilitiesJSON(raw string) ([]string, error) {
 	if strings.TrimSpace(raw) == "" {
-		return nil, nil
+		return nil, fmt.Errorf("capabilities: empty material")
 	}
 	var caps []string
 	if err := json.Unmarshal([]byte(raw), &caps); err != nil {
 		return nil, fmt.Errorf("capabilities: %w", err)
 	}
+	canonical, err := json.Marshal(caps)
+	if err != nil || string(canonical) != raw {
+		return nil, fmt.Errorf("capabilities: %q is not the canonical encoding of its value", raw)
+	}
 	return caps, nil
 }
 
-// decodeConstraintsJSON decodes a stored constraint map strictly.
+// decodeConstraintsJSON decodes a stored constraint map strictly, under
+// the same canonical-encoding rule: a nil map is unconstrained, so a
+// permissive decode would broaden authority.
 func decodeConstraintsJSON(raw string) (map[string][]string, error) {
 	if strings.TrimSpace(raw) == "" {
-		return nil, nil
+		return nil, fmt.Errorf("constraints: empty material")
+	}
+	var constraints map[string][]string
+	if err := json.Unmarshal([]byte(raw), &constraints); err != nil {
+		return nil, fmt.Errorf("constraints: %w", err)
+	}
+	canonical, err := json.Marshal(constraints)
+	if err != nil || string(canonical) != raw {
+		return nil, fmt.Errorf("constraints: %q is not the canonical encoding of its value", raw)
+	}
+	return constraints, nil
+}
+
+// decodeJSONBConstraints decodes PostgreSQL's jsonb text output, which is
+// NOT canonical (it contains spaces), so the canonical-encoding rule
+// cannot apply. Blank and malformed text are still errors, and the
+// column type already prevents them from being stored.
+func decodeJSONBConstraints(raw string) (map[string][]string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, fmt.Errorf("constraints: empty material")
 	}
 	var constraints map[string][]string
 	if err := json.Unmarshal([]byte(raw), &constraints); err != nil {
@@ -90,7 +126,7 @@ func decodePostgresGrantMaterial(capsRaw, constraintsRaw []byte) ([]string, map[
 	if err != nil {
 		return nil, nil, err
 	}
-	constraints, err := decodeConstraintsJSON(string(constraintsRaw))
+	constraints, err := decodeJSONBConstraints(string(constraintsRaw))
 	if err != nil {
 		return nil, nil, err
 	}

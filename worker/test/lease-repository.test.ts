@@ -8,7 +8,6 @@ import {
   leaseKey,
 } from "../src/lease-repository";
 import { orgKeyForLabel } from "../src/org-identity";
-import { providerKeyForLease } from "../src/provider-key";
 import type { LeaseRecord, ProviderMachine } from "../src/types";
 
 const acme = orgKeyForLabel("acme");
@@ -45,13 +44,28 @@ const serverFixture = (overrides: Partial<ProviderMachine> = {}): ProviderMachin
 
 class MemoryStorage {
   readonly map = new Map<string, unknown>();
-
+  /** Serializes transactions the way the durable-object storage does. */
+  private tail: Promise<unknown> = Promise.resolve();
   async get<T>(key: string): Promise<T | undefined> {
     return this.map.get(key) as T | undefined;
   }
 
   async put<T>(key: string, value: T): Promise<void> {
     this.map.set(key, value);
+  }
+
+  async transaction<T>(closure: (txn: MemoryStorage) => Promise<T>): Promise<T> {
+    const predecessor = this.tail;
+    let release!: () => void;
+    this.tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await predecessor;
+    try {
+      return await closure(this);
+    } finally {
+      release();
+    }
   }
 }
 
@@ -280,5 +294,51 @@ describe("lease transition validation", () => {
     await expect(
       repository.activateLease(leaseFixture(), { at: "2026-09-24T00:05:00.000Z" }),
     ).rejects.toThrow(LeaseTransitionRefused);
+  });
+});
+
+// TestLeaseTransitionSerialization is the adversarial case: writer A
+// pauses inside its transaction after reading; writer B submits a
+// transition from the same stale view; A commits; B must be REFUSED
+// rather than overwrite A's committed transition. Before the repository
+// owned its own transaction, B could read before A's write and land after
+// it — a silent lost update.
+describe("lease transition serialization", () => {
+  it("refuses a stale writer instead of overwriting a committed transition", async () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFor(storage);
+    const record = leaseFixture({ state: "provisioning" });
+    storage.map.set(leaseKey(record.id), record);
+
+    const writerA = structuredClone(record);
+    const writerB = structuredClone(record);
+
+    let releaseRead!: () => void;
+    const readObserved = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    let unblockRead!: () => void;
+    const readBlocked = new Promise<void>((resolve) => {
+      unblockRead = resolve;
+    });
+    repository.afterTransactionRead = async () => {
+      releaseRead();
+      await readBlocked;
+    };
+
+    const a = repository.activateLease(writerA, { at: "2026-09-24T00:05:00.000Z" });
+    await readObserved;
+    const b = repository.releaseLease(writerB, { deleteServer: true });
+    // Let A's transaction finish; B's is serialized behind it.
+    unblockRead();
+
+    const activated = await a;
+    expect(activated.state).toBe("active");
+    await expect(b).rejects.toThrow(LeaseTransitionRefused);
+
+    // A's transition survived: B did not overwrite it.
+    const stored = await repository.loadLease(record.id);
+    expect(stored?.state).toBe("active");
+    expect(stored?.updatedAt).toBe("2026-09-24T00:05:00.000Z");
   });
 });

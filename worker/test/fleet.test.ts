@@ -44654,7 +44654,9 @@ describe("synthetic acknowledgement reliability", () => {
         // validate the caller's expectation (incarnation, state, legal
         // target), so each bound carries exactly one extra read.
         expect.soft(get.mock.calls.length).toBeLessThanOrEqual(7);
-        expect(put).toHaveBeenCalledTimes(1);
+        // The release now persists inside a storage transaction, so the
+        // write is observed through the storage hook rather than the
+        // top-level put spy; exactly one lease write must still happen.
         expect(observedGet.mock.calls.length).toBeLessThanOrEqual(10);
         expect(observedPut.mock.calls.filter(([key]) => key.startsWith("lease:"))).toHaveLength(1);
         expect(observedPut).toHaveBeenCalledTimes(2);

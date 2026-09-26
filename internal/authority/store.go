@@ -391,7 +391,7 @@ func (s *Store) Resolve(ctx context.Context, grantID string, principal string) (
 		s.metrics.resolveDenied.Add(1)
 		return nil, fmt.Errorf("%w: grant %s generation %d: %v", ErrGrantMaterialUnverified, g.ID, g.Generation, err)
 	}
-	constraintMap, err := decodeConstraintsJSON(string(constraints))
+	constraintMap, err := decodeJSONBConstraints(string(constraints))
 	if err != nil {
 		s.metrics.resolveDenied.Add(1)
 		return nil, fmt.Errorf("%w: grant %s generation %d: %v", ErrGrantMaterialUnverified, g.ID, g.Generation, err)

@@ -60,6 +60,39 @@ func TestSQLiteResolveFailsClosedOnUnverifiableMaterial(t *testing.T) {
 				mustExec(t, db, `UPDATE authority_grants SET grant_digest = '' WHERE grant_id = ?`, grantID)
 			},
 		},
+		{
+			name: "blank capabilities",
+			corrupt: func(t *testing.T, db *sql.DB, grantID string) {
+				mustExec(t, db, `UPDATE authority_grants SET capabilities = '' WHERE grant_id = ?`, grantID)
+			},
+		},
+		{
+			name: "whitespace capabilities",
+			corrupt: func(t *testing.T, db *sql.DB, grantID string) {
+				mustExec(t, db, `UPDATE authority_grants SET capabilities = '   ' WHERE grant_id = ?`, grantID)
+			},
+		},
+		{
+			name: "blank constraints",
+			corrupt: func(t *testing.T, db *sql.DB, grantID string) {
+				mustExec(t, db, `UPDATE authority_grants SET constraints = '' WHERE grant_id = ?`, grantID)
+			},
+		},
+		{
+			name: "non-canonical capabilities",
+			corrupt: func(t *testing.T, db *sql.DB, grantID string) {
+				mustExec(t, db, `UPDATE authority_grants SET capabilities = '[ "cap.a" ]' WHERE grant_id = ?`, grantID)
+			},
+		},
+		{
+			// `null` is how the issuer encodes an empty (wildcard) list, so
+			// the decoder accepts it — the digest is what catches material
+			// rewritten to null without a reissue.
+			name: "capabilities rewritten to null",
+			corrupt: func(t *testing.T, db *sql.DB, grantID string) {
+				mustExec(t, db, `UPDATE authority_grants SET capabilities = 'null' WHERE grant_id = ?`, grantID)
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -162,5 +195,96 @@ func TestSQLiteDigestMigrationsAbortOnUnverifiableMaterial(t *testing.T) {
 				t.Fatalf("error = %v, want it to wrap ErrGrantMaterialUnverified", err)
 			}
 		})
+	}
+}
+
+// TestSQLiteMigrationRefusesBroadeningRepresentations is the migration
+// half of the authority fail-open regression: blank, whitespace, and
+// non-canonical material must ABORT the digest migrations rather than be
+// minted into a cryptographically verified wildcard grant.
+func TestSQLiteMigrationRefusesBroadeningRepresentations(t *testing.T) {
+	ctx := context.Background()
+	representations := []struct {
+		name  string
+		value string
+	}{
+		{"blank", `''`},
+		{"whitespace", `'   '`},
+		{"non-canonical array", `'[ "cap.a" ]'`},
+		{"non-canonical object", `'{ "repo": [ "acme/one" ] }'`},
+	}
+	for _, representation := range representations {
+		t.Run(representation.name, func(t *testing.T) {
+			db := openSQLite(t)
+			store, err := NewSQLiteStore(db)
+			if err != nil {
+				t.Fatalf("NewSQLiteStore: %v", err)
+			}
+			if _, err := store.IssueGrantWithConstraints(ctx, "g1", "alice",
+				[]string{"cap.a"}, map[string][]string{"repo": {"acme/one"}}, time.Now().Add(time.Hour)); err != nil {
+				t.Fatalf("issue grant: %v", err)
+			}
+			mustExec(t, db,
+				`UPDATE authority_grants SET capabilities = `+representation.value+`, constraints = `+representation.value+`, grant_digest = '' WHERE grant_id = ?`,
+				"g1")
+
+			// An in-memory SQLite database is per-connection, so pin one
+			// connection for the migrations and the readback.
+			conn, err := db.Conn(ctx)
+			if err != nil {
+				t.Fatalf("pin connection: %v", err)
+			}
+			defer conn.Close()
+			tx, err := conn.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatalf("begin: %v", err)
+			}
+			if err := recomputeSQLiteGrantDigests(ctx, tx); err == nil {
+				t.Fatal("recompute must abort on broadening material")
+			}
+			if err := backfillSQLiteGrantDigests(ctx, tx); err == nil {
+				t.Fatal("backfill must abort on broadening material")
+			}
+			if err := tx.Rollback(); err != nil {
+				t.Fatalf("rollback: %v", err)
+			}
+			// Nothing was minted: the row still has no digest.
+			var digest string
+			if err := conn.QueryRowContext(ctx,
+				`SELECT grant_digest FROM authority_grants WHERE grant_id = ?`, "g1").Scan(&digest); err != nil {
+				t.Fatalf("read digest: %v", err)
+			}
+			if digest != "" {
+				t.Fatalf("migration minted a digest (%q) for unverifiable material", digest)
+			}
+		})
+	}
+}
+
+// TestSQLiteWildcardGrantStillResolves proves the strictness does not
+// break a legitimately issued wildcard: an empty capability list is
+// stored as `null` (or `[]`) by the issuer and resolves with a matching
+// digest.
+func TestSQLiteWildcardGrantStillResolves(t *testing.T) {
+	ctx := context.Background()
+	for _, capabilities := range [][]string{nil, {}} {
+		db := openSQLite(t)
+		store, err := NewSQLiteStore(db)
+		if err != nil {
+			t.Fatalf("NewSQLiteStore: %v", err)
+		}
+		if _, err := store.IssueGrant(ctx, "g-wild", "alice", capabilities, time.Now().Add(time.Hour)); err != nil {
+			t.Fatalf("issue wildcard grant: %v", err)
+		}
+		resolved, err := store.Resolve(ctx, "g-wild", "alice")
+		if err != nil {
+			t.Fatalf("wildcard grant must resolve: %v", err)
+		}
+		if resolved == nil || !resolved.HasCapability("anything.at.all") {
+			t.Fatalf("wildcard grant must permit any capability: %+v", resolved)
+		}
+		if !capability.VerifyGrantDigest(resolved) {
+			t.Fatal("wildcard grant digest must verify")
+		}
 	}
 }
