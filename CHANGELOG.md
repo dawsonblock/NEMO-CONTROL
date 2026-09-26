@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Hardening — the ready pool has a transactional repository
+
+- Coordinator: pool persistence moved behind `worker/src/ready-pool-repository.ts`, built transactionally from the start rather than as a read/validate/write shape. Every transition reloads the entry, verifies the caller's expectation (same incarnation, same state, and a resulting state the lifecycle defines), applies the named transition, and persists inside one storage transaction. A stale writer is refused with `ReadyPoolTransitionRefused`.
+- The duplicate-provision invariant is now enforced where it belongs: registration refuses when the lease is borrowed or quarantined in **either** namespace, inside the transaction, so a racing register cannot create a second entry for the same lease.
+- Adversarial races are covered by tests: borrow vs retire, borrow vs quarantine, return vs eviction, a paused writer inside its transaction, a replaced incarnation, and the duplicate-provision refusal across both namespaces.
+- A real defect was caught by the *behavioral* pool tests rather than by the rules matrix: `quarantined → draining` is legal — draining is the documented way out of quarantine — and the table (and its matrix test, derived from the same incomplete source) both said otherwise. The table now allows it, with the reason recorded at the transition.
+- The return input is named `result`, matching the route's own vocabulary, so the state-ownership guard does not mistake a transition argument for a record construction.
+
 ### Hardening — durable terminal attempts own the finish log
 
 - Coordinator: terminalization is now staged through a durable attempt record with an EXPLICIT state machine — `reserved → log_written → consumed` — instead of inferring progress from which artifacts happen to exist. Transaction A reserves the attempt and its finish-log key; the immutable bytes are written outside the transaction; a transaction records `log_written` with the content digest; transaction B verifies the bytes against that digest and then commits the terminal run record, its event, and the attempt's consumption **atomically**.

@@ -54,7 +54,9 @@ export function isLegalReadyPoolTransition(from: ReadyPoolState, to: ReadyPoolSt
     case "draining":
       return to === "quarantined" || to === "stale";
     case "quarantined":
-      return to === "stale";
+      // A quarantined entry must be drained or released: draining it is the
+      // documented way out of quarantine, so it is a legal transition.
+      return to === "draining" || to === "stale";
     default:
       return false;
   }

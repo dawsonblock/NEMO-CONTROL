@@ -356,15 +356,17 @@ import {
 } from "./provider-reconciliation";
 import {
   INITIAL_READY_POOL_STATE,
-  borrowedReadyPoolEntry,
   classifyReadyPoolBorrow,
-  drainedReadyPoolEntry,
-  heartbeatedReadyPoolEntry,
-  quarantinedReadyPoolEntry,
   readyPoolBorrowDeadline,
-  returnedReadyPoolEntry,
-  staleReadyPoolEntry,
 } from "./ready-pool-lifecycle";
+import {
+  DurableObjectReadyPoolRepository,
+  ReadyPoolTransitionRefused,
+  readyPoolKey,
+  readyPoolPrefix,
+  typedReadyPoolPrefix,
+  type ReadyPoolRepository,
+} from "./ready-pool-repository";
 import {
   INITIAL_RUN_PHASE,
   INITIAL_RUN_STATE,
@@ -555,11 +557,9 @@ const providerReconciliationCandidatePrefix = "provider-reconciliation:";
 const providerReconciliationCircuitPrefix = "provider-reconciliation-circuit:";
 const awsIngressReconcileRecordKey = "aws-ingress-reconcile:pending";
 const azureDeferredCleanupPrefix = "azure-cleanup:";
-const readyPoolPrefix = "ready-pool:";
 const readyPoolDesiredPrefix = "ready-pool-desired:";
 const readyPoolFillClaimPrefix = "ready-pool-fill-claim:";
 const readyPoolCountersPrefix = "ready-pool-counters:";
-const typedReadyPoolPrefix = "typed-ready-pool-v1:";
 const typedReadyPoolDesiredPrefix = "typed-ready-pool-v1-desired:";
 const typedReadyPoolFillClaimPrefix = "typed-ready-pool-v1-fill-claim:";
 const typedReadyPoolCountersPrefix = "typed-ready-pool-v1-counters:";
@@ -1201,6 +1201,7 @@ export class FleetCoordinator {
   private readonly webVNCCredentialHandoffs: WebVNCCredentialHandoffs;
   private readonly leaseProvisioning: LeaseProvisioningController;
   private readonly leaseRepository: LeaseRepository;
+  private readonly readyPoolRepository: ReadyPoolRepository;
   private readonly runLifecycle: RunLifecycleService;
   private maintenanceRun: Promise<void> | undefined;
   private maintenanceFollowup: { grantVersion?: string; preserve: boolean } | undefined;
@@ -1219,6 +1220,9 @@ export class FleetCoordinator {
     // Lease lifecycle: the router never assigns a lease state — every
     // transition goes through a semantic repository operation.
     this.leaseRepository = new DurableObjectLeaseRepository(state.storage);
+    // Ready pool: transitions go through the pool repository, which owns
+    // the reload/validate/persist transaction.
+    this.readyPoolRepository = new DurableObjectReadyPoolRepository(state.storage);
     this.leaseProvisioning = new LeaseProvisioningController(
       state,
       env,
@@ -13101,7 +13105,12 @@ export class FleetCoordinator {
             .filter((existing) => existing.key !== key || Boolean(existing.identity) !== typed)
             .map((existing) => this.deleteReadyPoolEntry(existing, Boolean(existing.identity))),
         );
-        await this.putReadyPoolEntry(entry, typed);
+        try {
+          await this.readyPoolRepository.registerEntry(entry, typed);
+        } catch (error) {
+          if (!(error instanceof ReadyPoolTransitionRefused)) throw error;
+          return json({ error: "lease_pool_busy", message: error.message }, { status: 409 });
+        }
         if (fillClaim) {
           await this.state.storage.delete(readyPoolFillClaimKey(fillClaim.token, typed));
           await this.incrementReadyPoolCounters(request, key, { fillClaimsCompleted: 1 }, typed);
@@ -13197,20 +13206,21 @@ export class FleetCoordinator {
         }
         const { entry, lease } = first;
         const now = new Date(nowMs).toISOString();
-        const borrowed = borrowedReadyPoolEntry(entry, {
-          owner: requestOwner(request),
-          token: crypto.randomUUID(),
-          now,
-          nowMs,
-          heartbeat: input.heartbeat === true,
-          expiresAt: lease.expiresAt,
-        });
-        if (input.heartbeat !== true) {
-          delete borrowed.borrowHeartbeatRequired;
-          delete borrowed.borrowHeartbeatAt;
-          delete borrowed.borrowExpiresAt;
+        let borrowed: ReadyPoolEntry;
+        try {
+          borrowed = await this.readyPoolRepository.borrowEntry(entry, {
+            typed,
+            owner: requestOwner(request),
+            token: crypto.randomUUID(),
+            now,
+            nowMs,
+            heartbeat: input.heartbeat === true,
+            leaseExpiresAt: lease.expiresAt,
+          });
+        } catch (error) {
+          if (!(error instanceof ReadyPoolTransitionRefused)) throw error;
+          return json({ error: "no_ready_lease", message: error.message }, { status: 409 });
         }
-        await this.putReadyPoolEntry(borrowed, typed);
         await this.incrementReadyPoolCounters(request, key, { warmHits: 1 }, typed);
         await this.scheduleAlarm();
         return json({
@@ -13284,12 +13294,12 @@ export class FleetCoordinator {
           );
         }
         const now = new Date(nowMs).toISOString();
-        const updated = heartbeatedReadyPoolEntry(current, {
+        const updated = await this.readyPoolRepository.heartbeatBorrow(current, {
+          typed,
           now,
           nowMs,
           leaseExpiresAt: lease?.expiresAt,
         });
-        await this.putReadyPoolEntry(updated, typed);
         await this.incrementReadyPoolCounters(request, key, { borrowHeartbeats: 1 }, typed);
         await this.scheduleAlarm();
         return json({ entry: publicReadyPoolEntry(redactReadyPoolEntry(updated)) });
@@ -13652,8 +13662,13 @@ export class FleetCoordinator {
             { status: 403 },
           );
         }
-        const drained = this.nextReturnedReadyPoolEntry(current, lease, "draining", input.reason);
-        await this.putReadyPoolEntry(drained, typed);
+        const drained = await this.readyPoolRepository.returnEntry(current, {
+          typed,
+          result: "draining",
+          reason: input.reason,
+          now: new Date().toISOString(),
+          leaseExpiresAt: lease?.expiresAt,
+        });
         let returnedLease = lease;
         if (lease && lease.state === "active") {
           returnedLease = await this.releaseResolvedLease(lease, {
@@ -13672,35 +13687,31 @@ export class FleetCoordinator {
         return json(returned);
       }
       if (!lease || lease.state !== "active" || Date.parse(lease.expiresAt) <= Date.now()) {
-        const stale = this.nextReturnedReadyPoolEntry(current, lease, "stale", input.reason);
-        await this.putReadyPoolEntry(stale, typed);
+        const stale = await this.readyPoolRepository.returnEntry(current, {
+          typed,
+          result: "stale",
+          reason: input.reason,
+          now: new Date().toISOString(),
+          leaseExpiresAt: lease?.expiresAt,
+        });
         await this.state.runExclusive(() => this.scheduleAlarm());
         return json({
           entry: publicReadyPoolEntry(stale),
           lease: lease ? publicLeaseRecord(lease) : undefined,
         });
       }
-      const returned = this.nextReturnedReadyPoolEntry(current, lease, "ready", input.reason);
-      await this.putReadyPoolEntry(returned, typed);
+      const returned = await this.readyPoolRepository.returnEntry(current, {
+        typed,
+        result: "ready",
+        reason: input.reason,
+        now: new Date().toISOString(),
+        leaseExpiresAt: lease?.expiresAt,
+      });
       await this.state.runExclusive(() => this.scheduleAlarm());
       return json({
         entry: publicReadyPoolEntry(returned),
         lease: publicLeaseRecord(lease),
       });
-    });
-  }
-
-  private nextReturnedReadyPoolEntry(
-    current: ReadyPoolEntry,
-    lease: LeaseRecord | undefined,
-    state: ReadyPoolEntry["state"],
-    reason?: string,
-  ): ReadyPoolEntry {
-    return returnedReadyPoolEntry(current, {
-      state,
-      reason: nonSecretString(reason),
-      now: new Date().toISOString(),
-      leaseExpiresAt: lease?.expiresAt,
     });
   }
 
@@ -13758,10 +13769,15 @@ export class FleetCoordinator {
         !(entry.state === "draining" && providerCleanupPending)
       ) {
         // oxlint-disable-next-line eslint/no-await-in-loop -- ordered writes prevent stale maintenance from racing a newer entry transition.
-        await this.putReadyPoolEntry(
-          staleReadyPoolEntry(entry, new Date(nowMs).toISOString()),
-          typed,
-        );
+        try {
+          await this.readyPoolRepository.retireEntry(entry, {
+            typed,
+            kind: "stale",
+            at: new Date(nowMs).toISOString(),
+          });
+        } catch (error) {
+          if (!(error instanceof ReadyPoolTransitionRefused)) throw error;
+        }
         continue;
       }
       if (
@@ -13812,10 +13828,16 @@ export class FleetCoordinator {
     nowMs: number,
     typed = false,
   ): Promise<void> {
-    await this.putReadyPoolEntry(
-      quarantinedReadyPoolEntry(entry, { reason, at: new Date(nowMs).toISOString() }),
-      typed,
-    );
+    try {
+      await this.readyPoolRepository.retireEntry(entry, {
+        typed,
+        kind: "quarantined",
+        reason,
+        at: new Date(nowMs).toISOString(),
+      });
+    } catch (error) {
+      if (!(error instanceof ReadyPoolTransitionRefused)) throw error;
+    }
     await this.incrementReadyPoolCountersForScope(
       entry.owner,
       entry.org,
@@ -13916,7 +13938,15 @@ export class FleetCoordinator {
     typed: boolean,
   ): Promise<void> {
     if (entry.state === "draining") return;
-    await this.putReadyPoolEntry(drainedReadyPoolEntry(entry, new Date().toISOString()), typed);
+    try {
+      await this.readyPoolRepository.retireEntry(entry, {
+        typed,
+        kind: "draining",
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      if (!(error instanceof ReadyPoolTransitionRefused)) throw error;
+    }
   }
 
   private async listLeases(request: Request): Promise<Response> {
@@ -19810,10 +19840,6 @@ function readyPoolFieldMatches(
   }
   const got = exact ? (stored ?? "") : nonSecretString(stored);
   return got === want || (allowMissing && got === "");
-}
-
-function readyPoolKey(key: string, leaseID: string, typed = false): string {
-  return `${typed ? typedReadyPoolPrefix : readyPoolPrefix}${key}:${leaseID}`;
 }
 
 function readyPoolLegacyDesiredKey(

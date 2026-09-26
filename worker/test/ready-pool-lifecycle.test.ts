@@ -83,7 +83,7 @@ describe("ready pool state vocabulary", () => {
       ready: ["busy", "draining", "quarantined", "stale"],
       busy: ["ready", "draining", "quarantined", "stale"],
       draining: ["quarantined", "stale"],
-      quarantined: ["stale"],
+      quarantined: ["draining", "stale"],
       stale: [],
     };
     const rows = READY_POOL_STATES.flatMap((from) =>
