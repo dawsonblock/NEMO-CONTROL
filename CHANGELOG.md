@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.53.0 - 2026-09-26
 
 ### Hardening — adversarial persistence qualification
 
