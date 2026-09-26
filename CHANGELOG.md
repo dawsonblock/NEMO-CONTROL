@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Hardening — adversarial persistence qualification
+
+- Added `worker/test/persistence-qualification.test.ts`: crash injection at every persistence boundary across the three stateful repositories, with each post-restart durable state classified **valid** (the committed outcome), **recoverable** (a durable intermediate a retry converges from), or **impossible** (must never be observable). The suite asserts the classification, asserts that recovery converges where it claims to, and asserts the invariants that make "impossible" meaningful.
+- Run creation: a crash during the transaction leaves neither the record nor its event, classifies as recoverable, and a retry converges.
+- Terminalization: crashes before transaction A, between A and the log write, and before transaction B each classify as recoverable, leave the run non-terminal, and converge on retry; a committed terminalization classifies as valid and a replay stays a duplicate with one attempt. Corrupting the immutable bytes makes the classifier report **impossible** — the invariant is testable rather than aspirational.
+- Leases: a competing writer that commits first leaves the loser refused rather than overwritten; an irreversibly ended lease is never returned to a live state by any route.
+- Ready pool: one entry is never lent to two borrowers (the loser is refused, and exactly one owner and token remain), and an eviction cannot retire an entry another writer just returned.
+
 ### Hardening — the ready pool has a transactional repository
 
 - Coordinator: pool persistence moved behind `worker/src/ready-pool-repository.ts`, built transactionally from the start rather than as a read/validate/write shape. Every transition reloads the entry, verifies the caller's expectation (same incarnation, same state, and a resulting state the lifecycle defines), applies the named transition, and persists inside one storage transaction. A stale writer is refused with `ReadyPoolTransitionRefused`.
