@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Hardening — durable terminal attempts own the finish log
+
+- Coordinator: terminalization is now staged through a durable attempt record with an EXPLICIT state machine — `reserved → log_written → consumed` — instead of inferring progress from which artifacts happen to exist. Transaction A reserves the attempt and its finish-log key; the immutable bytes are written outside the transaction; a transaction records `log_written` with the content digest; transaction B verifies the bytes against that digest and then commits the terminal run record, its event, and the attempt's consumption **atomically**.
+- The invariant this makes checkable: a terminal run references a finish log only if the immutable bytes exist and their digest matches the durable attempt, and an uncommitted attempt never makes the run appear terminal. The tests assert exactly that on failure — the run stays `running` and references no log.
+- Repeating a finish converges: the attempt key is derived from (run, fingerprint), so a retry reuses the same attempt and the same log key rather than creating a second one, and a repeated finish after commit returns `duplicate` with one attempt on record.
+- A sweeper retires provably abandoned attempts by age. It never removes a log the run references — which is exactly what a committed terminal run does — so no live finish log can be swept; abandoned attempts and their bytes are removed together.
+- Crash boundaries covered by tests: before transaction A, after A (reserved), after the complete log write, before transaction B (log_written), after B (consumed), and a corrupted-bytes case where the digest check refuses to commit. The three fleet tests that encoded the old "delete the log on failure" behavior were updated to the staging semantics, including the terminal transaction now committing three records atomically.
+
 ### Hardening — run creation is atomic, and two claims are stated precisely
 
 - Coordinator: run creation is now ONE storage transaction — the run record, its `run.started` event, and the sequence metadata either all exist or none do. Before, the record, event, and counter were three separate writes, so a crash could leave a partially initialized audit record. The regression test fails the transaction and asserts that neither the record nor an orphan event survives.

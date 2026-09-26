@@ -267,6 +267,12 @@ export interface RunRepository {
   commitTerminalRun(input: TerminalRunCommitInput): Promise<RunCommitResult>;
   /** Remove a terminal run and everything it owns. */
   deleteTerminalRun(runID: string, cutoff: number): Promise<void>;
+  /**
+   * Remove terminalization attempts that are provably abandoned: an
+   * attempt whose log the run does not reference, older than the cutoff.
+   * A committed terminal run's log is never swept.
+   */
+  sweepTerminalAttempts(cutoff: number): Promise<number>;
 }
 
 /**
@@ -305,4 +311,60 @@ export class RunLifecycleService {
   async pruneTerminalRun(runID: string, cutoff: number): Promise<void> {
     return this.repository.deleteTerminalRun(runID, cutoff);
   }
+
+  /** Retire terminalization attempts that are provably abandoned. */
+  async sweepTerminalAttempts(cutoff: number): Promise<number> {
+    return this.repository.sweepTerminalAttempts(cutoff);
+  }
+}
+
+// ─── Terminal attempts (finish-log ownership) ────────────────────────
+
+/**
+ * The progress of one terminalization attempt, tracked EXPLICITLY rather
+ * than inferred from which artifacts happen to exist:
+ *
+ *   reserved     — the attempt owns a finish-log key, no bytes promised yet
+ *   log_written  — the immutable finish-log bytes exist and their digest
+ *                  is recorded on the attempt
+ *   consumed     — the terminal run record references this log; the
+ *                  attempt is history and may be swept
+ *
+ * The invariant this exists to make checkable: a terminal run may
+ * reference a finish log only if the immutable bytes exist and their
+ * digest matches the durable attempt, and an uncommitted attempt may
+ * never make the run appear terminal.
+ */
+export type TerminalAttemptState = "reserved" | "log_written" | "consumed";
+
+export interface TerminalAttemptRecord {
+  runID: string;
+  fingerprint: string;
+  state: TerminalAttemptState;
+  /** The finish-log key prefix this attempt reserved (immutable). */
+  logPrefix: string;
+  /** The content digest of the finish-log bytes, recorded with log_written. */
+  logDigest?: string;
+  reservedAt: string;
+  logWrittenAt?: string;
+  consumedAt?: string;
+}
+
+/** Whether the attempt has promised immutable log bytes. */
+export function terminalAttemptHasLog(attempt: TerminalAttemptRecord): boolean {
+  return attempt.state === "log_written" || attempt.state === "consumed";
+}
+
+/** Whether the attempt's log is owned by a committed terminal run. */
+export function terminalAttemptIsConsumed(attempt: TerminalAttemptRecord): boolean {
+  return attempt.state === "consumed";
+}
+
+/** The SHA-256 of a finish log's bytes, in the fingerprint's format. */
+export async function terminalLogDigest(bytes: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(bytes));
+  const hex = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  return `sha256:${hex}`;
 }

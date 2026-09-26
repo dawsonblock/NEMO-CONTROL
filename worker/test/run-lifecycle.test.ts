@@ -56,6 +56,9 @@ const commitInput = (
 class MemoryStorage implements RunRepositoryStorage {
   readonly map = new Map<string, unknown>();
   failTransactions = false;
+  /** Fail only the Nth transaction (1-based), for staged-flow crash tests. */
+  failTransactionNumber: number | undefined;
+  transactionCount = 0;
 
   async get<T>(key: string): Promise<T | undefined> {
     return this.map.get(key) as T | undefined;
@@ -80,7 +83,10 @@ class MemoryStorage implements RunRepositoryStorage {
   }
 
   async transaction<T>(closure: (txn: RunStorageView) => Promise<T>): Promise<T> {
-    if (this.failTransactions) throw new Error("storage transaction failed");
+    this.transactionCount += 1;
+    if (this.failTransactions || this.failTransactionNumber === this.transactionCount) {
+      throw new Error("storage transaction failed");
+    }
     return closure(this);
   }
 
@@ -336,5 +342,124 @@ describe("DurableObjectRunRepository", () => {
     await repository.createRunningRun(run);
     await repository.deleteTerminalRun(run.id, Date.now() + 60_000);
     expect(await storage.get(runKey(run.id))).toBeDefined();
+  });
+});
+
+// ─── Terminal attempt staging (crash boundaries) ─────────────────────
+
+const attemptPrefix = (runID: string) => `terminal-attempt:${runID}:`;
+
+describe("terminal attempt staging", () => {
+  it("reserves nothing when the attempt transaction fails", async () => {
+    const storage = new MemoryStorage();
+    const repository = new DurableObjectRunRepository(hostFor(storage));
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    storage.failTransactions = true;
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      "storage transaction failed",
+    );
+    storage.failTransactions = false;
+    // No attempt, no log, no terminal state.
+    expect((await storage.list({ prefix: attemptPrefix(run.id) })).size).toBe(0);
+    expect((await storage.get(runKey(run.id))) as RunRecord).toMatchObject({ state: "running" });
+  });
+
+  it("recovers a reserved attempt and converges on one attempt per fingerprint", async () => {
+    const storage = new MemoryStorage();
+    const repository = new DurableObjectRunRepository(hostFor(storage));
+    const run = runFixture();
+    await repository.createRunningRun(run);
+
+    // Crash after transaction A, before the log_written record: the
+    // attempt is reserved and the retry converges on it.
+    storage.failTransactionNumber = 3;
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow();
+    storage.failTransactionNumber = undefined;
+    const reserved = await storage.list<{ state: string; logPrefix: string }>({
+      prefix: attemptPrefix(run.id),
+    });
+    expect(reserved.size).toBe(1);
+    const reservedAttempt = [...reserved.values()][0]!;
+    expect(reservedAttempt.state).toBe("reserved");
+
+    // The retry converges on the SAME attempt and the same log key.
+    const committed = await repository.commitTerminalRun(commitInput(run));
+    expect(committed.kind).toBe("committed");
+    if (committed.kind !== "committed") return;
+    expect(committed.run.terminalLogPrefix).toBe(reservedAttempt.logPrefix);
+    const consumed = await storage.list<{ state: string }>({ prefix: attemptPrefix(run.id) });
+    expect(consumed.size).toBe(1);
+    expect([...consumed.values()][0]!.state).toBe("consumed");
+
+    // A repeated finish converges: duplicate, still one attempt.
+    const replay = await repository.commitTerminalRun(commitInput(run));
+    expect(replay.kind).toBe("duplicate");
+    expect((await storage.list({ prefix: attemptPrefix(run.id) })).size).toBe(1);
+  });
+
+  it("refuses to commit when the log bytes do not match the attempt digest", async () => {
+    const storage = new MemoryStorage();
+    const repository = new DurableObjectRunRepository(hostFor(storage));
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    // Crash before transaction B: the attempt is log_written and the run is
+    // still running.
+    storage.failTransactionNumber = 4;
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow();
+    storage.failTransactionNumber = undefined;
+    const attempts = await storage.list<{ state: string; logPrefix: string }>({
+      prefix: attemptPrefix(run.id),
+    });
+    const attempt = [...attempts.values()][0]!;
+    expect(attempt.state).toBe("log_written");
+    // Corrupt the immutable bytes: the commit must refuse rather than
+    // reference a log it cannot verify.
+    for (const key of [...storage.map.keys()].filter((key) => key.startsWith(attempt.logPrefix))) {
+      storage.map.set(key, "corrupted");
+    }
+    const refused = await repository.commitTerminalRun(commitInput(run));
+    expect(refused.kind).toBe("conflict");
+    expect((await storage.get(runKey(run.id))) as RunRecord).toMatchObject({ state: "running" });
+  });
+
+  it("never sweeps a live finish log, and sweeps abandoned attempts with their bytes", async () => {
+    const storage = new MemoryStorage();
+    const repository = new DurableObjectRunRepository(hostFor(storage));
+
+    // Live: a committed terminal run owns its log.
+    const live = runFixture({ id: "run-live" });
+    await repository.createRunningRun(live);
+    const committed = await repository.commitTerminalRun(commitInput(live));
+    expect(committed.kind).toBe("committed");
+    if (committed.kind !== "committed") return;
+    const livePrefix = committed.run.terminalLogPrefix!;
+
+    // Abandoned: a finish that crashed before transaction B.
+    const abandoned = runFixture({ id: "run-abandoned" });
+    await repository.createRunningRun(abandoned);
+    // Fail the abandoned run's terminal transaction (B), relative to the
+    // transactions already consumed by the live run's commit.
+    storage.failTransactionNumber = storage.transactionCount + 3;
+    await expect(repository.commitTerminalRun(commitInput(abandoned))).rejects.toThrow();
+    storage.failTransactionNumber = undefined;
+    const abandonedAttempts = await storage.list<{ logPrefix: string }>({
+      prefix: attemptPrefix(abandoned.id),
+    });
+    const abandonedPrefix = [...abandonedAttempts.values()][0]!.logPrefix;
+
+    const swept = await repository.sweepTerminalAttempts(Date.now() + 60_000);
+    expect(swept).toBe(1);
+
+    // The abandoned attempt and its bytes are gone; the live log and the
+    // live run's reference to it survive; the consumed attempt is retired.
+    expect((await storage.list({ prefix: attemptPrefix(abandoned.id) })).size).toBe(0);
+    expect((await storage.list({ prefix: abandonedPrefix })).size).toBe(0);
+    expect((await storage.get(runKey(live.id))) as RunRecord).toMatchObject({
+      state: "succeeded",
+      terminalLogPrefix: livePrefix,
+    });
+    expect((await storage.list({ prefix: livePrefix })).size).toBeGreaterThan(0);
+    expect((await storage.list({ prefix: attemptPrefix(live.id) })).size).toBe(0);
   });
 });

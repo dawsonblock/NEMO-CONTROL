@@ -41067,11 +41067,19 @@ describe("fleet run history", () => {
       state: "running",
       eventCount: 1,
     });
-    expect((await storage.list({ prefix: `runlog:${run.id}:finish:` })).size).toBe(0);
+    // The run references no finish log: an uncommitted attempt never makes
+    // the run appear terminal. The bytes stay owned by the durable attempt
+    // until the sweeper retires it.
+    expect(storage.value<RunRecord>(`run:${run.id}`)?.terminalLogPrefix).toBeUndefined();
+    const attempts = await storage.list({ prefix: `terminal-attempt:${run.id}:` });
+    expect(attempts.size).toBe(1);
+    const attempt = [...attempts.values()][0] as { state: string; logPrefix: string };
+    expect(attempt.state).toBe("log_written");
+    expect((await storage.list({ prefix: attempt.logPrefix })).size).toBeGreaterThan(0);
     expect(storage.value(`runevent:${run.id}:000000000002`)).toBeUndefined();
   });
 
-  it("rolls back terminal log when transaction fails after event write", async () => {
+  it("keeps the terminal attempt recoverable when the terminal transaction fails", async () => {
     const storage = new MemoryStorage();
     const fleet = testFleet(storage);
     const create = await fleet.fetch(
@@ -41108,10 +41116,13 @@ describe("fleet run history", () => {
       state: "running",
       eventCount: 1,
     });
-    // Terminal log was cleaned up.
-    expect((await storage.list({ prefix: `runlog:${run.id}:finish:` })).size).toBe(0);
-    // Event was not persisted.
+    // The run references no log, the event was not persisted, and the
+    // durable attempt survives for a retry (or for the sweeper to retire).
+    expect(storage.value<RunRecord>(`run:${run.id}`)?.terminalLogPrefix).toBeUndefined();
     expect(storage.value(`runevent:${run.id}:000000000002`)).toBeUndefined();
+    const attempts = await storage.list({ prefix: `terminal-attempt:${run.id}:` });
+    expect(attempts.size).toBe(1);
+    expect(([...attempts.values()][0] as { state: string }).state).toBe("log_written");
   });
 
   it("rejects duplicate terminal finish with different terminal digest", async () => {
@@ -41672,7 +41683,9 @@ describe("fleet run history", () => {
         })
       ).size,
     ).toBe(3);
-    expect(storage.transactionPutCounts.at(-1)).toBe(2);
+    // The terminal transaction commits the event, the run record, and the
+    // attempt's consumption — atomically.
+    expect(storage.transactionPutCounts.at(-1)).toBe(3);
 
     const logs = await fleet.fetch(request("GET", `/v1/runs/${run.id}/logs`));
     const logText = await logs.text();

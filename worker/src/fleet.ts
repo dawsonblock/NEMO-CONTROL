@@ -18151,10 +18151,23 @@ export class FleetCoordinator {
     } else {
       await this.state.storage.delete(runPruneCursorKey);
     }
+    await this.sweepTerminalAttempts();
   }
 
   private async deleteTerminalRun(runID: string, cutoff: number): Promise<void> {
     await this.runLifecycle.pruneTerminalRun(runID, cutoff);
+  }
+
+  /**
+   * Retire abandoned terminalization attempts alongside the run
+   * retention sweep. The repository refuses to sweep an attempt whose log
+   * a committed run references, so a live finish log can never be removed
+   * here; abandoned attempts are only removed once they age out.
+   */
+  private async sweepTerminalAttempts(): Promise<void> {
+    await this.runLifecycle.sweepTerminalAttempts(
+      Date.now() - terminalRunRetentionMs(this.env.CRABBOX_RUN_RETENTION_DAYS),
+    );
   }
 
   /**
