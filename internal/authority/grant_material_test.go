@@ -262,29 +262,49 @@ func TestSQLiteMigrationRefusesBroadeningRepresentations(t *testing.T) {
 }
 
 // TestSQLiteWildcardGrantStillResolves proves the strictness does not
-// break a legitimately issued wildcard: an empty capability list is
-// stored as `null` (or `[]`) by the issuer and resolves with a matching
-// digest.
+// break a legitimately issued wildcard, and pins BOTH stored
+// representations: json.Marshal encodes a nil slice as `null` and an
+// allocated empty slice as `[]`. Both mean "no capabilities" — the
+// wildcard — so a later cleanup that normalizes the two would silently
+// change authority semantics, and this test fails if that happens.
 func TestSQLiteWildcardGrantStillResolves(t *testing.T) {
 	ctx := context.Background()
-	for _, capabilities := range [][]string{nil, {}} {
-		db := openSQLite(t)
-		store, err := NewSQLiteStore(db)
-		if err != nil {
-			t.Fatalf("NewSQLiteStore: %v", err)
-		}
-		if _, err := store.IssueGrant(ctx, "g-wild", "alice", capabilities, time.Now().Add(time.Hour)); err != nil {
-			t.Fatalf("issue wildcard grant: %v", err)
-		}
-		resolved, err := store.Resolve(ctx, "g-wild", "alice")
-		if err != nil {
-			t.Fatalf("wildcard grant must resolve: %v", err)
-		}
-		if resolved == nil || !resolved.HasCapability("anything.at.all") {
-			t.Fatalf("wildcard grant must permit any capability: %+v", resolved)
-		}
-		if !capability.VerifyGrantDigest(resolved) {
-			t.Fatal("wildcard grant digest must verify")
-		}
+	cases := []struct {
+		name         string
+		capabilities []string
+		stored       string
+	}{
+		{"nil slice marshals to null", nil, "null"},
+		{"empty slice marshals to []", []string{}, "[]"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db := openSQLite(t)
+			store, err := NewSQLiteStore(db)
+			if err != nil {
+				t.Fatalf("NewSQLiteStore: %v", err)
+			}
+			if _, err := store.IssueGrant(ctx, "g-wild", "alice", tc.capabilities, time.Now().Add(time.Hour)); err != nil {
+				t.Fatalf("issue wildcard grant: %v", err)
+			}
+			var stored string
+			if err := db.QueryRowContext(ctx,
+				`SELECT capabilities FROM authority_grants WHERE grant_id = ?`, "g-wild").Scan(&stored); err != nil {
+				t.Fatalf("read stored capabilities: %v", err)
+			}
+			if stored != tc.stored {
+				t.Fatalf("stored capabilities = %q, want %q", stored, tc.stored)
+			}
+			resolved, err := store.Resolve(ctx, "g-wild", "alice")
+			if err != nil {
+				t.Fatalf("wildcard grant must resolve: %v", err)
+			}
+			if resolved == nil || !resolved.HasCapability("anything.at.all") {
+				t.Fatalf("wildcard grant must permit any capability: %+v", resolved)
+			}
+			if !capability.VerifyGrantDigest(resolved) {
+				t.Fatal("wildcard grant digest must verify")
+			}
+		})
 	}
 }

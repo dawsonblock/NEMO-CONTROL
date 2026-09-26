@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Hardening — run creation is atomic, and two claims are stated precisely
+
+- Coordinator: run creation is now ONE storage transaction — the run record, its `run.started` event, and the sequence metadata either all exist or none do. Before, the record, event, and counter were three separate writes, so a crash could leave a partially initialized audit record. The regression test fails the transaction and asserts that neither the record nor an orphan event survives.
+- Authority: the wildcard representation is now stated precisely in both code and tests. `json.Marshal` encodes a **nil** slice as `null` and an **allocated empty** slice as `[]`; both mean "no capabilities", which this lifecycle treats as the wildcard. The test pins both stored strings, so a future cleanup that normalizes nil and empty slices cannot silently change authority semantics.
+- Enforcement: the state-ownership guard's limitation is now phrased precisely — the native TypeScript 7 toolchain used here (the tsgo surface) does not expose the legacy JavaScript Compiler API and its type checker, which is what symbol-level enforcement would need. The earlier phrasing attributed the gap to "TypeScript 7's Node API" generally, which is not accurate: the legacy Compiler API still exists in TypeScript 6.x and earlier.
+
 ### Hardening — second audit remediation: authority representations, lease ownership, atomic transitions
 
 - Authority: the SQLite decoder now requires the stored material to be the **canonical encoding** of what it decodes to. Blank, whitespace, and non-canonical text return `ErrGrantMaterialUnverified`. Before, blank material decoded to nil — and a nil capability list is the wildcard while a nil constraint map is unconstrained — so a row with blank material and no digest could be *minted* into a cryptographically verified wildcard grant by the digest migrations. Both migrations now abort on all four broadening representations, and the tests assert that no digest was written. `null` remains valid: it is how the issuer encodes an empty list, and distinguishing it from corruption means removing the empty-means-wildcard convention, a compatibility-breaking change noted for a future release. PostgreSQL's jsonb text is not canonical, so it keeps a separate strict decoder.

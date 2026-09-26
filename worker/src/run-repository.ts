@@ -140,20 +140,23 @@ export class DurableObjectRunRepository implements RunRepository {
   }
 
   /**
-   * Persist a new running run and its `run.started` event, in the order
-   * the coordinator has always used: the running record first, then the
-   * event, then the record carrying the event counter.
+   * Create the run record, its initial event, and the sequence metadata in
+   * ONE transaction: either all of it exists or none of it does. A crash
+   * can therefore never leave a partially initialized audit record — the
+   * record without its `run.started` event, or an event whose run has no
+   * counter for it.
    */
   async createRunningRun(run: RunRecord): Promise<RunEventRecord> {
-    await this.storage.put(runKey(run.id), run);
-    const now = new Date().toISOString();
-    const seq = (run.eventCount ?? 0) + 1;
-    const event = runStartedEvent(run.id, seq, now);
-    run.eventCount = seq;
-    run.lastEventAt = now;
-    await this.storage.put(runEventKey(run.id, seq), event);
-    await this.storage.put(runKey(run.id), run);
-    return event;
+    return this.storage.transaction(async (txn) => {
+      const now = new Date().toISOString();
+      const seq = (run.eventCount ?? 0) + 1;
+      const event = runStartedEvent(run.id, seq, now);
+      run.eventCount = seq;
+      run.lastEventAt = now;
+      await txn.put(runKey(run.id), run);
+      await txn.put(runEventKey(run.id, seq), event);
+      return event;
+    });
   }
 
   /**

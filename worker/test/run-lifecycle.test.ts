@@ -193,6 +193,19 @@ const hostFor = (storage: MemoryStorage) => ({
 });
 
 describe("DurableObjectRunRepository", () => {
+  it("creates the record and its started event atomically, or not at all", async () => {
+    const storage = new MemoryStorage();
+    const repository = new DurableObjectRunRepository(hostFor(storage));
+    const run = runFixture();
+    storage.failTransactions = true;
+    await expect(repository.createRunningRun(run)).rejects.toThrow("storage transaction failed");
+    storage.failTransactions = false;
+    // A failed creation leaves nothing behind: no record, no orphan event.
+    expect(await storage.get(runKey(run.id))).toBeUndefined();
+    expect(await storage.get(runEventKey(run.id, 1))).toBeUndefined();
+    expect(run.eventCount).toBe(0);
+  });
+
   it("creates a running record and its started event", async () => {
     const storage = new MemoryStorage();
     const repository = new DurableObjectRunRepository(hostFor(storage));

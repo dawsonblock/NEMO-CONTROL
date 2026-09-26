@@ -12,14 +12,16 @@ import { describe, expect, it } from "vitest";
 // nothing. A guard that cannot fail is worse than no guard, so the
 // patterns are proven against known-bad samples before they are trusted.
 //
-// Limitation, stated honestly: this is a lexical guard, not symbol
-// resolution. TypeScript 7's Node API does not expose a type checker in
-// this toolchain, so an assignment through an alias whose record type is
-// not visible in the same file can still slip past. The stronger form —
-// an AST/lint rule that resolves the LeaseRecord/ReadyPoolEntry symbol
-// and forbids writes outside the approved modules — is the tracked
-// follow-up; until then this guard plus the allowlist below is what
-// stands between the codebase and a second owner of lifecycle state.
+// Limitation, stated precisely: this is a lexical guard, not symbol
+// resolution. The native TypeScript 7 toolchain used by this repository
+// (the tsgo surface) does not expose the legacy JavaScript Compiler API
+// and its type checker, which is what symbol-level enforcement would
+// need — so an assignment through an alias whose record type is not
+// visible in the same file can still slip past. The stronger form, an
+// AST/lint rule that resolves the LeaseRecord/ReadyPoolEntry symbol and
+// forbids writes outside the approved modules, is the tracked follow-up;
+// until then this guard plus the allowlist below is what stands between
+// the codebase and a second owner of lifecycle state.
 
 const LEASE_STATES = ["provisioning", "active", "released", "expired", "failed"] as const;
 const POOL_STATES = ["ready", "busy", "draining", "quarantined", "stale"] as const;

@@ -32,10 +32,16 @@ var ErrGrantMaterialUnverified = errors.New("grant material could not be verifie
 // decode failure must never become an empty list — an empty capability
 // list is the wildcard, so a permissive decode would BROADEN authority.
 //
-// `null` remains valid: it is how `json.Marshal` encodes an empty list
-// (the column default is `[]`). Distinguishing an issued wildcard from
-// material corrupted into `null` is impossible under that convention;
-// removing the convention is a compatibility-breaking change.
+// `null` remains valid, and the distinction is precise: `json.Marshal`
+// encodes a NIL slice as `null` and an ALLOCATED empty slice as `[]`.
+// Both mean "no capabilities", which this lifecycle treats as the
+// wildcard — so a later cleanup that normalizes nil and empty slices
+// would silently change authority semantics. The wildcard test pins both
+// stored representations for exactly that reason.
+//
+// Distinguishing an issued wildcard from material corrupted into `null`
+// is impossible under that convention; removing the convention (requiring
+// an explicit `*`) is a compatibility-breaking change.
 func decodeCapabilitiesJSON(raw string) ([]string, error) {
 	if strings.TrimSpace(raw) == "" {
 		return nil, fmt.Errorf("capabilities: empty material")
