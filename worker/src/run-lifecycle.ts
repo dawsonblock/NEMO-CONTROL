@@ -270,7 +270,10 @@ export interface RunRepository {
   /**
    * Remove terminalization attempts that are provably abandoned: an
    * attempt whose log the run does not reference, older than the cutoff.
-   * A committed terminal run's log is never swept.
+   * A committed terminal run's log is never swept, and a consumed
+   * attempt is retained until its run is deleted. The abandon decision is
+   * claimed atomically (state `retiring`) so it cannot race a concurrent
+   * terminal commit.
    */
   sweepTerminalAttempts(cutoff: number): Promise<number>;
 }
@@ -328,14 +331,23 @@ export class RunLifecycleService {
  *   log_written  — the immutable finish-log bytes exist and their digest
  *                  is recorded on the attempt
  *   consumed     — the terminal run record references this log; the
- *                  attempt is history and may be swept
+ *                  attempt is the run's durable digest anchor and is
+ *                  removed WITH the run, never swept on its own
+ *   retiring     — garbage collection has claimed the abandoned attempt;
+ *                  the terminal commit must never consume it again
  *
  * The invariant this exists to make checkable: a terminal run may
  * reference a finish log only if the immutable bytes exist and their
  * digest matches the durable attempt, and an uncommitted attempt may
  * never make the run appear terminal.
+ *
+ * A consumed attempt is deliberately NOT swept while its run exists: the
+ * run's `terminalLogPrefix` and the attempt's `logDigest` are one durable
+ * integrity unit, so removing the attempt alone would make a valid
+ * terminal run unverifiable (the persistence qualification classifies
+ * exactly that as impossible).
  */
-export type TerminalAttemptState = "reserved" | "log_written" | "consumed";
+export type TerminalAttemptState = "reserved" | "log_written" | "consumed" | "retiring";
 
 export interface TerminalAttemptRecord {
   runID: string;
@@ -358,6 +370,11 @@ export function terminalAttemptHasLog(attempt: TerminalAttemptRecord): boolean {
 /** Whether the attempt's log is owned by a committed terminal run. */
 export function terminalAttemptIsConsumed(attempt: TerminalAttemptRecord): boolean {
   return attempt.state === "consumed";
+}
+
+/** Whether garbage collection has claimed the attempt for retirement. */
+export function terminalAttemptIsRetiring(attempt: TerminalAttemptRecord): boolean {
+  return attempt.state === "retiring";
 }
 
 /** The SHA-256 of a finish log's bytes, in the fingerprint's format. */

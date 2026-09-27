@@ -14,6 +14,7 @@ import {
   runStartedEvent,
   terminalAttemptHasLog,
   terminalAttemptIsConsumed,
+  terminalAttemptIsRetiring,
   terminalLogDigest,
   terminalRunTimestamp,
   type RunCommitResult,
@@ -68,6 +69,11 @@ export function runEventKey(runID: string, seq: number): string {
 /** The durable terminalization attempt for one (run, fingerprint) pair. */
 export function terminalAttemptKey(runID: string, fingerprint: string): string {
   return `terminal-attempt:${runID}:${fingerprint}`;
+}
+
+/** Every terminalization attempt that belongs to one run. */
+export function terminalAttemptRunPrefix(runID: string): string {
+  return `terminal-attempt:${runID}:`;
 }
 
 const terminalAttemptPrefix = "terminal-attempt:";
@@ -170,16 +176,26 @@ export class DurableObjectRunRepository implements RunRepository {
    * counter for it.
    */
   async createRunningRun(run: RunRecord): Promise<RunEventRecord> {
-    return this.storage.transaction(async (txn) => {
+    const committed = await this.storage.transaction(async (txn) => {
+      // Build the persisted record from a clone, so a transaction that
+      // aborts (or retries) never leaves the caller holding a record the
+      // durable state does not reflect.
+      const next = structuredClone(run);
       const now = new Date().toISOString();
-      const seq = (run.eventCount ?? 0) + 1;
-      const event = runStartedEvent(run.id, seq, now);
-      run.eventCount = seq;
-      run.lastEventAt = now;
-      await txn.put(runKey(run.id), run);
-      await txn.put(runEventKey(run.id, seq), event);
-      return event;
+      const seq = (next.eventCount ?? 0) + 1;
+      const event = runStartedEvent(next.id, seq, now);
+      next.eventCount = seq;
+      next.lastEventAt = now;
+      await txn.put(runKey(next.id), next);
+      await txn.put(runEventKey(next.id, seq), event);
+      return { event, seq, now };
     });
+    // Publish the committed sequence back to the caller only AFTER the
+    // commit: callers that keep using their record stay in sync, while an
+    // aborted attempt leaves the caller's object untouched.
+    run.eventCount = committed.seq;
+    run.lastEventAt = committed.now;
+    return committed.event;
   }
 
   /**
@@ -211,9 +227,10 @@ export class DurableObjectRunRepository implements RunRepository {
       if (classification === "conflict") return { kind: "conflict" as const, run: current };
       const existing = await txn.get<TerminalAttemptRecord>(attemptKey);
       if (existing) {
-        if (terminalAttemptIsConsumed(existing)) {
-          // The run already consumed this attempt but no longer classifies
-          // as a duplicate: it moved on. Refuse rather than rewrite.
+        if (terminalAttemptIsConsumed(existing) || terminalAttemptIsRetiring(existing)) {
+          // Consumed: the run already used this attempt and moved on.
+          // Retiring: garbage collection owns it, and a new attempt must
+          // not reuse a log key GC is about to delete.
           return { kind: "conflict" as const, run: current };
         }
         return { kind: "reserved" as const, attempt: existing };
@@ -239,7 +256,7 @@ export class DurableObjectRunRepository implements RunRepository {
       await writeTerminalRunLog(this.storage, attempt.logPrefix, input.log.text);
       const recorded = await this.storage.transaction(async (txn) => {
         const current = await txn.get<TerminalAttemptRecord>(attemptKey);
-        if (!current || terminalAttemptIsConsumed(current)) {
+        if (!current || terminalAttemptIsConsumed(current) || terminalAttemptIsRetiring(current)) {
           return undefined;
         }
         const next: TerminalAttemptRecord = {
@@ -302,9 +319,15 @@ export class DurableObjectRunRepository implements RunRepository {
    * Sweep terminalization attempts that are provably abandoned. An
    * attempt is LIVE — never swept, and neither are its bytes — while the
    * run references its log prefix, which is exactly what a committed
-   * terminal run does. Everything else older than the cutoff is an
-   * abandoned reservation: a crash before the terminal commit, or a
-   * conflicting finish that never committed.
+   * terminal run does. A consumed attempt is the run's durable digest
+   * anchor and is removed with the run, not here.
+   *
+   * The abandon decision is a transaction of its own: it reloads the run
+   * and the attempt together and claims the attempt (state `retiring`)
+   * only if the run does not reference its log. A terminal commit that
+   * runs after the claim sees `retiring` and refuses; one that commits
+   * first makes the run reference the log, so the claim is refused. The
+   * two outcomes cannot interleave into a run pointing at deleted bytes.
    */
   async sweepTerminalAttempts(cutoff: number): Promise<number> {
     const attempts = await this.storage.list<TerminalAttemptRecord>({
@@ -312,23 +335,38 @@ export class DurableObjectRunRepository implements RunRepository {
     });
     let swept = 0;
     for (const [key, attempt] of attempts) {
-      // oxlint-disable-next-line eslint/no-await-in-loop -- each attempt is retired from its own freshly read state before the next is considered.
-      const run = await this.loadRun(attempt.runID);
-      if (run?.terminalLogPrefix === attempt.logPrefix) {
-        // Live: the run owns this log. A consumed attempt may be
-        // forgotten, but never the bytes it points at.
-        if (terminalAttemptIsConsumed(attempt)) {
-          // oxlint-disable-next-line eslint/no-await-in-loop -- a consumed attempt is forgotten one at a time.
-          await this.storage.delete(key);
-        }
+      // A consumed attempt is the run's durable digest anchor; it is
+      // removed with its run. A retiring attempt is already claimed.
+      if (terminalAttemptIsConsumed(attempt) || terminalAttemptIsRetiring(attempt)) {
         continue;
       }
       const reservedAt = Date.parse(attempt.reservedAt);
       if (!Number.isFinite(reservedAt) || reservedAt > cutoff) {
         continue;
       }
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each attempt is claimed from its own freshly read state before the next is considered.
+      const claimed = await this.storage.transaction(async (txn) => {
+        const current = await txn.get<TerminalAttemptRecord>(key);
+        if (!current || terminalAttemptIsConsumed(current) || terminalAttemptIsRetiring(current)) {
+          return undefined;
+        }
+        const run = await txn.get<RunRecord>(runKey(current.runID));
+        if (run?.terminalLogPrefix === current.logPrefix) {
+          // Live: the run owns this log. Refuse the claim, so a commit
+          // that just referenced it is never swept.
+          return undefined;
+        }
+        const next: TerminalAttemptRecord = { ...current, state: "retiring" };
+        await txn.put(key, next);
+        return next;
+      });
+      if (!claimed) {
+        continue;
+      }
+      // GC now owns the attempt: deleting its bytes can no longer race a
+      // commit, because the commit accepts only log_written attempts.
       // oxlint-disable-next-line eslint/no-await-in-loop -- the bytes are removed before the attempt that owned them.
-      await deleteStoragePrefix(this.storage, attempt.logPrefix).catch(() => undefined);
+      await deleteStoragePrefix(this.storage, claimed.logPrefix).catch(() => undefined);
       // oxlint-disable-next-line eslint/no-await-in-loop -- retire the attempt only after its bytes are gone.
       await this.storage.delete(key);
       swept += 1;
@@ -350,6 +388,10 @@ export class DurableObjectRunRepository implements RunRepository {
       await deleteStoragePrefix(this.storage, runLogChunkPrefix(runID));
       await this.storage.delete(runLogKey(runID));
       await this.storage.delete(runKey(runID));
+      // The run's digest anchor is removed with it — never before it, so a
+      // crash mid-deletion can leave an orphaned attempt but never a run
+      // that references a deleted attempt.
+      await deleteStoragePrefix(this.storage, terminalAttemptRunPrefix(runID));
     });
   }
 }
