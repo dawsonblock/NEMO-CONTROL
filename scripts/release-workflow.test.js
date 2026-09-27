@@ -292,7 +292,7 @@ test("the required Release Check lives in its own protected credential-free work
   assert.match(check, /runs-on: macos-15/);
   assert.match(check, /persist-credentials: false/);
   assert.match(check, /unset GH_TOKEN GITHUB_TOKEN ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_RUNTIME_TOKEN/);
-  assert.match(check, /goreleaser release --snapshot --clean --config \.goreleaser\.yaml/);
+  assert.match(check, /goreleaser release --snapshot --clean --single-target --config \.goreleaser\.yaml/);
   assert.doesNotMatch(check, /secrets\.|GH_TOKEN:|contents: write/);
   const codeowners = read(".github/CODEOWNERS");
   assert.match(codeowners, /^\/\.github\/workflows\/release-check\.yml @dawsonblock$/m);
