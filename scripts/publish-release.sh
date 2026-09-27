@@ -220,7 +220,12 @@ crabbox_release_asset_names "$version" | LC_ALL=C sort >"$scripts_asset_names"
 }
 git -C "$ROOT" show "$SOURCE_COMMIT:CHANGELOG.md" >"$WORK/tagged-changelog.md"
 "$ROOT/scripts/extract-release-notes.sh" "$TAG" \
-  <"$WORK/tagged-changelog.md" >"$WORK/expected-notes.md"
+  <"$WORK/tagged-changelog.md" >"$WORK/expected-section.md"
+# The canonical release body is the extracted section verbatim, or the
+# deterministic bound stub when the section exceeds GitHub's body limit.
+crabbox_release_body_from_notes \
+  "$WORK/expected-section.md" "$TAG" "$SOURCE_COMMIT" \
+  >"$WORK/expected-notes.md"
 
 # Initial trust check. This is repeated after every remote byte is re-downloaded.
 verify_protected_source initial

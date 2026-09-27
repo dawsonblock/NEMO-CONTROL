@@ -165,7 +165,13 @@ jobs:
           set -euo pipefail
           git show "$RELEASE_COMMIT:CHANGELOG.md" >"$RUNNER_TEMP/tagged-changelog.md"
           scripts/extract-release-notes.sh "$RELEASE_TAG" \
-            <"$RUNNER_TEMP/tagged-changelog.md" >"$RUNNER_TEMP/expected-notes.md"
+            <"$RUNNER_TEMP/tagged-changelog.md" >"$RUNNER_TEMP/expected-section.md"
+          # The release body is the section verbatim, or the deterministic
+          # bound stub when the section exceeds GitHub's body limit.
+          source scripts/release-config.sh
+          crabbox_release_body_from_notes \
+            "$RUNNER_TEMP/expected-section.md" "$RELEASE_TAG" "$RELEASE_COMMIT" \
+            >"$RUNNER_TEMP/expected-notes.md"
           bytes=$(wc -c <"$RUNNER_TEMP/expected-notes.md" | tr -d '[:space:]')
           sha256=$(shasum -a 256 "$RUNNER_TEMP/expected-notes.md" | awk '{print $1}')
           [[ "$bytes" =~ ^[1-9][0-9]*$ && "$sha256" =~ ^[0-9a-f]{64}$ ]]

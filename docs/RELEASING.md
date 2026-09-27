@@ -211,7 +211,11 @@ The GitHub record is exactly one draft selected by numeric release ID, with:
 - tag and title `vX.Y.Z`;
 - `draft=true` and `prerelease=false`;
 - body byte-for-byte equal to the canonical `CHANGELOG.md` section extracted
-  from the tagged source;
+  from the tagged source, or — when the section exceeds GitHub's
+  125000-byte release-body limit — the deterministic bound stub (tag,
+  section heading, source commit, section SHA-256 and byte count) that
+  every gate re-derives identically via
+  `crabbox_release_body_from_notes`;
 - exactly the eight assets above, each with a unique numeric ID, positive size,
   and matching SHA-256 digest.
 
