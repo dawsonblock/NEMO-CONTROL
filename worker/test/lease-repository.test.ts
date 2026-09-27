@@ -342,3 +342,77 @@ describe("lease transition serialization", () => {
     expect(stored?.updatedAt).toBe("2026-09-24T00:05:00.000Z");
   });
 });
+
+// A same-state transition (recording cleanup debt on a terminal record)
+// changes metadata without changing state. A state comparison alone
+// cannot distinguish the two writers, so without a revision check B
+// silently overwrites A's committed metadata.
+describe("lease same-state serialization", () => {
+  it("refuses a same-state writer instead of overwriting committed metadata", async () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFor(storage);
+    const record = leaseFixture({ state: "failed" });
+    storage.map.set(leaseKey(record.id), record);
+
+    const writerA = structuredClone(record);
+    const writerB = structuredClone(record);
+
+    const a = await repository.retainUnresolvedLease(writerA, {
+      message: "resource may exist (A)",
+      at: "2026-09-24T00:40:00.000Z",
+    });
+    expect(a.state).toBe("failed");
+    expect(a.cleanupError).toBe("resource may exist (A)");
+
+    await expect(
+      repository.retainUnresolvedLease(writerB, {
+        message: "resource may exist (B)",
+        at: "2026-09-24T00:41:00.000Z",
+      }),
+    ).rejects.toThrow(LeaseTransitionRefused);
+
+    const stored = await repository.loadLease(record.id);
+    expect(stored?.state).toBe("failed");
+    expect(stored?.cleanupError).toBe("resource may exist (A)");
+  });
+
+  it("refuses a same-state writer paused across a commit", async () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFor(storage);
+    const record = leaseFixture({ state: "failed" });
+    storage.map.set(leaseKey(record.id), record);
+
+    const writerA = structuredClone(record);
+    const writerB = structuredClone(record);
+
+    let releaseRead!: () => void;
+    const readObserved = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    let unblockRead!: () => void;
+    const readBlocked = new Promise<void>((resolve) => {
+      unblockRead = resolve;
+    });
+    repository.afterTransactionRead = async () => {
+      releaseRead();
+      await readBlocked;
+    };
+
+    const a = repository.retainUnresolvedLease(writerA, {
+      message: "resource may exist (A)",
+      at: "2026-09-24T00:40:00.000Z",
+    });
+    await readObserved;
+    const b = repository.retainUnresolvedLease(writerB, {
+      message: "resource may exist (B)",
+      at: "2026-09-24T00:41:00.000Z",
+    });
+    unblockRead();
+
+    await a;
+    await expect(b).rejects.toThrow(LeaseTransitionRefused);
+
+    const stored = await repository.loadLease(record.id);
+    expect(stored?.cleanupError).toBe("resource may exist (A)");
+  });
+});

@@ -283,3 +283,90 @@ describe("DurableObjectReadyPoolRepository", () => {
     expect(await repository.loadEntry(entry.key, entry.leaseID)).toMatchObject({ state: "busy" });
   });
 });
+
+// A heartbeat is a same-state (`busy` -> `busy`) metadata update. Two
+// heartbeats from the same stale view cannot be distinguished by state,
+// so without a revision check the second silently rewinds the deadline.
+describe("ready-pool same-state serialization", () => {
+  it("refuses a same-state heartbeat instead of overwriting committed metadata", async () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFor(storage);
+    const entry = entryFixture();
+    await repository.registerEntry(entry, false);
+    const borrowed = await repository.borrowEntry(entry, borrowInput());
+
+    const writerA = structuredClone(borrowed);
+    const writerB = structuredClone(borrowed);
+
+    const a = await repository.heartbeatBorrow(writerA, {
+      typed: false,
+      now: "2026-09-24T01:01:00.000Z",
+      nowMs: Date.parse("2026-09-24T01:01:00.000Z"),
+    });
+    expect(a.state).toBe("busy");
+    expect(a.borrowHeartbeatAt).toBe("2026-09-24T01:01:00.000Z");
+
+    await expect(
+      repository.heartbeatBorrow(writerB, {
+        typed: false,
+        now: "2026-09-24T01:02:00.000Z",
+        nowMs: Date.parse("2026-09-24T01:02:00.000Z"),
+      }),
+    ).rejects.toThrow(ReadyPoolTransitionRefused);
+
+    const stored = await repository.loadEntry(entry.key, entry.leaseID);
+    expect(stored?.borrowHeartbeatAt).toBe("2026-09-24T01:01:00.000Z");
+  });
+
+  it("refuses a same-state heartbeat paused across a commit", async () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFor(storage);
+    const entry = entryFixture();
+    await repository.registerEntry(entry, false);
+    const borrowed = await repository.borrowEntry(entry, borrowInput());
+
+    const writerA = structuredClone(borrowed);
+    const writerB = structuredClone(borrowed);
+
+    let releaseRead!: () => void;
+    const readObserved = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    let unblockRead!: () => void;
+    const readBlocked = new Promise<void>((resolve) => {
+      unblockRead = resolve;
+    });
+    let paused = false;
+    const originalTransaction = storage.transaction.bind(storage);
+    storage.transaction = async (closure) => {
+      if (!paused) {
+        paused = true;
+        return originalTransaction(async (txn) => {
+          releaseRead();
+          await readBlocked;
+          return closure(txn);
+        });
+      }
+      return originalTransaction(closure);
+    };
+
+    const a = repository.heartbeatBorrow(writerA, {
+      typed: false,
+      now: "2026-09-24T01:01:00.000Z",
+      nowMs: Date.parse("2026-09-24T01:01:00.000Z"),
+    });
+    await readObserved;
+    const b = repository.heartbeatBorrow(writerB, {
+      typed: false,
+      now: "2026-09-24T01:02:00.000Z",
+      nowMs: Date.parse("2026-09-24T01:02:00.000Z"),
+    });
+    unblockRead();
+
+    await a;
+    await expect(b).rejects.toThrow(ReadyPoolTransitionRefused);
+
+    const stored = await repository.loadEntry(entry.key, entry.leaseID);
+    expect(stored?.borrowHeartbeatAt).toBe("2026-09-24T01:01:00.000Z");
+  });
+});

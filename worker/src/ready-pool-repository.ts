@@ -131,13 +131,20 @@ export class DurableObjectReadyPoolRepository implements ReadyPoolRepository {
 
   /**
    * Run one transition inside a storage transaction: reload, verify the
-   * caller's expectation, apply, and persist as one atomic unit.
+   * caller's expectation (incarnation, state, and storage revision),
+   * apply the named operation to the RELOADED entry, validate the
+   * resulting state, and persist as one atomic unit.
+   *
+   * The operation is applied to the reloaded entry, never to the caller's
+   * possibly stale copy, so a same-state update another writer committed
+   * in the meantime is preserved. The revision check refuses a caller
+   * superseded by a same-state write, which a state comparison alone
+   * cannot detect.
    */
   private async transition(
     expected: ReadyPoolEntry,
     typed: boolean,
-    probe: (entry: ReadyPoolEntry) => ReadyPoolEntry,
-    apply: () => ReadyPoolEntry,
+    operation: (current: ReadyPoolEntry) => ReadyPoolEntry,
   ): Promise<ReadyPoolEntry> {
     const storageKey = readyPoolKey(expected.key, expected.leaseID, typed);
     return this.storage.transaction(async (txn) => {
@@ -153,16 +160,19 @@ export class DurableObjectReadyPoolRepository implements ReadyPoolRepository {
           `pool entry ${storageKey} state changed from ${expected.state} to ${current.state}`,
         );
       }
-      const resulting = probe(structuredClone(current));
-      if (
-        resulting.state !== current.state &&
-        !isLegalReadyPoolTransition(current.state, resulting.state)
-      ) {
+      const currentRevision = current.storageRevision ?? 0;
+      if (currentRevision !== (expected.storageRevision ?? 0)) {
         throw new ReadyPoolTransitionRefused(
-          `pool entry ${storageKey} may not move from ${current.state} to ${resulting.state}`,
+          `pool entry ${storageKey} revision changed from ${expected.storageRevision ?? 0} to ${currentRevision}`,
         );
       }
-      const next = apply();
+      const next = operation(structuredClone(current));
+      if (next.state !== current.state && !isLegalReadyPoolTransition(current.state, next.state)) {
+        throw new ReadyPoolTransitionRefused(
+          `pool entry ${storageKey} may not move from ${current.state} to ${next.state}`,
+        );
+      }
+      next.storageRevision = currentRevision + 1;
       await txn.put(storageKey, next);
       return next;
     });
@@ -207,7 +217,7 @@ export class DurableObjectReadyPoolRepository implements ReadyPoolRepository {
       }
       return borrowed;
     };
-    return this.transition(entry, input.typed, borrow, () => borrow(entry));
+    return this.transition(entry, input.typed, borrow);
   }
 
   async heartbeatBorrow(
@@ -220,7 +230,7 @@ export class DurableObjectReadyPoolRepository implements ReadyPoolRepository {
         nowMs: input.nowMs,
         leaseExpiresAt: input.leaseExpiresAt,
       });
-    return this.transition(entry, input.typed, beat, () => beat(entry));
+    return this.transition(entry, input.typed, beat);
   }
 
   async returnEntry(entry: ReadyPoolEntry, input: ReturnEntryInput): Promise<ReadyPoolEntry> {
@@ -231,7 +241,7 @@ export class DurableObjectReadyPoolRepository implements ReadyPoolRepository {
         now: input.now,
         leaseExpiresAt: input.leaseExpiresAt,
       });
-    return this.transition(entry, input.typed, returned, () => returned(entry));
+    return this.transition(entry, input.typed, returned);
   }
 
   async retireEntry(entry: ReadyPoolEntry, input: RetireEntryInput): Promise<ReadyPoolEntry> {
@@ -245,6 +255,6 @@ export class DurableObjectReadyPoolRepository implements ReadyPoolRepository {
           return staleReadyPoolEntry(target, input.at);
       }
     };
-    return this.transition(entry, input.typed, retire, () => retire(entry));
+    return this.transition(entry, input.typed, retire);
   }
 }

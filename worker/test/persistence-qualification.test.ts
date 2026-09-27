@@ -48,10 +48,18 @@ class CrashStorage implements RunRepositoryStorage {
   readonly map = new Map<string, unknown>();
   /** Throw when the Nth transaction begins (1-based). */
   crashTransaction: number | undefined;
+  /**
+   * Throw after the Nth write made inside a specific transaction, so a
+   * crash can land mid-transaction (after some writes, before the rest)
+   * rather than only at a transaction boundary.
+   */
+  crashWriteInTransaction: { transaction: number; write: number } | undefined;
   /** Throw when the Nth write of a given key prefix happens (1-based). */
   crashWritePrefix: string | undefined;
   crashWriteNumber: number | undefined = 1;
   transactionCount = 0;
+  private transactionDepth = 0;
+  private transactionWrites = 0;
   private writes = new Map<string, number>();
   private tail: Promise<unknown> = Promise.resolve();
 
@@ -60,6 +68,15 @@ class CrashStorage implements RunRepositoryStorage {
   }
 
   async put<T>(key: string, value: T): Promise<void> {
+    if (this.transactionDepth > 0) {
+      this.transactionWrites += 1;
+      if (
+        this.crashWriteInTransaction?.transaction === this.transactionCount &&
+        this.crashWriteInTransaction.write === this.transactionWrites
+      ) {
+        throw new Error(`injected crash after transactional write ${this.transactionWrites}`);
+      }
+    }
     if (this.crashWritePrefix && key.startsWith(this.crashWritePrefix)) {
       const count = (this.writes.get(this.crashWritePrefix) ?? 0) + 1;
       this.writes.set(this.crashWritePrefix, count);
@@ -84,6 +101,14 @@ class CrashStorage implements RunRepositoryStorage {
     return out;
   }
 
+  /**
+   * A transaction is atomic: on any failure the backing map is restored
+   * to its pre-transaction snapshot, exactly as durable-object storage
+   * rolls back a failed transaction. Without this, a crash injected
+   * mid-transaction would leave partial writes visible, and the harness
+   * could not actually prove that a half-written transaction is
+   * invisible after recovery.
+   */
   async transaction<T>(closure: (txn: RunStorageView) => Promise<T>): Promise<T> {
     this.transactionCount += 1;
     if (this.crashTransaction === this.transactionCount) {
@@ -95,9 +120,19 @@ class CrashStorage implements RunRepositoryStorage {
       release = resolve;
     });
     await predecessor;
+    const snapshot = new Map(this.map);
+    this.transactionWrites = 0;
+    this.transactionDepth += 1;
     try {
       return await closure(this);
+    } catch (error) {
+      this.map.clear();
+      for (const [key, value] of snapshot) {
+        this.map.set(key, value);
+      }
+      throw error;
     } finally {
+      this.transactionDepth -= 1;
       release();
     }
   }
@@ -195,6 +230,20 @@ describe("run creation crash boundaries", () => {
     expect(await storage.get(runEventKey(run.id, 1))).toBeDefined();
     expect(await classifyRun(storage, run.id)).toBe("recoverable");
   });
+
+  it("rolls back a creation that crashes after a partial write", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    // Crash after the first write of transaction 1 (the run record),
+    // before the run.started event. Atomicity means NEITHER survives.
+    storage.crashWriteInTransaction = { transaction: storage.transactionCount + 1, write: 1 };
+    await expect(repository.createRunningRun(run)).rejects.toThrow(/injected crash/);
+    storage.crashWriteInTransaction = undefined;
+    expect(await storage.get(runKey(run.id))).toBeUndefined();
+    expect((await storage.list({ prefix: `runevent:${run.id}:` })).size).toBe(0);
+    expect(await classifyRun(storage, run.id)).toBe("recoverable");
+  });
 });
 
 describe("terminalization crash boundaries", () => {
@@ -237,6 +286,52 @@ describe("terminalization crash boundaries", () => {
     expect(replay.kind).toBe("duplicate");
     const attempts = await storage.list({ prefix: `terminal-attempt:${run.id}:` });
     expect(attempts.size).toBe(1);
+  });
+
+  it("rolls back a terminal commit that crashes mid-transaction B", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    // Transactions: 1 = create, 2 = reserve (A), 3 = log_written, 4 = B.
+    // Crash after B's first write (the terminal event), before the record
+    // and the consumed attempt: the whole transaction must roll back.
+    storage.crashWriteInTransaction = { transaction: storage.transactionCount + 3, write: 1 };
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(/injected crash/);
+    storage.crashWriteInTransaction = undefined;
+    expect((await storage.get(runKey(run.id))) as RunRecord).toMatchObject({ state: "running" });
+    expect(await classifyRun(storage, run.id)).toBe("recoverable");
+    const attempts = await storage.list<{ state: string }>({
+      prefix: `terminal-attempt:${run.id}:`,
+    });
+    expect([...attempts.values()][0]!.state).toBe("log_written");
+
+    // Recovery converges on the valid outcome.
+    const committed = await repository.commitTerminalRun(commitInput(run));
+    expect(committed.kind).toBe("committed");
+    expect(await classifyRun(storage, run.id)).toBe("valid");
+  });
+
+  it("keeps a committed run valid across the attempt sweep", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    await repository.commitTerminalRun(commitInput(run));
+    expect(await classifyRun(storage, run.id)).toBe("valid");
+
+    // Age the consumed attempt past any cutoff. Ordinary maintenance must
+    // not turn a valid terminal run into an impossible one by deleting its
+    // digest anchor.
+    const attempts = await storage.list<{ reservedAt: string }>({
+      prefix: `terminal-attempt:${run.id}:`,
+    });
+    for (const [key, attempt] of attempts) {
+      storage.map.set(key, { ...attempt, reservedAt: "2000-01-01T00:00:00.000Z" });
+    }
+    const swept = await repository.sweepTerminalAttempts(Date.now());
+    expect(swept).toBe(0);
+    expect(await classifyRun(storage, run.id)).toBe("valid");
   });
 
   it("treats a terminal record with unverified bytes as impossible", async () => {
@@ -310,6 +405,34 @@ describe("lease transition crash boundaries", () => {
     const stored = (await storage.get(leaseKey(lease.id))) as LeaseRecord;
     expect(stored.state).toBe("released");
   });
+
+  it("refuses a same-state writer after a competing metadata update commits", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectLeaseRepository(storage);
+    // A terminal record whose cleanup debt is rewritten without a state
+    // change: a state comparison alone cannot tell the two writers apart.
+    const lease = leaseFixture({ state: "failed" });
+    storage.map.set(leaseKey(lease.id), lease);
+    const writerA = structuredClone(lease);
+    const writerB = structuredClone(lease);
+
+    const a = await repository.retainUnresolvedLease(writerA, {
+      message: "resource may exist (A)",
+      at: "2026-09-24T00:40:00.000Z",
+    });
+    expect(a.cleanupError).toBe("resource may exist (A)");
+
+    await expect(
+      repository.retainUnresolvedLease(writerB, {
+        message: "resource may exist (B)",
+        at: "2026-09-24T00:41:00.000Z",
+      }),
+    ).rejects.toThrow(LeaseTransitionRefused);
+    expect((await storage.get(leaseKey(lease.id))) as LeaseRecord).toMatchObject({
+      state: "failed",
+      cleanupError: "resource may exist (A)",
+    });
+  });
 });
 
 describe("ready pool crash boundaries", () => {
@@ -376,5 +499,36 @@ describe("ready pool crash boundaries", () => {
     expect(
       (await storage.get(readyPoolKey(entry.key, entry.leaseID))) as ReadyPoolEntry,
     ).toMatchObject({ state: "ready" });
+  });
+
+  it("refuses a same-state heartbeat after a competing heartbeat commits", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectReadyPoolRepository(storage);
+    const entry = entryFixture();
+    await repository.registerEntry(entry, false);
+    const borrowed = await repository.borrowEntry(
+      entry,
+      borrowInput("alice@example.com", "token-1"),
+    );
+    const writerA = structuredClone(borrowed);
+    const writerB = structuredClone(borrowed);
+
+    const a = await repository.heartbeatBorrow(writerA, {
+      typed: false,
+      now: "2026-09-24T01:01:00.000Z",
+      nowMs: Date.parse("2026-09-24T01:01:00.000Z"),
+    });
+    expect(a.borrowHeartbeatAt).toBe("2026-09-24T01:01:00.000Z");
+
+    await expect(
+      repository.heartbeatBorrow(writerB, {
+        typed: false,
+        now: "2026-09-24T01:02:00.000Z",
+        nowMs: Date.parse("2026-09-24T01:02:00.000Z"),
+      }),
+    ).rejects.toThrow(ReadyPoolTransitionRefused);
+    expect(
+      (await storage.get(readyPoolKey(entry.key, entry.leaseID))) as ReadyPoolEntry,
+    ).toMatchObject({ borrowHeartbeatAt: "2026-09-24T01:01:00.000Z" });
   });
 });

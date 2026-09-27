@@ -546,6 +546,14 @@ export interface LeaseRecord {
   releasedAt?: string;
   endedAt?: string;
   registeredAt?: string;
+  /**
+   * Monotonic optimistic-concurrency counter, bumped by the lease
+   * repository on every committed transition. A caller may only commit a
+   * transition from the revision it loaded, so two same-state writers
+   * cannot silently overwrite each other. Absent on records written
+   * before the counter existed and read as 0.
+   */
+  storageRevision?: number;
 }
 
 export type ReadyPoolEntryState = "ready" | "busy" | "draining" | "quarantined" | "stale";
@@ -599,6 +607,14 @@ export interface ReadyPoolEntry {
   createdAt: string;
   updatedAt: string;
   expiresAt: string;
+  /**
+   * Monotonic optimistic-concurrency counter, bumped by the pool
+   * repository on every committed transition. A same-state writer that
+   * loaded an older revision is refused instead of overwriting a
+   * committed update. Absent on records written before the counter
+   * existed and read as 0.
+   */
+  storageRevision?: number;
 }
 
 export interface ReadyPoolRegisterRequest {
