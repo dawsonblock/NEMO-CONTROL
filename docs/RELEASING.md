@@ -196,7 +196,12 @@ members, and the name, size, and SHA-256 of each payload it
 describes. Under the unsigned contract every macOS payload records
 `signing: "none"` and `notarized: false`, and carries no Team ID, authority,
 secure timestamp, or notarization submission fields — verification rejects
-signed-mode fields when the declared mode is `none`. Its own
+signed-mode fields when the declared mode is `none`. "Unsigned" means no
+identity-bearing signature: a payload either has no code signature at all
+(typical for amd64) or only the linker-generated adhoc signature every
+arm64 Mach-O receives at link time; the verifier accepts exactly those two
+states and rejects identity signatures, authorities, secure timestamps,
+and notarization tickets. Its own
 name, size, digest, upload timestamp, and unique GitHub asset ID are captured in
 the immutable draft proof after upload. `checksums.txt` and provenance must not
 form a self-referential digest cycle.
