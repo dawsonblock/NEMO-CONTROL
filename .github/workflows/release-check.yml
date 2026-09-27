@@ -16,7 +16,9 @@ jobs:
   check:
     name: Release Check
     runs-on: macos-15
-    timeout-minutes: 20
+    # The snapshot builds the Swift VMD plus six Go binaries; that exceeded
+    # 20 minutes on hosted macos runners in practice.
+    timeout-minutes: 45
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
