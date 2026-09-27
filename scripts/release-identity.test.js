@@ -13,6 +13,13 @@ const read = (file) => fs.readFileSync(path.join(repoRoot, file), "utf8");
 
 const RELEASE_IDENTITY = "dawsonblock/crabedence-V1";
 const RELEASE_TAP = "dawsonblock/tap";
+// Releases at or before v0.50.0 predate the fork and were imported from
+// upstream. A release record describes where an artifact actually came
+// from, not who owns the ledger that happens to hold it, so those records
+// must keep their real provenance. The fork's first release line is
+// v0.52.0 (its earliest tag is v0.52.0-rc.1).
+const UPSTREAM_IDENTITY = "openclaw/crabbox";
+const FIRST_FORK_RELEASE = [0, 52, 0];
 
 test("release configuration carries only the fork identity", () => {
   const config = read("scripts/release-config.sh");
@@ -90,12 +97,32 @@ test("security ownership, signer policy, and the release manifest are fork-owned
   assert.doesNotMatch(allowedSigners, /openclaw/i);
 });
 
-test("release records and documentation bind the fork repository", () => {
+const versionParts = (name) =>
+  name
+    .replace(/^v/, "")
+    .replace(/\.json$/, "")
+    .split(".")
+    .map((part) => Number.parseInt(part, 10));
+
+const atLeast = (parts, floor) => {
+  for (let index = 0; index < floor.length; index += 1) {
+    const part = parts[index] ?? 0;
+    if (part !== floor[index]) return part > floor[index];
+  }
+  return true;
+};
+
+test("release records describe where each artifact actually came from", () => {
   const recordsDir = path.join(repoRoot, "release/records");
   for (const name of fs.readdirSync(recordsDir)) {
     if (!name.endsWith(".json")) continue;
     const record = JSON.parse(fs.readFileSync(path.join(recordsDir, name), "utf8"));
-    assert.equal(record.repository, RELEASE_IDENTITY, `${name} binds a foreign repository`);
+    const forkOwned = atLeast(versionParts(name), FIRST_FORK_RELEASE);
+    assert.equal(
+      record.repository,
+      forkOwned ? RELEASE_IDENTITY : UPSTREAM_IDENTITY,
+      `${name} records the wrong provenance`,
+    );
   }
   const releasing = read("docs/RELEASING.md");
   // The bare module path github.com/openclaw/crabbox may appear where the doc
