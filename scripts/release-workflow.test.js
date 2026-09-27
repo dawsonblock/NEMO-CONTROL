@@ -215,7 +215,7 @@ test("public download mode hashes fixed canonical assets without native approval
       draft: false, immutable: true, prerelease: false, published_at: "2026-08-01T00:00:00Z",
       assets: names.map((name, index) => ({
         name, id: 100 + index, size: bytes.length, state: "uploaded", digest,
-        url: `https://api.github.com/repos/openclaw/crabbox/releases/assets/${100 + index}`,
+        url: `https://api.github.com/repos/dawsonblock/crabedence-V1/releases/assets/${100 + index}`,
       })),
     };
     const metadata = path.join(root, "release.json");
@@ -233,7 +233,7 @@ set -eu
 url=\${!#}
 printf '%s\\n' "$url" >>${quote(calls)}
 case "$url" in
-  https://api.github.com/repos/openclaw/crabbox/releases/123) cat ${quote(metadata)} ;;
+  https://api.github.com/repos/dawsonblock/crabedence-V1/releases/123) cat ${quote(metadata)} ;;
   ${names.map((name) => `https://github.com/openclaw/crabbox/releases/download/v1.2.3/${name}`).join("|")}) cat ${quote(payload)} ;;
   *) echo unexpected-endpoint >&2; exit 96 ;;
 esac
@@ -245,7 +245,7 @@ esac
       return spawnSync("/bin/bash", ["-c", workflowShell(download)], {
         encoding: "utf8", env: {
           PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: root, RELEASE_TAG: tag,
-          GITHUB_REPOSITORY: "openclaw/crabbox", RELEASE_ID: "123", EXPECTED_DRAFT: "false",
+          GITHUB_REPOSITORY: "dawsonblock/crabedence-V1", RELEASE_ID: "123", EXPECTED_DRAFT: "false",
           EXPECTED_NOTES_BYTES: String(Buffer.byteLength(notes)),
           EXPECTED_NOTES_SHA256: crypto.createHash("sha256").update(notes).digest("hex"),
         },
@@ -399,7 +399,7 @@ test("release source guard pins an allowed signed tag object while permitting la
       record,
       `${JSON.stringify({
         schemaVersion: 1,
-        repository: "openclaw/crabbox",
+        repository: "dawsonblock/crabedence-V1",
         tag: "v1.2.3",
         tagObject,
         sourceCommit: tagCommit,
@@ -837,7 +837,7 @@ test("release documentation authorizes normal continuation from one full request
   assert.match(secretGate, /rev-parse HEAD/);
   assert.match(secretGate, /status --porcelain --untracked-files=all/);
   assert.match(secretGate, /remote get-url origin/);
-  assert.match(secretGate, /ls-remote https:\/\/github\.com\/openclaw\/crabbox/);
+  assert.match(secretGate, /ls-remote https:\/\/github\.com\/dawsonblock\/crabedence-V1/);
   assert.match(secretGate, /awk "\{print \\\$1\}"/);
   assert.doesNotMatch(secretGate, /awk "\{print \\\\\\$1\}"/);
   assert.ok(secretGate.indexOf("status --porcelain") < secretGate.indexOf("exec /bin/bash"));

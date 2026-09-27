@@ -2,7 +2,12 @@
 # shellcheck disable=SC2034 # Constants are consumed by scripts that source this file.
 set -euo pipefail
 
-CRABBOX_RELEASE_REPOSITORY=openclaw/crabbox
+# The release identity is this repository. Override it only to test the
+# pipeline itself; the workflows assert github.repository against it.
+CRABBOX_RELEASE_REPOSITORY=${CRABBOX_RELEASE_REPOSITORY:-dawsonblock/crabedence-V1}
+# The tap this pipeline publishes the formula to, and the formula name.
+CRABBOX_RELEASE_TAP=${CRABBOX_RELEASE_TAP:-dawsonblock/tap}
+CRABBOX_RELEASE_TAP_FORMULA=${CRABBOX_RELEASE_TAP_FORMULA:-crabbox}
 CRABBOX_RELEASE_DEFAULT_BRANCH=main
 CRABBOX_RELEASE_GO_VERSION=go1.26.5
 CRABBOX_RELEASE_GORELEASER_VERSION=2.17.0
@@ -13,6 +18,8 @@ CRABBOX_RELEASE_HELPER_IDENTIFIER=org.openclaw.crabbox.apple-vm-helper
 CRABBOX_RELEASE_VMD_IDENTIFIER=org.openclaw.crabbox.apple-vm-vmd
 readonly \
   CRABBOX_RELEASE_REPOSITORY \
+  CRABBOX_RELEASE_TAP \
+  CRABBOX_RELEASE_TAP_FORMULA \
   CRABBOX_RELEASE_DEFAULT_BRANCH \
   CRABBOX_RELEASE_GO_VERSION \
   CRABBOX_RELEASE_GORELEASER_VERSION \

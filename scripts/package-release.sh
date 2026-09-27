@@ -52,10 +52,10 @@ VERIFIER_COMMIT=${VERIFIER_COMMIT:-$(git -C "$ROOT" rev-parse HEAD)}
   exit 1
 }
 origin_url=$(git -C "$ROOT" remote get-url origin)
-[[ "$origin_url" == https://github.com/openclaw/crabbox ||
-  "$origin_url" == https://github.com/openclaw/crabbox.git ||
-  "$origin_url" == git@github.com:openclaw/crabbox.git ]] || {
-  echo "release packaging requires the canonical openclaw/crabbox origin" >&2
+[[ "$origin_url" == "https://github.com/$CRABBOX_RELEASE_REPOSITORY" ||
+  "$origin_url" == "https://github.com/$CRABBOX_RELEASE_REPOSITORY.git" ||
+  "$origin_url" == "git@github.com:$CRABBOX_RELEASE_REPOSITORY.git" ]] || {
+  echo "release packaging requires the canonical $CRABBOX_RELEASE_REPOSITORY origin" >&2
   exit 1
 }
 remote_main=$(git -C "$ROOT" ls-remote origin "refs/heads/$CRABBOX_RELEASE_DEFAULT_BRANCH" | awk '{print $1}')

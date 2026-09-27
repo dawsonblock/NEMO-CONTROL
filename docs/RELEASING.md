@@ -325,7 +325,7 @@ exact run as `DRAFT_VERIFIER_RUN_ID`, then require both native jobs to succeed:
 
 ```sh
 gh workflow run release-assets.yml \
-  --repo openclaw/crabbox \
+  --repo dawsonblock/crabedence-V1 \
   --ref main \
   -f release_id="$RELEASE_ID" \
   -f tag="$TAG" \
@@ -337,7 +337,7 @@ gh workflow run release-assets.yml \
 
 : "${DRAFT_VERIFIER_RUN_ID:?set to the numeric ID of that exact draft run}"
 gh run watch "$DRAFT_VERIFIER_RUN_ID" \
-  --repo openclaw/crabbox --exit-status
+  --repo dawsonblock/crabedence-V1 --exit-status
 ```
 
 After the native draft proof succeeds and the publication checks below pass,
@@ -373,7 +373,7 @@ installed-Homebrew smoke, not this handoff.
   : "${TAG:?}"
   [[ "$TAG" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] || exit 1
   ASSETS_JSON=$(curl --disable --fail --silent --show-error --location --retry 3 \
-    "https://api.github.com/repos/openclaw/crabbox/releases/tags/$TAG" |
+    "https://api.github.com/repos/dawsonblock/crabedence-V1/releases/tags/$TAG" |
     jq -ce --arg tag "$TAG" '
       (if .tag_name == $tag and .draft == false and .prerelease == false and
          .immutable == true and (.assets | type) == "array"
@@ -390,7 +390,7 @@ installed-Homebrew smoke, not this handoff.
     ')
   gh workflow run update-formula.yml \
     --repo openclaw/homebrew-tap --ref main \
-    -f formula=crabbox -f tag="$TAG" -f repository=openclaw/crabbox \
+    -f formula=crabbox -f tag="$TAG" -f repository=dawsonblock/crabedence-V1 \
     -f assets="$ASSETS_JSON"
 )
 ```
@@ -427,7 +427,7 @@ git merge-base --is-ancestor "$VERIFIER_COMMIT" "$WORKFLOW_COMMIT"
 git merge-base --is-ancestor "$TAG_COMMIT" "$VERIFIER_COMMIT"
 
 gh workflow run release-assets.yml \
-  --repo openclaw/crabbox \
+  --repo dawsonblock/crabedence-V1 \
   --ref main \
   -f release_id="$RELEASE_ID" \
   -f tag="$TAG" \
@@ -439,7 +439,7 @@ gh workflow run release-assets.yml \
 
 : "${PUBLIC_VERIFIER_RUN_ID:?set to the numeric ID of that exact public run}"
 gh run watch "$PUBLIC_VERIFIER_RUN_ID" \
-  --repo openclaw/crabbox --exit-status
+  --repo dawsonblock/crabedence-V1 --exit-status
 ```
 
 Independently smoke-test the public source-install channel from the public Go

@@ -11,7 +11,7 @@ const tag = "v0.37.0";
 const releaseId = 123;
 const runId = 9001;
 const workflowId = 77;
-const repository = "openclaw/crabbox";
+const repository = "dawsonblock/crabedence-V1";
 
 // The publication fixtures replay real signed release tags, which CI
 // provides (the scripts job checks out with fetch-depth: 0). A local

@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const REPOSITORY = "openclaw/crabbox";
+const REPOSITORY = process.env.CRABBOX_RELEASE_REPOSITORY ?? "dawsonblock/crabedence-V1";
 const TEAM_ID = "FWJYW4S8P8";
 const AUTHORITY = `Developer ID Application: OpenClaw Foundation (${TEAM_ID})`;
 const CLI_ID = "org.openclaw.crabbox";

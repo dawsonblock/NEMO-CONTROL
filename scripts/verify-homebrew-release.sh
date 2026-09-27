@@ -5,7 +5,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck source=scripts/release-config.sh
 source "$ROOT/scripts/release-config.sh"
 
-FORMULA=openclaw/tap/crabbox
+FORMULA="$CRABBOX_RELEASE_TAP/$CRABBOX_RELEASE_TAP_FORMULA"
 SCRIPT_PATH="$ROOT/scripts/verify-homebrew-release.sh"
 PROTECTED_HOMEBREW_TOOLING=(
   .github/release-allowed-signers
@@ -229,15 +229,19 @@ freeze_public_release() {
 
 verify_homebrew_formula() {
   local node_bin=$1 metadata_file=$2 tag=$3 archive_name=$4 archive_sha=$5
-  "$node_bin" - "$metadata_file" "$tag" "$archive_name" "$archive_sha" <<'NODE'
+  env CRABBOX_RELEASE_REPOSITORY="$CRABBOX_RELEASE_REPOSITORY" \
+    CRABBOX_RELEASE_TAP="$CRABBOX_RELEASE_TAP" \
+    CRABBOX_RELEASE_TAP_FORMULA="$CRABBOX_RELEASE_TAP_FORMULA" \
+    "$node_bin" - "$metadata_file" "$tag" "$archive_name" "$archive_sha" <<'NODE'
 const fs = require("node:fs");
 const [file, tag, archive, sha256] = process.argv.slice(2);
 const { formulae } = JSON.parse(fs.readFileSync(file, "utf8"));
 const formula = formulae?.[0];
-const url = `https://github.com/openclaw/crabbox/releases/download/${tag}/${archive}`;
+const url = `https://github.com/${process.env.CRABBOX_PUBLISH_REPOSITORY}/releases/download/${tag}/${archive}`;
 if (
   formulae?.length !== 1 || formula?.name !== "crabbox" ||
-  formula.full_name !== "openclaw/tap/crabbox" || formula.tap !== "openclaw/tap" ||
+  formula.full_name !== process.env.CRABBOX_RELEASE_TAP + "/" + process.env.CRABBOX_RELEASE_TAP_FORMULA ||
+  formula.tap !== process.env.CRABBOX_RELEASE_TAP ||
   formula.versions?.stable !== tag.slice(1) || formula.urls?.stable?.url !== url ||
   !/^[0-9a-f]{64}$/.test(sha256) || formula.urls.stable.checksum !== sha256
 ) throw new Error("Homebrew formula metadata does not match the selected release archive");
@@ -305,7 +309,7 @@ homebrew_phase() {
   local archive_sha
   archive_sha=$(sha256_file "$native_archive")
   local metadata_file="$work/formula.json"
-  "$brew_bin" tap openclaw/tap
+  "$brew_bin" tap "$CRABBOX_RELEASE_TAP"
   "$brew_bin" update --force
   # Tap maintainers own executable formulae; metadata is not a Ruby sandbox.
   "$brew_bin" info --json=v2 --formula "$FORMULA" >"$metadata_file"

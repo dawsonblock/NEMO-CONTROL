@@ -7,6 +7,11 @@ set -euo pipefail
 : "${EXPECTED_TAG_COMMIT:?EXPECTED_TAG_COMMIT is required}"
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=scripts/release-config.sh
+source "$ROOT/scripts/release-config.sh"
+# The record check below runs in a child process; this script exports the
+# identity deliberately, and only for its own children.
+export CRABBOX_RELEASE_REPOSITORY
 TRUSTED_HEAD=${TRUSTED_HEAD:-HEAD}
 ALLOWED_SIGNERS=${ALLOWED_SIGNERS:-"$ROOT/.github/release-allowed-signers"}
 RELEASE_RECORD=${RELEASE_RECORD:-"$ROOT/release/records/$RELEASE_TAG.json"}
@@ -39,7 +44,7 @@ const [file, tag, tagObject, sourceCommit, requirePublishable] = process.argv.sl
 const record = JSON.parse(fs.readFileSync(file, 'utf8'));
 if (
   record.schemaVersion !== 1 ||
-  record.repository !== 'openclaw/crabbox' ||
+  record.repository !== process.env.CRABBOX_RELEASE_REPOSITORY ||
   record.tag !== tag ||
   record.tagObject !== tagObject ||
   record.sourceCommit !== sourceCommit ||
