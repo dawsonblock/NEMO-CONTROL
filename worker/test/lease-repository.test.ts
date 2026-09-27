@@ -416,3 +416,60 @@ describe("lease same-state serialization", () => {
     expect(stored?.cleanupError).toBe("resource may exist (A)");
   });
 });
+
+// Cleanup-failure debt is transition input, applied to the reloaded
+// record. A caller that mutates its own copy instead is ignored, so the
+// two fleet.ts failure paths must express the debt here rather than by
+// assigning fields on the record they pass in.
+describe("lease cleanup-failure debt", () => {
+  it("records deletion debt and the validity window from the input", async () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFor(storage);
+    const record = leaseFixture({ state: "failed" });
+    storage.map.set(leaseKey(record.id), record);
+
+    const failed = await repository.retainUnresolvedLease(record, {
+      message: "resource may exist",
+      at: "2026-09-24T00:40:00.000Z",
+      releaseDeletesServer: true,
+      expiresAt: "2026-09-24T00:40:00.000Z",
+    });
+    expect(failed.releaseDeletesServer).toBe(true);
+    expect(failed.expiresAt).toBe("2026-09-24T00:40:00.000Z");
+
+    const stored = await repository.loadLease(record.id);
+    expect(stored?.releaseDeletesServer).toBe(true);
+    expect(stored?.expiresAt).toBe("2026-09-24T00:40:00.000Z");
+  });
+
+  it("ignores a caller-side edit the transition would discard", async () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFor(storage);
+    const record = leaseFixture({ state: "failed" });
+    storage.map.set(leaseKey(record.id), record);
+
+    const caller = structuredClone(record);
+    caller.releaseDeletesServer = true;
+    const failed = await repository.retainUnresolvedLease(caller, {
+      message: "resource may exist",
+      at: "2026-09-24T00:40:00.000Z",
+    });
+    expect(failed.releaseDeletesServer).toBeUndefined();
+  });
+
+  it("carries the validity window but disclaims deletion debt on manual resolution", async () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFor(storage);
+    const record = leaseFixture({ releaseDeletesServer: true });
+    storage.map.set(leaseKey(record.id), record);
+
+    const expired = await repository.expireLeaseForManualCleanup(record, {
+      error: "manual resolution required",
+      at: "2026-09-24T00:41:00.000Z",
+      expiresAt: "2026-09-24T00:41:00.000Z",
+    });
+    expect(expired.state).toBe("expired");
+    expect(expired.releaseDeletesServer).toBe(false);
+    expect(expired.expiresAt).toBe("2026-09-24T00:41:00.000Z");
+  });
+});

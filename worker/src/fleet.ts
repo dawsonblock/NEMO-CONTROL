@@ -18204,23 +18204,44 @@ export class FleetCoordinator {
    * Apply a failed cleanup to the lease through the transition that fits:
    * unresolved provider debt and manual resolution are terminal
    * transitions owned by the lease repository, a retryable failure stays
-   * a retry on the same record.
+   * a retry on the same record. Outstanding debt — a deletion still owed,
+   * a validity window that ended with the failure — travels as transition
+   * input, never as a caller-side edit, which the transition discards.
    */
   private async applyLeaseCleanupFailure(
     lease: LeaseRecord,
     error: unknown,
     message: string,
     at: string,
+    debt: { releaseDeletesServer?: boolean; expiresAt?: string } = {},
   ): Promise<void> {
     switch (classifyLeaseCleanupFailure(error)) {
       case "unresolved":
-        await this.leaseRepository.retainUnresolvedLease(lease, { message, at });
+        await this.leaseRepository.retainUnresolvedLease(lease, {
+          message,
+          at,
+          ...(debt.releaseDeletesServer === undefined
+            ? {}
+            : { releaseDeletesServer: debt.releaseDeletesServer }),
+          ...(debt.expiresAt === undefined ? {} : { expiresAt: debt.expiresAt }),
+        });
         return;
       case "manual":
-        await this.leaseRepository.expireLeaseForManualCleanup(lease, { error: message, at });
+        // Manual resolution disclaims provider deletion, so the terminal
+        // transition's releaseDeletesServer stands; only the validity
+        // window carries over.
+        await this.leaseRepository.expireLeaseForManualCleanup(lease, {
+          error: message,
+          at,
+          ...(debt.expiresAt === undefined ? {} : { expiresAt: debt.expiresAt }),
+        });
         return;
       default:
         applyRetryableLeaseCleanupFailure(lease, message, at);
+        if (debt.releaseDeletesServer !== undefined) {
+          lease.releaseDeletesServer = debt.releaseDeletesServer;
+        }
+        if (debt.expiresAt !== undefined) lease.expiresAt = debt.expiresAt;
         await this.putLease(lease);
     }
   }
@@ -18950,15 +18971,15 @@ export class FleetCoordinator {
           return { suppressed: true as const, lease: latest ?? cleanupLease };
         }
         const failedAt = new Date().toISOString();
-        if (cleanupLease.state === "released") {
-          cleanupLease.releaseDeletesServer = true;
-        }
-        cleanupLease.expiresAt = failedAt;
         await this.applyLeaseCleanupFailure(
           cleanupLease,
           error,
           coordinatorErrorMessage(this.env, error),
           failedAt,
+          {
+            ...(cleanupLease.state === "released" ? { releaseDeletesServer: true } : {}),
+            expiresAt: failedAt,
+          },
         );
         await this.markAWSIngressReconcilePending(cleanupLease);
         await this.scheduleAlarm();
@@ -19240,12 +19261,12 @@ export class FleetCoordinator {
         ) {
           return;
         }
-        current.releaseDeletesServer = true;
         await this.applyLeaseCleanupFailure(
           current,
           error,
           coordinatorErrorMessage(this.env, error),
           new Date().toISOString(),
+          { releaseDeletesServer: true },
         );
         await this.scheduleAlarm();
       });

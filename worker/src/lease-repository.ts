@@ -73,11 +73,26 @@ export interface ReleaseLeaseInput {
 export interface UnresolvedLeaseInput {
   message: string;
   at: string;
+  /**
+   * Cleanup debt the failed attempt still owes: a provider deletion is
+   * outstanding. The transition records it on the RELOADED record; a
+   * caller that mutates its own copy instead will have the edit
+   * discarded.
+   */
+  releaseDeletesServer?: boolean | undefined;
+  /** The record's validity window ends with the failure. */
+  expiresAt?: string | undefined;
 }
 
 export interface ManualExpiryInput {
   error: string;
   at: string;
+  /**
+   * The record's validity window ends with the failure. Deletion debt is
+   * NOT carried: manual resolution disclaims the provider resource, and
+   * the transition owns that decision.
+   */
+  expiresAt?: string | undefined;
 }
 
 export interface LeaseExpiryInput {
@@ -114,6 +129,21 @@ export class LeaseTransitionRefused extends Error {
     super(message);
     this.name = "LeaseTransitionRefused";
   }
+}
+
+/**
+ * Record a failed cleanup's outstanding debt on the reloaded record.
+ * Kept beside the transitions so every caller records debt the same way —
+ * through input, never by mutating the record it passed in (which the
+ * transition would discard).
+ */
+function applyCleanupFailureDebt(
+  record: LeaseRecord,
+  releaseDeletesServer: boolean | undefined,
+  expiresAt: string | undefined,
+): void {
+  if (releaseDeletesServer !== undefined) record.releaseDeletesServer = releaseDeletesServer;
+  if (expiresAt !== undefined) record.expiresAt = expiresAt;
 }
 
 export class DurableObjectLeaseRepository implements LeaseRepository {
@@ -246,6 +276,7 @@ export class DurableObjectLeaseRepository implements LeaseRepository {
   ): Promise<LeaseRecord> {
     return this.transition(lease, (current) => {
       retainUnresolvedProviderResource(current, input.message, input.at);
+      applyCleanupFailureDebt(current, input.releaseDeletesServer, input.expiresAt);
       return current;
     });
   }
@@ -256,6 +287,9 @@ export class DurableObjectLeaseRepository implements LeaseRepository {
   ): Promise<LeaseRecord> {
     return this.transition(lease, (current) => {
       terminalizeManualProviderCleanup(current, input.error, input.at);
+      // Manual resolution disclaims provider deletion, so the transition's
+      // releaseDeletesServer stands; only the validity window carries over.
+      if (input.expiresAt !== undefined) current.expiresAt = input.expiresAt;
       return current;
     });
   }

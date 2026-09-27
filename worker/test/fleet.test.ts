@@ -13777,6 +13777,7 @@ describe("fleet lease identity and idle", () => {
         cloudID: lease.cloudID,
         provisioningResourceMayExist: true,
         provisioningFailureRetryable: false,
+        releaseDeletesServer: true,
       });
       expect(unresolved?.cleanupError).toContain(
         "original API, organization, and credential context",
@@ -23456,6 +23457,7 @@ describe("fleet lease identity and idle", () => {
       cloudID: "vm-cbx-abcdef123456",
       cleanupError: "azure delete throttled Authorization: [redacted]",
       releaseDeletesServer: true,
+      expiresAt: expect.any(String),
     });
     expect(failedCleanup?.cleanupError).not.toContain("release-secret");
 
