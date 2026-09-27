@@ -23,10 +23,14 @@ const writeExecutable = (file, body) => {
 };
 
 /**
- * Run the verifier against a mock artifact. `signed` selects what the mock
- * codesign reports, so the same harness can prove both directions.
+ * Run the verifier against a mock artifact. `mode` selects what the mock
+ * codesign reports, so the same harness can prove every direction:
+ *   - "unsigned": codesign reports "code object is not signed at all"
+ *   - "adhoc":    the linker-generated arm64 adhoc signature real Go and
+ *                 Swift Mach-O output carries (the shipped-artifact case)
+ *   - "signed":   an identity-bearing Developer ID signature
  */
-function runVerifier({ signed }) {
+function runVerifier({ mode }) {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "crabbox-unsigned-"));
   try {
     const bin = path.join(work, "bin");
@@ -50,21 +54,42 @@ printf 'codesign:%s\\n' "$*" >>${JSON.stringify(log)}
 binary=\${!#}
 case "$*" in
   "-dvvv $binary")
-    ${
-      signed
-        ? `printf 'Identifier=%s\\n' "$CRABBOX_RELEASE_CLI_IDENTIFIER"
-printf 'Authority=%s\\n' "$CRABBOX_RELEASE_AUTHORITY"
-printf 'TeamIdentifier=%s\\n' "$CRABBOX_RELEASE_TEAM_ID"
-exit 0`
-        : `printf '%s\\n' "$binary: code object is not signed at all"
-exit 1`
-    }
-    ;;
-  "--verify --strict $binary")
-    ${signed ? "exit 0" : "exit 1"}
+    case ${JSON.stringify(mode)} in
+      signed)
+        printf 'Identifier=crabbox\\n'
+        printf 'Format=Mach-O thin (arm64)\\n'
+        printf 'CodeDirectory v=20500 size=100 flags=0x10000(runtime) hashes=3+0 location=embedded\\n'
+        printf 'Signature size=9000\\n'
+        printf 'Authority=Developer ID Application: Example (TEAMID1234)\\n'
+        printf 'TeamIdentifier=TEAMID1234\\n'
+        printf 'Timestamp=Sep 27, 2026 at 00:00:00\\n'
+        exit 0
+        ;;
+      adhoc-authority)
+        printf 'Identifier=a.out\\n'
+        printf 'Format=Mach-O thin (arm64)\\n'
+        printf 'CodeDirectory v=20400 size=100 flags=0x20002(adhoc,linker-signed) hashes=3+0 location=embedded\\n'
+        printf 'Signature=adhoc\\n'
+        printf 'TeamIdentifier=not set\\n'
+        printf 'Authority=Developer ID Application: Example (TEAMID1234)\\n'
+        exit 0
+        ;;
+      adhoc)
+        printf 'Identifier=a.out\\n'
+        printf 'Format=Mach-O thin (arm64)\\n'
+        printf 'CodeDirectory v=20400 size=100 flags=0x20002(adhoc,linker-signed) hashes=3+0 location=embedded\\n'
+        printf 'Signature=adhoc\\n'
+        printf 'TeamIdentifier=not set\\n'
+        exit 0
+        ;;
+      *)
+        printf '%s\\n' "$binary: code object is not signed at all"
+        exit 1
+        ;;
+    esac
     ;;
   "--verify --strict --check-notarization -R=notarized $binary")
-    ${signed ? "exit 0" : "exit 1"}
+    ${mode === "signed" ? "exit 0" : "exit 1"}
     ;;
   *)
     exit 98
@@ -90,17 +115,28 @@ esac
 }
 
 test("the unsigned contract accepts an unsigned artifact", { skip: !darwin }, () => {
-  const { result, calls } = runVerifier({ signed: false });
+  const { result, calls } = runVerifier({ mode: "unsigned" });
   assert.equal(result.status, 0, result.stderr);
   // The signature surface was actually consulted, not skipped.
   assert.match(calls, /codesign:-dvvv /);
   assert.match(calls, /codesign:--verify --strict /);
 });
 
+test("the unsigned contract accepts a linker-adhoc artifact", { skip: !darwin }, () => {
+  const { result } = runVerifier({ mode: "adhoc" });
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test("the unsigned contract rejects a signed artifact", { skip: !darwin }, () => {
-  const { result } = runVerifier({ signed: true });
+  const { result } = runVerifier({ mode: "signed" });
   assert.notEqual(result.status, 0, "a signed artifact must fail the unsigned contract");
-  assert.match(result.stderr, /unsigned release policy: binary carries a code signature/);
+  assert.match(result.stderr, /unsigned release policy: binary carries an identity code signature/);
+});
+
+test("the unsigned contract rejects an authority on an adhoc signature", { skip: !darwin }, () => {
+  const { result } = runVerifier({ mode: "adhoc-authority" });
+  assert.notEqual(result.status, 0, "an authority claim must fail the unsigned contract");
+  assert.match(result.stderr, /unsigned release policy: binary carries a signing authority/);
 });
 
 test("the default signing mode is the declared unsigned contract", () => {

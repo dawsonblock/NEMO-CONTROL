@@ -767,9 +767,14 @@ test("signing and verification enforce the declared unsigned contract and keep t
   assert.doesNotMatch(config, /OpenClaw Foundation|FWJYW4S8P8|org\.openclaw/);
   // The signer refuses outright under the unsigned contract.
   assert.match(signer, /unsigned release contract forbids invoking the signer/);
-  // The verifier proves unsignedness instead of skipping signature checks.
+  // The verifier proves unsignedness instead of skipping signature checks:
+  // it accepts only "not signed at all" or a bare linker-adhoc signature,
+  // and positively rejects identity, team, authority, and secure-timestamp
+  // metadata plus any notarization ticket.
   assert.match(verifier, /code object is not signed at all/);
-  assert.match(verifier, /unsigned release policy: binary carries a code signature/);
+  assert.match(verifier, /unsigned release policy: binary carries an identity code signature/);
+  assert.match(verifier, /unsigned release policy: binary carries a signing authority/);
+  assert.match(verifier, /unsigned release policy: binary carries a secure timestamp/);
   // The developer-id path is preserved for a later contract upgrade: it still
   // enforces hardened runtime, secure timestamp, and online notarization.
   assert.match(signer, /--options runtime/);

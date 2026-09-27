@@ -47,16 +47,36 @@ ACTUAL_ARCH=$(lipo -archs "$BINARY")
 
 if [[ "$CRABBOX_RELEASE_APPLE_SIGNING" == "none" ]]; then
   # This release contract declares macOS artifacts unsigned and not
-  # notarized. That is asserted positively: a signature or a notarization
-  # ticket is a failure, never a tolerated extra.
+  # notarized. "Unsigned" means no identity-bearing signature: the Mach-O
+  # either has no code signature at all (typical for amd64 builds) or only
+  # the linker-generated adhoc signature the toolchain stamps on every
+  # arm64 Mach-O — Signature=adhoc, linker-signed, no team, no authority,
+  # no secure timestamp. An identity signature or a notarization ticket is
+  # a failure, never a tolerated extra.
   UNSIGNED_SIGNATURE=$(codesign -dvvv "$BINARY" 2>&1 || true)
-  grep -q 'code object is not signed at all' <<<"$UNSIGNED_SIGNATURE" || {
-    echo "unsigned release policy: binary carries a code signature" >&2
-    exit 1
-  }
-  if codesign --verify --strict "$BINARY" >/dev/null 2>&1; then
-    echo "unsigned release policy: binary verifies as a signed artifact" >&2
-    exit 1
+  if ! grep -q 'code object is not signed at all' <<<"$UNSIGNED_SIGNATURE"; then
+    grep -q '^Signature=adhoc$' <<<"$UNSIGNED_SIGNATURE" || {
+      echo "unsigned release policy: binary carries an identity code signature" >&2
+      exit 1
+    }
+    grep -q 'linker-signed' <<<"$UNSIGNED_SIGNATURE" || {
+      echo "unsigned release policy: binary signature was not linker-generated" >&2
+      exit 1
+    }
+    if grep -q '^TeamIdentifier=' <<<"$UNSIGNED_SIGNATURE"; then
+      grep -q '^TeamIdentifier=not set$' <<<"$UNSIGNED_SIGNATURE" || {
+        echo "unsigned release policy: binary carries a team identity" >&2
+        exit 1
+      }
+    fi
+    if grep -q '^Authority=' <<<"$UNSIGNED_SIGNATURE"; then
+      echo "unsigned release policy: binary carries a signing authority" >&2
+      exit 1
+    fi
+    if grep -q '^Timestamp=' <<<"$UNSIGNED_SIGNATURE"; then
+      echo "unsigned release policy: binary carries a secure timestamp" >&2
+      exit 1
+    fi
   fi
   # Notarization is asserted through the same codesign surface the signed
   # path uses — this verifier never invokes a separate ticket tool — so an
