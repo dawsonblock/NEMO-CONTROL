@@ -81,9 +81,7 @@ describe("state ownership guard self-test", () => {
       'latest.state = canceled ? "released" : "failed";',
       'current.state = leaseIsLive(current) ? "expired" : current.state;',
     ];
-    const missed = samples.filter(
-      (sample) => [...sample.matchAll(assignmentPattern)].length === 0,
-    );
+    const missed = samples.filter((sample) => [...sample.matchAll(assignmentPattern)].length === 0);
     // The array names exactly which known-bad shapes the pattern missed.
     expect(missed).toEqual([]);
     expect([...`state: "provisioning",`.matchAll(leaseLiteralPattern)].length).toBe(1);

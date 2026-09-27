@@ -211,9 +211,7 @@ describe("terminalization crash boundaries", () => {
     await repository.createRunningRun(run);
 
     crash(storage);
-    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
-      /injected crash/,
-    );
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(/injected crash/);
     // The run never appears terminal, and no terminal record references an
     // unverified log.
     expect(await classifyRun(storage, run.id)).toBe("recoverable");
