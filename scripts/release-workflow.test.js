@@ -991,7 +991,8 @@ test("draft creation performs static-only verification and never deletes or repl
   assert.match(script, /--verify-tag/);
   assert.doesNotMatch(script, /--target/);
   assert.doesNotMatch(script, /target_commitish !== process\.env\.RELEASE_COMMIT/);
-  assert.match(script, /--notes-file "\$notes"/);
+  assert.match(script, /crabbox_release_body_from_notes "\$notes" "\$TAG" "\$TAG_COMMIT"/);
+  assert.match(script, /--notes-file "\$body"/);
   assert.match(script, /--json databaseId/);
   assert.match(script, /releases\/\$release_id/);
   assert.doesNotMatch(script, /gh api --paginate/);

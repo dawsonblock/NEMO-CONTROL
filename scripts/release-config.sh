@@ -77,6 +77,29 @@ crabbox_release_asset_names() {
   printf '%s\n' checksums.txt provenance.json
 }
 
+# GitHub rejects release bodies over 125000 bytes. The canonical release body
+# is the extracted CHANGELOG.md section verbatim; when the section exceeds the
+# limit the body is a deterministic bound stub instead — every gate derives it
+# identically from the tagged source, so the stub still pins the exact section
+# digest and length.
+CRABBOX_RELEASE_BODY_LIMIT=125000
+crabbox_release_body_from_notes() {
+  local notes=${1:-} tag=${2:-} source_commit=${3:-} bytes digest
+  [[ -f "$notes" ]] || return 2
+  bytes=$(wc -c <"$notes" | tr -d '[:space:]')
+  if (( bytes <= CRABBOX_RELEASE_BODY_LIMIT )); then
+    cat "$notes"
+    return 0
+  fi
+  digest=$(shasum -a 256 "$notes" | awk '{print $1}')
+  printf 'Crabbox %s\n\n' "$tag"
+  printf 'The canonical release notes for this release are the `## %s` section of\n' "${tag#v}"
+  printf 'CHANGELOG.md at source commit %s. GitHub'\''s release body limit\n' "$source_commit"
+  printf '(%s bytes) prevents embedding the %s-byte section verbatim.\n\n' \
+    "$CRABBOX_RELEASE_BODY_LIMIT" "$bytes"
+  printf 'Section SHA-256: %s\nSection bytes: %s\n' "$digest" "$bytes"
+}
+
 crabbox_release_designated_requirement() {
   [[ "$CRABBOX_RELEASE_APPLE_SIGNING" == developer-id ]] || {
     echo "designated requirements exist only under developer-id signing" >&2
