@@ -43,13 +43,15 @@ changes under a new version, preserving the original changelog section. See
 > Do not move the tag or weaken the verifier. The runtime fix requires a new
 > signed release tag.
 
-> **Signer registration:** GitHub evaluates SSH tag-signature verification at
-> push time only. Register the tagging machine's SSH key as a GitHub account
-> signing key *before* creating the tag, and confirm the pushed tag reports
-> `verification.verified == true` before producing any candidate. A tag pushed
-> under an unregistered key is permanently unverified; recovering requires
-> replacing the tag under temporarily lifted tag-ruleset enforcement and
-> rebinding the release record's `tagObject`.
+> **Signer registration:** Register the tagging machine's SSH key as a GitHub
+> account *signing* key (authentication keys are a separate list) *before*
+> creating the tag, and confirm the pushed tag reports
+> `verification.verified == true` before producing any candidate. GitHub
+> re-evaluates tag verification when a key is registered afterward, but the
+> release sequence does not depend on that re-evaluation: a tag that stays
+> `unknown_key` can never pass `scripts/publish-release.sh`, and recovering
+> requires replacing the tag under temporarily lifted tag-ruleset enforcement
+> and rebinding the release record's `tagObject`.
 
 A release begins with an annotated signed `vMAJOR.MINOR.PATCH` tag and two
 captured immutable Git identities:
@@ -504,8 +506,10 @@ formula changes and interpolation are accepted. This metadata check is not a
 Ruby sandbox. All-four URL/hash maintenance belongs to the ordinary tap updater.
 
 The verifier performs a fresh public fetch, install or reinstall, exact
-archive-to-install byte comparison, native architecture and Foundation signature
-and online notarization checks, `brew test`, exact version execution, and Apple
+archive-to-install byte comparison, native architecture and the declared
+unsigned-signature checks (unsigned signature report required, strict
+signature verification and notarization requirement both required to fail),
+`brew test`, exact version execution, and Apple
 Silicon helper `vmd-info`. The helper must be present only on arm64 and report
 the provenance-bound VMD trust marker. No raw candidate execution is needed
 before this installed-binary smoke. Protected downstream tooling remains clean
@@ -560,8 +564,9 @@ credentials. The verifier fails if any prohibited credential remains.
 
 Each job verifies the frozen inventory, checksums, provenance, exact archive
 shape, Go build information, source revision and clean-build flag, thin native
-architecture, Foundation signature, hardened runtime, secure timestamp, and
-online notarization. Protected tooling statically locates the one provenance-
+architecture, and the declared unsigned Apple state — every macOS binary must
+carry no signature and no notarization, per `scripts/verify-macos-binary.sh`.
+Protected tooling statically locates the one provenance-
 matched embedded VMD Mach-O without executing the helper, then independently
 verifies it. Static jobs freeze the two immutable proof artifacts first.
 Candidate-controlled code runs only in dependent clean jobs: the arm64 helper
@@ -576,10 +581,12 @@ draft metadata, notes, and every asset record again. Require byte-for-byte
 equality with the frozen proof and require the successful native markers to
 refer to that exact state.
 
-Enable organization-enforced release immutability for this repository before
-the publication gate. The publisher checks the live setting before its sole
+Enable repository-level release immutability for this repository before
+the publication gate — a personal-account repository has no
+organization-enforced mode, so the repository setting is the strongest form
+available. The publisher checks the live setting before its sole
 PATCH, and the publication response plus every public verifier must report
-`immutable=true`. A repository-only or disabled setting blocks publication
+`immutable=true`. A disabled setting blocks publication
 before mutation.
 
 The protected native verifier uses a non-cancelling concurrency key scoped to
