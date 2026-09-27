@@ -11,6 +11,17 @@ CRABBOX_RELEASE_TAP_FORMULA=${CRABBOX_RELEASE_TAP_FORMULA:-crabbox}
 CRABBOX_RELEASE_DEFAULT_BRANCH=main
 CRABBOX_RELEASE_GO_VERSION=go1.26.5
 CRABBOX_RELEASE_GORELEASER_VERSION=2.17.0
+# Apple signing mode: `developer-id` requires a Developer ID identity and
+# notarization; `none` declares macOS artifacts unsigned and not notarized,
+# which the verifier proves by rejecting any signature it finds.
+CRABBOX_RELEASE_APPLE_SIGNING=${CRABBOX_RELEASE_APPLE_SIGNING:-developer-id}
+case "$CRABBOX_RELEASE_APPLE_SIGNING" in
+  developer-id | none) ;;
+  *)
+    echo "CRABBOX_RELEASE_APPLE_SIGNING must be developer-id or none" >&2
+    return 2 2>/dev/null || exit 2
+    ;;
+esac
 CRABBOX_RELEASE_TEAM_ID=FWJYW4S8P8
 CRABBOX_RELEASE_AUTHORITY="Developer ID Application: OpenClaw Foundation (${CRABBOX_RELEASE_TEAM_ID})"
 CRABBOX_RELEASE_CLI_IDENTIFIER=org.openclaw.crabbox
@@ -23,6 +34,7 @@ readonly \
   CRABBOX_RELEASE_DEFAULT_BRANCH \
   CRABBOX_RELEASE_GO_VERSION \
   CRABBOX_RELEASE_GORELEASER_VERSION \
+  CRABBOX_RELEASE_APPLE_SIGNING \
   CRABBOX_RELEASE_TEAM_ID \
   CRABBOX_RELEASE_AUTHORITY \
   CRABBOX_RELEASE_CLI_IDENTIFIER \
