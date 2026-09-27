@@ -192,7 +192,10 @@ freeze_public_release() {
   local expected_names="$work/expected-assets.txt" notes="$work/expected-notes.md"
   crabbox_release_asset_names "$version" | LC_ALL=C sort >"$expected_names"
   git -C "$ROOT" show "$source_commit:CHANGELOG.md" >"$work/tagged-changelog.md"
-  "$ROOT/scripts/extract-release-notes.sh" "$tag" <"$work/tagged-changelog.md" >"$notes"
+  "$ROOT/scripts/extract-release-notes.sh" "$tag" <"$work/tagged-changelog.md" >"$work/expected-section.md"
+  # The release body is the section verbatim, or the deterministic bound stub
+  # when the section exceeds GitHub's body limit.
+  crabbox_release_body_from_notes "$work/expected-section.md" "$tag" "$source_commit" >"$notes"
 
   find "$asset_dir" -mindepth 1 -maxdepth 1 -exec basename {} \; | LC_ALL=C sort >"$work/actual-assets.txt"
   cmp -s "$expected_names" "$work/actual-assets.txt" || {
