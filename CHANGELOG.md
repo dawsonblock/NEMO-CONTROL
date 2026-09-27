@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.53.1 - 2026-09-27
+
+### Fixed — persistence integrity: stale-writer and terminal-GC races
+
+- Coordinator: lease and ready-pool transitions are now applied to the freshly reloaded record inside the transaction, never to the caller's possibly stale copy, and carry a monotonic `storageRevision` optimistic-concurrency check. A same-state writer — a borrow heartbeat, or cleanup debt recorded on a terminal lease — that lost a race is now refused instead of silently overwriting committed metadata. The transition input, not a mutated loaded record, is the only way to persist an edit.
+- Coordinator: terminalization attempts gained a `retiring` state. The sweeper claims an abandoned attempt inside a transaction that reloads the run and refuses when the run references the attempt's log, and the terminal commit accepts only a `log_written` attempt, so a sweep can no longer delete a finish log a concurrent commit just referenced.
+- Coordinator: a consumed terminal attempt is retained as the run's durable digest anchor and removed together with its run by `deleteTerminalRun`, rather than being swept on its own. Ordinary maintenance no longer turns a valid terminal run into one the qualification classifier calls impossible.
+- Coordinator: `createRunningRun` builds the persisted record from a clone and publishes the committed sequence back to the caller only after commit, so an aborted creation leaves the caller's record untouched.
+- Qualification: the crash harness gives `CrashStorage.transaction` real snapshot/rollback semantics and can inject a crash after the Nth write inside a transaction, so it proves mid-transaction atomicity rather than only a crash before the transaction begins. Added same-state lease and ready-pool cases, a mid-transaction-B rollback case, and a post-sweep classification case.
+
+### Fixed — release-ledger provenance
+
+- Release: the 27 imported pre-fork release records (v0.37.0–v0.50.0) are restored to their real `openclaw/crabbox` provenance; only fork-origin releases (v0.52.0 onward) name `dawsonblock/crabedence-V1`. `scripts/release-identity.test.js` now checks each record against its actual origin instead of forcing every record to the fork.
+- Release: `release/records/v0.53.0.json` is `blocked`, with the persistence-integrity findings recorded as the blocker. The signed v0.53.0 tag is preserved and not moved; the fixes are intended for v0.53.1.
+
 ## 0.53.0 - 2026-09-26
 
 ### Security — dependency advisories classified, worker toolchain updated
