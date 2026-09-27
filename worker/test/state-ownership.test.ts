@@ -81,9 +81,11 @@ describe("state ownership guard self-test", () => {
       'latest.state = canceled ? "released" : "failed";',
       'current.state = leaseIsLive(current) ? "expired" : current.state;',
     ];
-    for (const sample of samples) {
-      expect([...sample.matchAll(assignmentPattern)].length, sample).toBeGreaterThan(0);
-    }
+    const missed = samples.filter(
+      (sample) => [...sample.matchAll(assignmentPattern)].length === 0,
+    );
+    // The array names exactly which known-bad shapes the pattern missed.
+    expect(missed).toEqual([]);
     expect([...`state: "provisioning",`.matchAll(leaseLiteralPattern)].length).toBe(1);
     expect([...`state: "quarantined",`.matchAll(poolLiteralPattern)].length).toBe(1);
   });
@@ -95,9 +97,10 @@ describe("state ownership guard self-test", () => {
       'pasteBtn.dataset.state = "ok";',
       "operation.step.state = journal.state;",
     ];
-    for (const sample of nonMatches) {
-      expect([...sample.matchAll(assignmentPattern)].length, sample).toBe(0);
-    }
+    const falsePositives = nonMatches.filter(
+      (sample) => [...sample.matchAll(assignmentPattern)].length > 0,
+    );
+    expect(falsePositives).toEqual([]);
   });
 });
 

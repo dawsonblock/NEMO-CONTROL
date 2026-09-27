@@ -374,7 +374,9 @@ describe("terminal attempt staging", () => {
     // Crash after transaction A, before the log_written record: the
     // attempt is reserved and the retry converges on it.
     storage.failTransactionNumber = 3;
-    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow();
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      "storage transaction failed",
+    );
     storage.failTransactionNumber = undefined;
     const reserved = await storage.list<{ state: string; logPrefix: string }>({
       prefix: attemptPrefix(run.id),
@@ -406,7 +408,9 @@ describe("terminal attempt staging", () => {
     // Crash before transaction B: the attempt is log_written and the run is
     // still running.
     storage.failTransactionNumber = 4;
-    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow();
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      "storage transaction failed",
+    );
     storage.failTransactionNumber = undefined;
     const attempts = await storage.list<{ state: string; logPrefix: string }>({
       prefix: attemptPrefix(run.id),
@@ -415,8 +419,10 @@ describe("terminal attempt staging", () => {
     expect(attempt.state).toBe("log_written");
     // Corrupt the immutable bytes: the commit must refuse rather than
     // reference a log it cannot verify.
-    for (const key of [...storage.map.keys()].filter((key) => key.startsWith(attempt.logPrefix))) {
-      storage.map.set(key, "corrupted");
+    for (const logKey of [...storage.map.keys()].filter((candidate) =>
+      candidate.startsWith(attempt.logPrefix),
+    )) {
+      storage.map.set(logKey, "corrupted");
     }
     const refused = await repository.commitTerminalRun(commitInput(run));
     expect(refused.kind).toBe("conflict");
@@ -441,7 +447,9 @@ describe("terminal attempt staging", () => {
     // Fail the abandoned run's terminal transaction (B), relative to the
     // transactions already consumed by the live run's commit.
     storage.failTransactionNumber = storage.transactionCount + 3;
-    await expect(repository.commitTerminalRun(commitInput(abandoned))).rejects.toThrow();
+    await expect(repository.commitTerminalRun(commitInput(abandoned))).rejects.toThrow(
+      "storage transaction failed",
+    );
     storage.failTransactionNumber = undefined;
     const abandonedAttempts = await storage.list<{ logPrefix: string }>({
       prefix: attemptPrefix(abandoned.id),

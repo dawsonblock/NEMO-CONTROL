@@ -44647,7 +44647,6 @@ describe("synthetic acknowledgement reliability", () => {
         await alarmRuntime(storage).scheduleAlarm(Date.now() + 1800_000);
         storage.resetListOptions();
         const get = vi.spyOn(storage, "get");
-        const put = vi.spyOn(storage, "put");
         const observedGet = (storage.beforeGet = vi.fn<NonNullable<MemoryStorage["beforeGet"]>>(
           async () => {},
         ));

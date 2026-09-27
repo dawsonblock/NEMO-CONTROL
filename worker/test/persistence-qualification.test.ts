@@ -123,6 +123,16 @@ const runFixture = (overrides: Partial<RunRecord> = {}): RunRecord =>
     ...overrides,
   }) as RunRecord;
 
+const borrowInput = (owner: string, token: string) => ({
+  typed: false,
+  owner,
+  token,
+  now: "2026-09-24T01:00:00.000Z",
+  nowMs: Date.parse("2026-09-24T01:00:00.000Z"),
+  heartbeat: true,
+  leaseExpiresAt: "2026-09-24T02:00:00.000Z",
+});
+
 const commitInput = (binding: RunRecord, overrides: Record<string, unknown> = {}) => ({
   runID: binding.id,
   fingerprint: "sha256:aaaa",
@@ -201,7 +211,9 @@ describe("terminalization crash boundaries", () => {
     await repository.createRunningRun(run);
 
     crash(storage);
-    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow();
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      /injected crash/,
+    );
     // The run never appears terminal, and no terminal record references an
     // unverified log.
     expect(await classifyRun(storage, run.id)).toBe("recoverable");
@@ -240,10 +252,10 @@ describe("terminalization crash boundaries", () => {
     // Corrupt the bytes: the classifier must call this impossible, which is
     // what makes the invariant testable rather than aspirational.
     const stored = (await storage.get(runKey(run.id))) as RunRecord;
-    for (const key of [...storage.map.keys()].filter((key) =>
-      key.startsWith(stored.terminalLogPrefix!),
+    for (const logKey of [...storage.map.keys()].filter((candidate) =>
+      candidate.startsWith(stored.terminalLogPrefix!),
     )) {
-      storage.map.set(key, "tampered");
+      storage.map.set(logKey, "tampered");
     }
     expect(await classifyRun(storage, run.id)).toBe("impossible");
   });
@@ -320,16 +332,6 @@ describe("ready pool crash boundaries", () => {
       expiresAt: "2026-09-24T02:00:00.000Z",
       ...overrides,
     }) as ReadyPoolEntry;
-
-  const borrowInput = (owner: string, token: string) => ({
-    typed: false,
-    owner,
-    token,
-    now: "2026-09-24T01:00:00.000Z",
-    nowMs: Date.parse("2026-09-24T01:00:00.000Z"),
-    heartbeat: true,
-    leaseExpiresAt: "2026-09-24T02:00:00.000Z",
-  });
 
   it("never lends one entry to two borrowers, and refuses the loser", async () => {
     const storage = new CrashStorage();

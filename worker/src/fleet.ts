@@ -13768,8 +13768,8 @@ export class FleetCoordinator {
         entry.state !== "stale" &&
         !(entry.state === "draining" && providerCleanupPending)
       ) {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- ordered writes prevent stale maintenance from racing a newer entry transition.
         try {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- ordered writes prevent stale maintenance from racing a newer entry transition.
           await this.readyPoolRepository.retireEntry(entry, {
             typed,
             kind: "stale",

@@ -312,11 +312,13 @@ export class DurableObjectRunRepository implements RunRepository {
     });
     let swept = 0;
     for (const [key, attempt] of attempts) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each attempt is retired from its own freshly read state before the next is considered.
       const run = await this.loadRun(attempt.runID);
       if (run?.terminalLogPrefix === attempt.logPrefix) {
         // Live: the run owns this log. A consumed attempt may be
         // forgotten, but never the bytes it points at.
         if (terminalAttemptIsConsumed(attempt)) {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- a consumed attempt is forgotten one at a time.
           await this.storage.delete(key);
         }
         continue;
@@ -325,7 +327,9 @@ export class DurableObjectRunRepository implements RunRepository {
       if (!Number.isFinite(reservedAt) || reservedAt > cutoff) {
         continue;
       }
+      // oxlint-disable-next-line eslint/no-await-in-loop -- the bytes are removed before the attempt that owned them.
       await deleteStoragePrefix(this.storage, attempt.logPrefix).catch(() => undefined);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- retire the attempt only after its bytes are gone.
       await this.storage.delete(key);
       swept += 1;
     }
