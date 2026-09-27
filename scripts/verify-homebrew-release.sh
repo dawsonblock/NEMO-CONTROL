@@ -87,6 +87,7 @@ assert_clean_homebrew_environment() {
   while IFS= read -r name; do
     case "$name" in
       CRABBOX_HOMEBREW_CLEAN_CHILD | \
+        CRABBOX_RELEASE_APPLE_SIGNING | \
         CRABBOX_VERIFY_TOOLING_COMMIT | \
         HOME | HOMEBREW_CACHE | HOMEBREW_NO_ANALYTICS | HOMEBREW_NO_AUTO_UPDATE | \
         HOMEBREW_NO_ENV_HINTS | HOMEBREW_NO_INSTALL_CLEANUP | \
@@ -237,7 +238,7 @@ const fs = require("node:fs");
 const [file, tag, archive, sha256] = process.argv.slice(2);
 const { formulae } = JSON.parse(fs.readFileSync(file, "utf8"));
 const formula = formulae?.[0];
-const url = `https://github.com/${process.env.CRABBOX_PUBLISH_REPOSITORY}/releases/download/${tag}/${archive}`;
+const url = `https://github.com/${process.env.CRABBOX_RELEASE_REPOSITORY}/releases/download/${tag}/${archive}`;
 if (
   formulae?.length !== 1 || formula?.name !== "crabbox" ||
   formula.full_name !== process.env.CRABBOX_RELEASE_TAP + "/" + process.env.CRABBOX_RELEASE_TAP_FORMULA ||
@@ -483,6 +484,7 @@ main() {
     HOMEBREW_NO_INSTALL_CLEANUP=1 \
     NONINTERACTIVE=1 \
     CRABBOX_HOMEBREW_CLEAN_CHILD=1 \
+    CRABBOX_RELEASE_APPLE_SIGNING="$CRABBOX_RELEASE_APPLE_SIGNING" \
     CRABBOX_VERIFY_TOOLING_COMMIT="$tooling_commit" \
     /bin/bash -c 'source "$1"; shift; homebrew_phase "$@"' \
       crabbox-homebrew-phase "$SCRIPT_PATH" \

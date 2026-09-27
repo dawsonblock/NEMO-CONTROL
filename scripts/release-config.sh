@@ -14,7 +14,7 @@ CRABBOX_RELEASE_GORELEASER_VERSION=2.17.0
 # Apple signing mode: `developer-id` requires a Developer ID identity and
 # notarization; `none` declares macOS artifacts unsigned and not notarized,
 # which the verifier proves by rejecting any signature it finds.
-CRABBOX_RELEASE_APPLE_SIGNING=${CRABBOX_RELEASE_APPLE_SIGNING:-developer-id}
+CRABBOX_RELEASE_APPLE_SIGNING=${CRABBOX_RELEASE_APPLE_SIGNING:-none}
 case "$CRABBOX_RELEASE_APPLE_SIGNING" in
   developer-id | none) ;;
   *)
@@ -22,11 +22,20 @@ case "$CRABBOX_RELEASE_APPLE_SIGNING" in
     return 2 2>/dev/null || exit 2
     ;;
 esac
-CRABBOX_RELEASE_TEAM_ID=FWJYW4S8P8
-CRABBOX_RELEASE_AUTHORITY="Developer ID Application: OpenClaw Foundation (${CRABBOX_RELEASE_TEAM_ID})"
-CRABBOX_RELEASE_CLI_IDENTIFIER=org.openclaw.crabbox
-CRABBOX_RELEASE_HELPER_IDENTIFIER=org.openclaw.crabbox.apple-vm-helper
-CRABBOX_RELEASE_VMD_IDENTIFIER=org.openclaw.crabbox.apple-vm-vmd
+# The signing identity is deliberately not a release constant: the fork owns
+# no Apple Developer ID, so developer-id mode requires the operator to supply
+# both values explicitly. Unsigned mode leaves them empty, which makes every
+# signature comparison fail closed rather than match an inherited identity.
+if [[ "$CRABBOX_RELEASE_APPLE_SIGNING" == developer-id ]]; then
+  : "${CRABBOX_RELEASE_TEAM_ID:?developer-id releases require CRABBOX_RELEASE_TEAM_ID}"
+  : "${CRABBOX_RELEASE_AUTHORITY:?developer-id releases require CRABBOX_RELEASE_AUTHORITY}"
+else
+  CRABBOX_RELEASE_TEAM_ID=
+  CRABBOX_RELEASE_AUTHORITY=
+fi
+CRABBOX_RELEASE_CLI_IDENTIFIER=io.github.dawsonblock.crabbox
+CRABBOX_RELEASE_HELPER_IDENTIFIER=io.github.dawsonblock.crabbox.apple-vm-helper
+CRABBOX_RELEASE_VMD_IDENTIFIER=io.github.dawsonblock.crabbox.apple-vm-vmd
 readonly \
   CRABBOX_RELEASE_REPOSITORY \
   CRABBOX_RELEASE_TAP \
@@ -69,6 +78,10 @@ crabbox_release_asset_names() {
 }
 
 crabbox_release_designated_requirement() {
+  [[ "$CRABBOX_RELEASE_APPLE_SIGNING" == developer-id ]] || {
+    echo "designated requirements exist only under developer-id signing" >&2
+    return 2
+  }
   local identifier=${1:-}
   case "$identifier" in
     "$CRABBOX_RELEASE_CLI_IDENTIFIER" | \

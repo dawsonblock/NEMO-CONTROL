@@ -73,7 +73,7 @@ esac
 `,
     );
 
-    const result = spawnSync("/bin/bash", [verifier, "org.openclaw.crabbox", "arm64", binary], {
+    const result = spawnSync("/bin/bash", [verifier, "io.github.dawsonblock.crabbox", "arm64", binary], {
       cwd: work,
       encoding: "utf8",
       env: {
@@ -103,7 +103,7 @@ test("the unsigned contract rejects a signed artifact", { skip: !darwin }, () =>
   assert.match(result.stderr, /unsigned release policy: binary carries a code signature/);
 });
 
-test("the default signing mode is unchanged", () => {
+test("the default signing mode is the declared unsigned contract", () => {
   const config = fs.readFileSync(path.join(root, "scripts/release-config.sh"), "utf8");
-  assert.match(config, /CRABBOX_RELEASE_APPLE_SIGNING=\$\{CRABBOX_RELEASE_APPLE_SIGNING:-developer-id\}/);
+  assert.match(config, /CRABBOX_RELEASE_APPLE_SIGNING=\$\{CRABBOX_RELEASE_APPLE_SIGNING:-none\}/);
 });

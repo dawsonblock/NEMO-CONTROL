@@ -63,7 +63,7 @@ test("release workflow is verifier-only, protected-default, dual-native, and tok
   );
   assert.match(
     read(".github/CODEOWNERS"),
-    /^\/\.github\/workflows\/verify-homebrew\.yml @openclaw\/openclaw-secops$/m,
+    /^\/\.github\/workflows\/verify-homebrew\.yml @dawsonblock$/m,
   );
 });
 
@@ -184,7 +184,7 @@ test("Homebrew smoke uses protected native tooling and only anonymous fixed-repo
   assert.match(workflow, /persist-credentials: false/);
   assert.match(workflow, /ref: \$\{\{ github.workflow_sha \}\}/);
   assert.match(workflow, /assets_dir="\$RUNNER_TEMP\/release-assets"/);
-  assert.match(workflow, /https:\/\/github.com\/openclaw\/crabbox\/releases\/download\/\$RELEASE_TAG\/\$asset/);
+  assert.match(workflow, /https:\/\/github.com\/\$GITHUB_REPOSITORY\/releases\/download\/\$RELEASE_TAG\/\$asset/);
   const verify = workflowStep(workflow, "Verify public Homebrew install without credentials");
   assert.match(verify, /unset ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_RUNTIME_TOKEN GH_TOKEN GITHUB_TOKEN/);
   assert.match(verify, /"\$TAG_OBJECT" "\$SOURCE_COMMIT" "\$VERIFIER_COMMIT" \\\n\s+"\$RELEASE_ID"/);
@@ -234,7 +234,7 @@ url=\${!#}
 printf '%s\\n' "$url" >>${quote(calls)}
 case "$url" in
   https://api.github.com/repos/dawsonblock/crabedence-V1/releases/123) cat ${quote(metadata)} ;;
-  ${names.map((name) => `https://github.com/openclaw/crabbox/releases/download/v1.2.3/${name}`).join("|")}) cat ${quote(payload)} ;;
+  ${names.map((name) => `https://github.com/dawsonblock/crabedence-V1/releases/download/v1.2.3/${name}`).join("|")}) cat ${quote(payload)} ;;
   *) echo unexpected-endpoint >&2; exit 96 ;;
 esac
 `);
@@ -280,10 +280,22 @@ test("script CI fetches signed release tags for publication fixtures", () => {
   assert.match(scriptsJob, /timeout-minutes: 10/);
 });
 
-test("Crabbox CI cannot redefine the organization-required release check", () => {
+test("the required Release Check lives in its own protected credential-free workflow", () => {
   const ci = read(".github/workflows/ci.yml");
   assert.doesNotMatch(ci, /^\s+name: Release Check$/m);
   assert.doesNotMatch(ci, /goreleaser\/goreleaser-action/);
+  // The merge gate runs in a dedicated workflow file so a pull request cannot
+  // bury or rename the check inside a larger workflow it also edits.
+  const check = read(".github/workflows/release-check.yml");
+  assert.match(check, /^  pull_request:$/m);
+  assert.match(check, /^\s+name: Release Check$/m);
+  assert.match(check, /runs-on: macos-15/);
+  assert.match(check, /persist-credentials: false/);
+  assert.match(check, /unset GH_TOKEN GITHUB_TOKEN ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_RUNTIME_TOKEN/);
+  assert.match(check, /goreleaser release --snapshot --clean --config \.goreleaser\.yaml/);
+  assert.doesNotMatch(check, /secrets\.|GH_TOKEN:|contents: write/);
+  const codeowners = read(".github/CODEOWNERS");
+  assert.match(codeowners, /^\/\.github\/workflows\/release-check\.yml @dawsonblock$/m);
 });
 
 test("GoReleaser is credential-free build-only with exact binary archives", () => {
@@ -332,7 +344,7 @@ test("versioned Go installation is hermetic and precedes release builds", () => 
   assert.ok(gateIndex >= 0 && gateIndex < releaseIndex);
 
   const codeowners = read(".github/CODEOWNERS");
-  assert.match(codeowners, /^\/scripts\/verify-go-install\.sh @openclaw\/openclaw-secops$/m);
+  assert.match(codeowners, /^\/scripts\/verify-go-install\.sh @dawsonblock$/m);
 });
 
 test("release config emits the exact immutable eight-asset inventory", () => {
@@ -573,13 +585,21 @@ test("provenance binds the explicit producer manifest, separate packager, notari
     "--notes",
     notes,
   ];
+  const signedEnv = {
+    ...process.env,
+    CRABBOX_RELEASE_APPLE_SIGNING: "developer-id",
+    CRABBOX_RELEASE_TEAM_ID: "EXAMPLE0000",
+    CRABBOX_RELEASE_AUTHORITY: "Developer ID Application: Example (EXAMPLE0000)",
+  };
   try {
     fs.writeFileSync(notes, "## 1.2.3 - 2026-07-10\n\n- Release.\n");
     for (const name of archives) {
       fs.writeFileSync(path.join(directory, name), `fixture:${name}\n`);
     }
-    execFileSync(process.execPath, [script, ...writeArgs]);
-    assert.doesNotThrow(() => execFileSync(process.execPath, [script, ...verifyArgs]));
+    execFileSync(process.execPath, [script, ...writeArgs], { env: signedEnv });
+    assert.doesNotThrow(() =>
+      execFileSync(process.execPath, [script, ...verifyArgs], { env: signedEnv }),
+    );
     const provenance = JSON.parse(fs.readFileSync(path.join(directory, "provenance.json")));
     assert.equal(provenance.producer.manifestSha256, candidateManifestSha256);
     assert.equal(provenance.producer.swift, "Apple Swift version 6.1 (swiftlang-test)");
@@ -592,7 +612,10 @@ test("provenance binds the explicit producer manifest, separate packager, notari
       123456,
     );
     fs.appendFileSync(path.join(directory, "crabbox_1.2.3_linux_arm64.tar.gz"), "drift");
-    assert.notEqual(spawnSync(process.execPath, [script, ...verifyArgs]).status, 0);
+    assert.notEqual(
+      spawnSync(process.execPath, [script, ...verifyArgs], { env: signedEnv }).status,
+      0,
+    );
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
     fs.rmSync(candidate, { recursive: true, force: true });
@@ -729,15 +752,26 @@ test("Go binary proof checks clean exact VCS and target build info", () => {
   }
 });
 
-test("signing and verification enforce Foundation identity, runtime, timestamp, and online notarization", () => {
+test("signing and verification enforce the declared unsigned contract and keep the developer-id path behind the mode", () => {
   const config = read("scripts/release-config.sh");
   const signer = read("scripts/codesign-macos.sh");
   const verifier = read("scripts/verify-macos-binary.sh");
   const packager = read("scripts/package-release.sh");
-  assert.match(config, /Developer ID Application: OpenClaw Foundation/);
-  assert.match(config, /FWJYW4S8P8/);
-  assert.match(config, /org\.openclaw\.crabbox/);
-  assert.match(config, /org\.openclaw\.crabbox\.apple-vm-helper/);
+  // The fork owns no Apple identity: unsigned is the declared default and the
+  // developer-id identity is operator-supplied, never a default.
+  assert.match(config, /CRABBOX_RELEASE_APPLE_SIGNING=\$\{CRABBOX_RELEASE_APPLE_SIGNING:-none\}/);
+  assert.match(config, /CRABBOX_RELEASE_TEAM_ID:\?developer-id releases require/);
+  assert.match(config, /CRABBOX_RELEASE_AUTHORITY:\?developer-id releases require/);
+  assert.match(config, /io\.github\.dawsonblock\.crabbox/);
+  assert.match(config, /io\.github\.dawsonblock\.crabbox\.apple-vm-helper/);
+  assert.doesNotMatch(config, /OpenClaw Foundation|FWJYW4S8P8|org\.openclaw/);
+  // The signer refuses outright under the unsigned contract.
+  assert.match(signer, /unsigned release contract forbids invoking the signer/);
+  // The verifier proves unsignedness instead of skipping signature checks.
+  assert.match(verifier, /code object is not signed at all/);
+  assert.match(verifier, /unsigned release policy: binary carries a code signature/);
+  // The developer-id path is preserved for a later contract upgrade: it still
+  // enforces hardened runtime, secure timestamp, and online notarization.
   assert.match(signer, /--options runtime/);
   assert.match(signer, /--timestamp/);
   assert.match(signer, /notarytool submit/);
@@ -822,14 +856,15 @@ test("release documentation authorizes normal continuation from one full request
   assert.doesNotMatch(release, /render-homebrew|PUBLIC_PROOFS|public_verifier_run_id/);
   assert.match(release, /already-current tap is success/);
   assert.match(release, /metadata check is not a\nRuby sandbox/);
-  assert.match(release, /Developer ID Application: OpenClaw Foundation \(FWJYW4S8P8\)/);
+  assert.match(release, /CRABBOX_RELEASE_APPLE_SIGNING=none/);
+  assert.match(release, /unsigned and not\s+notarized/);
+  assert.doesNotMatch(release, /Developer ID Application: OpenClaw Foundation \(FWJYW4S8P8\)/);
   assert.match(release, /PACKAGE_SCRIPT_SHA256/);
   assert.match(
     release,
     /PACKAGE_SCRIPT_SHA256=\$\(git --no-pager show \\\n  "\$\{VERIFIER_COMMIT\}:scripts\/package-release\.sh"/,
   );
-  assert.match(release, /mac-release[\s\S]*\/bin\/bash -c/);
-  const secretGateStart = release.indexOf("codesign-run --with-package-secrets --");
+  const secretGateStart = release.indexOf("/bin/bash -c '\n    set -euo pipefail\n    root=\$1");
   const secretGateEnd = release.indexOf("' crabbox-protected-package", secretGateStart);
   assert.ok(secretGateStart >= 0 && secretGateEnd > secretGateStart);
   const secretGate = release.slice(secretGateStart, secretGateEnd);
@@ -908,31 +943,17 @@ test("v0.38.4 is pinned to the sparse-sync source and ready for publication", ()
   assert.equal(record.publicationStatus, "ready");
 });
 
-test("managed Foundation signing and notary configuration is repository-owned and secret-free", () => {
+test("the unsigned release manifest is repository-owned and secret-free", () => {
   const manifest = read(".mac-release.env");
   const codeowners = read(".github/CODEOWNERS");
-  assert.match(
-    manifest,
-    /MAC_RELEASE_CODESIGN_IDENTITY='Developer ID Application: OpenClaw Foundation \(FWJYW4S8P8\)'/,
-  );
-  assert.match(
-    manifest,
-    /^MAC_RELEASE_OP_ITEM='Release - App Store Connect API key \(3373VBN2P4\) - notarization'$/m,
-  );
-  assert.match(manifest, /MAC_RELEASE_OP_FIELDS=NOTARYTOOL_KEYCHAIN_PROFILE/);
-  assert.match(manifest, /^MAC_RELEASE_OP_VAULT=Molty$/m);
-  assert.match(manifest, /^MAC_RELEASE_OP_USE_SERVICE_ACCOUNT=1$/m);
-  assert.match(manifest, /^MAC_RELEASE_OP_TMUX_SESSION=op-work$/m);
-  assert.match(
-    manifest,
-    /^MAC_RELEASE_CODESIGN_OP_ITEM='Release - macOS signing keychain ref - OpenClaw Foundation'$/m,
-  );
-  assert.match(manifest, /^MAC_RELEASE_CODESIGN_OP_VAULT=Molty$/m);
-  assert.match(manifest, /^MAC_RELEASE_CODESIGN_OP_USE_SERVICE_ACCOUNT=1$/m);
-  assert.match(manifest, /MAC_RELEASE_CODESIGN_KEYCHAIN_MANAGED=1/);
-  assert.match(manifest, /MAC_RELEASE_CODESIGN_PASSWORDLESS=1/);
+  // The manifest declares the unsigned contract and carries no signing or
+  // notarization material at all — there is nothing to leak.
+  assert.match(manifest, /^CRABBOX_RELEASE_APPLE_SIGNING='none'$/m);
+  assert.doesNotMatch(manifest, /MAC_RELEASE_CODESIGN|MAC_RELEASE_OP_|NOTARYTOOL/);
+  assert.doesNotMatch(manifest, /OpenClaw Foundation|FWJYW4S8P8|org\.openclaw/);
   assert.doesNotMatch(manifest, /(?:PASSWORD|TOKEN|SECRET)=/);
-  assert.match(codeowners, /^\/\.mac-release\.env @openclaw\/openclaw-secops$/m);
+  assert.match(codeowners, /^\/\.mac-release\.env @dawsonblock$/m);
+  assert.doesNotMatch(codeowners, /@openclaw\//);
 });
 
 test("credential-free producer captures tool output before parsing under pipefail", () => {

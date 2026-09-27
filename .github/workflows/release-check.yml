@@ -1,0 +1,38 @@
+name: Release Check
+
+# Credential-free macOS release snapshot check. The publish gate requires a
+# no-bypass repository ruleset demanding this check context before merge, so a
+# pull request cannot land while the release configuration fails to build.
+# This file is CODEOWNERS-protected: the check cannot be redefined without
+# owner review.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Release Check
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Credential-free release snapshot
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_RUNTIME_TOKEN
+          # Pinned through the Go module checksum database, not a floating install.
+          go install github.com/goreleaser/goreleaser/v2@v2.17.0
+          goreleaser release --snapshot --clean --config .goreleaser.yaml
