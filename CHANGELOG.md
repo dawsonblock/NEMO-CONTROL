@@ -2,6 +2,11 @@
 
 ## 0.53.0 - 2026-09-26
 
+### Security — dependency advisories classified, worker toolchain updated
+
+- The worker's three high-severity advisories (`sharp` via `miniflare` via `wrangler`) were **dev-tooling only** — the local Workers simulator, never in the shipped bundle — and are cleared by a non-breaking `wrangler` 4.127 → 4.135 bump (published 8 days before this change). `npm audit` for the worker now reports zero vulnerabilities, and the full worker gate passes with it.
+- Nemo's six advisories (one critical) are also dev/qualification tooling, but their only fixes are **semver-major** (`vitest` 1.6 → 5.0, `ajv-cli` 0.6). Migrating the qualification harness's test runner is a behavioural change that needs its own qualification, so it is deliberately **deferred** to a follow-up rather than smuggled into this release. `npm audit fix` was not run blind in either package.
+
 ### Hardening — adversarial persistence qualification
 
 - Added `worker/test/persistence-qualification.test.ts`: crash injection at every persistence boundary across the three stateful repositories, with each post-restart durable state classified **valid** (the committed outcome), **recoverable** (a durable intermediate a retry converges from), or **impossible** (must never be observable). The suite asserts the classification, asserts that recovery converges where it claims to, and asserts the invariants that make "impossible" meaningful.
