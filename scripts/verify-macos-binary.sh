@@ -45,6 +45,36 @@ ACTUAL_ARCH=$(lipo -archs "$BINARY")
   exit 1
 }
 
+if [[ "$CRABBOX_RELEASE_APPLE_SIGNING" == "none" ]]; then
+  # This release contract declares macOS artifacts unsigned and not
+  # notarized. That is asserted positively: a signature or a notarization
+  # ticket is a failure, never a tolerated extra.
+  UNSIGNED_SIGNATURE=$(codesign -dvvv "$BINARY" 2>&1 || true)
+  grep -q 'code object is not signed at all' <<<"$UNSIGNED_SIGNATURE" || {
+    echo "unsigned release policy: binary carries a code signature" >&2
+    exit 1
+  }
+  if codesign --verify --strict "$BINARY" >/dev/null 2>&1; then
+    echo "unsigned release policy: binary verifies as a signed artifact" >&2
+    exit 1
+  fi
+  # Notarization is asserted through the same codesign surface the signed
+  # path uses — this verifier never invokes a separate ticket tool — so an
+  # unsigned binary must also fail the notarization requirement.
+  if codesign --verify --strict --check-notarization -R=notarized "$BINARY" >/dev/null 2>&1; then
+    echo "unsigned release policy: binary satisfies the notarization requirement" >&2
+    exit 1
+  fi
+  if [[ "$EXECUTE" == 1 ]]; then
+    [[ "$IDENTIFIER" == "$CRABBOX_RELEASE_CLI_IDENTIFIER" ]] || {
+      echo "candidate execution is supported only for the Crabbox CLI" >&2
+      exit 2
+    }
+    env -i LC_ALL=C PATH=/usr/bin:/bin:/usr/sbin:/sbin "$BINARY" --version
+  fi
+  exit 0
+fi
+
 REQUIREMENT=$(crabbox_release_designated_requirement "$IDENTIFIER")
 EXPECTED_REQUIREMENT_CANONICAL=$(csreq -r "=$REQUIREMENT" -t)
 codesign --verify --strict -R="$REQUIREMENT" --verbose=2 "$BINARY"

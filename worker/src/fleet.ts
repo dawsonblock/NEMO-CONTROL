@@ -37,6 +37,20 @@ import {
   type GitHubUserGrant,
 } from "./auth";
 import {
+  actorFromRequest,
+  completeBridgePrincipal,
+  leaseAccessRoleForPrincipal,
+  leaseManagerAuthorized,
+  leaseViewerAuthorized,
+  normalizeShareUser,
+  normalizedLeaseShare,
+  runReadableByPrincipal,
+  runReadableToPrincipal,
+  runWritableByPrincipal,
+  sanitizeShareRole,
+  type NormalizedLeaseShare,
+} from "./authorization";
+import {
   EC2SpotClient,
   awsAutomaticProbesConfigured,
   awsCredentialsConfigured,
@@ -205,6 +219,33 @@ import {
   normalizeImageVariantSelectors,
 } from "./image-capabilities";
 import {
+  clearLeaseCleanupMetadata,
+  clearProvisioningRecoveryMetadata,
+  clearRuntimeAdapterDeleteMetadata,
+  finalizedReleasedLease,
+  isRegisteredLease,
+  leaseCleanupIsUnresolved,
+  leaseHeartbeatStateError,
+  lateProviderResourceLease,
+  leaseIsLive,
+  INITIAL_LEASE_STATE,
+  REGISTERED_LEASE_STATE,
+  absentProvisioningLease,
+  completedLeaseCleanup,
+  expiredWorkspaceProvisioningLease,
+  finalizedProvisioningLease,
+  interruptedProvisioningLease,
+  provisioningFailedLease,
+  recoveredWorkspaceLease,
+  recoveryFailedLease,
+  unresolvedWorkspaceProvisioningLease,
+  rollbackCleanupLease,
+  providerProjectForConfig,
+  providerRegionForConfig,
+  retainUnresolvedProviderResource,
+} from "./lease-lifecycle";
+import { DurableObjectLeaseRepository, type LeaseRepository } from "./lease-repository";
+import {
   MarketplaceInputError,
   marketplaceQuote,
   marketplaceStatus,
@@ -314,11 +355,38 @@ import {
   type ProviderReconciliationQuarantine,
 } from "./provider-reconciliation";
 import {
-  sameTerminalRunBinding,
-  terminalFinishSHA256,
-  validateRunEvidence,
-  verifyTerminalReceipt,
-} from "./run-receipt";
+  INITIAL_READY_POOL_STATE,
+  classifyReadyPoolBorrow,
+  readyPoolBorrowDeadline,
+} from "./ready-pool-lifecycle";
+import {
+  DurableObjectReadyPoolRepository,
+  ReadyPoolTransitionRefused,
+  readyPoolKey,
+  readyPoolPrefix,
+  typedReadyPoolPrefix,
+  type ReadyPoolRepository,
+} from "./ready-pool-repository";
+import {
+  INITIAL_RUN_PHASE,
+  INITIAL_RUN_STATE,
+  RunLifecycleService,
+  applyRunEventSummary,
+  terminalRunTimestamp,
+} from "./run-lifecycle";
+import { terminalFinishSHA256, validateRunEvidence, verifyTerminalReceipt } from "./run-receipt";
+import {
+  DurableObjectRunRepository,
+  deleteStoragePrefix,
+  runEventKey,
+  runEventPrefix,
+  runKey,
+  runLogChunkPrefix,
+  runLogKey,
+  runTerminalLogRoot,
+  terminalRunLogChunkPrefix,
+  terminalRunLogValueKey,
+} from "./run-repository";
 import {
   readRuntimeAdapterRelayBody,
   runtimeAdapterProxyPath,
@@ -434,7 +502,6 @@ import { WebVNCCredentialHandoffs, type WebVNCCredentialHandoffResult } from "./
 
 const fleetID = "default";
 const maxStoredRunLogBytes = 8 * 1024 * 1024;
-const runLogChunkBytes = 64 * 1024;
 const maxLeaseTelemetryHistory = 60;
 const maxRunTelemetrySamples = 60;
 const maxExternalRunnerSyncItems = 200;
@@ -490,18 +557,15 @@ const providerReconciliationCandidatePrefix = "provider-reconciliation:";
 const providerReconciliationCircuitPrefix = "provider-reconciliation-circuit:";
 const awsIngressReconcileRecordKey = "aws-ingress-reconcile:pending";
 const azureDeferredCleanupPrefix = "azure-cleanup:";
-const readyPoolPrefix = "ready-pool:";
 const readyPoolDesiredPrefix = "ready-pool-desired:";
 const readyPoolFillClaimPrefix = "ready-pool-fill-claim:";
 const readyPoolCountersPrefix = "ready-pool-counters:";
-const typedReadyPoolPrefix = "typed-ready-pool-v1:";
 const typedReadyPoolDesiredPrefix = "typed-ready-pool-v1-desired:";
 const typedReadyPoolFillClaimPrefix = "typed-ready-pool-v1-fill-claim:";
 const typedReadyPoolCountersPrefix = "typed-ready-pool-v1-counters:";
 const durableObjectStorageKeyMaxBytes = 2048;
 const readyPoolIdentitySchemaV1 = "crabbox-ready-pool-identity/v1";
 const readyPoolSeedFieldMaxBytes = 1024;
-const readyPoolBorrowTimeoutMs = 2 * 60_000;
 const readyPoolFillClaimTimeoutMs = 15 * 60_000;
 const readyPoolTerminalRetentionMs = 24 * 60 * 60_000;
 export const deviceMembershipCacheTTLMS = 60_000;
@@ -1136,6 +1200,9 @@ export class FleetCoordinator {
   private providerMaintenanceQueue: Promise<void> = Promise.resolve();
   private readonly webVNCCredentialHandoffs: WebVNCCredentialHandoffs;
   private readonly leaseProvisioning: LeaseProvisioningController;
+  private readonly leaseRepository: LeaseRepository;
+  private readonly readyPoolRepository: ReadyPoolRepository;
+  private readonly runLifecycle: RunLifecycleService;
   private maintenanceRun: Promise<void> | undefined;
   private maintenanceFollowup: { grantVersion?: string; preserve: boolean } | undefined;
 
@@ -1146,6 +1213,16 @@ export class FleetCoordinator {
     private readonly authContext: AuthRequestContext = {},
     private readonly coordinatorGeneration: string = crypto.randomUUID(),
   ) {
+    // Run lifecycle: the router never decides how a run changes state —
+    // it resolves the actor, verifies request material, and delegates to
+    // the lifecycle service through the durable-object repository.
+    this.runLifecycle = new RunLifecycleService(new DurableObjectRunRepository(state));
+    // Lease lifecycle: the router never assigns a lease state — every
+    // transition goes through a semantic repository operation.
+    this.leaseRepository = new DurableObjectLeaseRepository(state.storage);
+    // Ready pool: transitions go through the pool repository, which owns
+    // the reload/validate/persist transaction.
+    this.readyPoolRepository = new DurableObjectReadyPoolRepository(state.storage);
     this.leaseProvisioning = new LeaseProvisioningController(
       state,
       env,
@@ -1154,7 +1231,6 @@ export class FleetCoordinator {
         const now = new Date().toISOString();
         const completed: LeaseRecord = {
           ...lease,
-          state: "active",
           updatedAt: now,
           cloudID: result.server.cloudID,
           serverID: result.server.id,
@@ -1165,7 +1241,7 @@ export class FleetCoordinator {
           ...(result.server.region ? { region: result.server.region } : {}),
           ...(result.image ? { image: result.image } : {}),
         };
-        clearProvisioningRecoveryMetadata(completed);
+        finalizedProvisioningLease(completed);
         if (result.cost) {
           completed.estimatedHourlyUSD = result.cost.hourlyUSD;
           completed.maxEstimatedUSD = result.cost.maxUSD;
@@ -2137,21 +2213,21 @@ export class FleetCoordinator {
       }
       if (
         (attachment.kind === "webvnc-viewer" || attachment.kind === "code-viewer") &&
-        !this.leaseViewerAuthorized(lease, attachment)
+        !leaseViewerAuthorized(lease, attachment)
       ) {
         revokedViewers.set(socket, "lease access revoked");
       }
       if (
         (attachment.kind === "webvnc-agent" || attachment.kind === "code-agent") &&
         completeBridgePrincipal(attachment) &&
-        !this.leaseManagerAuthorized(lease, attachment)
+        !leaseManagerAuthorized(lease, attachment)
       ) {
         revokedViewers.set(socket, "lease access revoked");
         continue;
       }
       if (
         (attachment.kind === "egress-host" || attachment.kind === "egress-client") &&
-        !this.leaseManagerAuthorized(lease, attachment)
+        !leaseManagerAuthorized(lease, attachment)
       ) {
         revokedEgressSessions.set(egressSocketKey(lease.id, attachment.sessionID), {
           leaseID: lease.id,
@@ -2732,7 +2808,7 @@ export class FleetCoordinator {
     const runID = typeof input.runID === "string" ? input.runID : "";
     const run = runID ? await this.getRun(runID) : undefined;
     const lease = run ? await this.ensureRunLeaseAttribution(run) : undefined;
-    if (!run || !this.runReadableToControl(run, attachment, lease)) {
+    if (!run || !runReadableToPrincipal(run, attachment, lease)) {
       sendControl(socket, { type: "error", code: "not_found", message: "run not found" });
       return;
     }
@@ -3548,34 +3624,28 @@ export class FleetCoordinator {
         !lease.cloudID &&
         lease.provisioningRequestStartedAt,
       );
-      const released = finalizedReleasedLease(lease, true, false);
-      if (canceledBeforeProviderIdentity) {
-        released.provisioningRequestStartedAt = lease.provisioningRequestStartedAt!;
-        if (lease.provisioningCoordinatorVersion) {
-          released.provisioningCoordinatorVersion = lease.provisioningCoordinatorVersion;
-        }
-        if (lease.provisioningRequestSettledAt) {
-          released.provisioningRequestSettledAt = lease.provisioningRequestSettledAt;
-        }
-        if (lease.provisioningRecoveryObservedAt) {
-          released.provisioningRecoveryObservedAt = lease.provisioningRecoveryObservedAt;
-        }
-        if (lease.provisioningRecoveryMissingSince) {
-          released.provisioningRecoveryMissingSince = lease.provisioningRecoveryMissingSince;
-        }
-        released.releaseDeletesServer = true;
-        released.provisioningResourceMayExist = true;
-        released.provisioningFailureRetryable = true;
-      }
-      if (shouldDelete) {
-        const cleanupStarted = new Date();
-        released.cleanupStartedAt = cleanupStarted.toISOString();
-        released.cleanupClaimExpiresAt = new Date(
-          cleanupStarted.getTime() + leaseCleanupClaimStaleMs,
-        ).toISOString();
-        released.releaseDeletesServer = true;
-      }
-      await this.putLease(released);
+      const cleanupStarted = shouldDelete ? new Date() : undefined;
+      const released = await this.leaseRepository.releaseLease(lease, {
+        deleteServer: true,
+        keep: false,
+        restoreDispatchEvidence: canceledBeforeProviderIdentity
+          ? {
+              provisioningRequestStartedAt: lease.provisioningRequestStartedAt!,
+              provisioningCoordinatorVersion: lease.provisioningCoordinatorVersion,
+              provisioningRequestSettledAt: lease.provisioningRequestSettledAt,
+              provisioningRecoveryObservedAt: lease.provisioningRecoveryObservedAt,
+              provisioningRecoveryMissingSince: lease.provisioningRecoveryMissingSince,
+            }
+          : undefined,
+        cleanupClaim: cleanupStarted
+          ? {
+              startedAt: cleanupStarted.toISOString(),
+              expiresAt: new Date(
+                cleanupStarted.getTime() + leaseCleanupClaimStaleMs,
+              ).toISOString(),
+            }
+          : undefined,
+      });
       await this.putCreateAttempt(attempt);
       await this.markAWSIngressReconcilePending(released);
       await this.scheduleAlarm();
@@ -3689,14 +3759,7 @@ export class FleetCoordinator {
         !continueReadiness &&
         !(lease.state === "released" && lease.releaseDeletesServer === false)
       ) {
-        if (lease.state === "provisioning") lease.state = "failed";
-        lease.endedAt ??= lease.updatedAt;
-        lease.releaseDeletesServer = true;
-        lease.provisioningResourceMayExist = true;
-        lease.provisioningFailureRetryable = false;
-        delete lease.failureError;
-        lease.cleanupError = "provider resource returned after the lease ended; cleanup pending";
-        lease.cleanupRetryAt = new Date(now.getTime() + leaseCleanupRetryDelayMs).toISOString();
+        lateProviderResourceLease(lease, now, leaseCleanupRetryDelayMs);
       } else if (!continueReadiness) {
         clearProvisioningRecoveryMetadata(lease);
         clearLeaseCleanupMetadata(lease);
@@ -4198,7 +4261,7 @@ export class FleetCoordinator {
           idleTimeoutSeconds: config.idleTimeoutSeconds,
           estimatedHourlyUSD: cost.hourlyUSD,
           maxEstimatedUSD: cost.maxUSD,
-          state: "provisioning",
+          state: INITIAL_LEASE_STATE,
           createdAt: now.toISOString(),
           updatedAt: now.toISOString(),
           lastTouchedAt: now.toISOString(),
@@ -4317,11 +4380,11 @@ export class FleetCoordinator {
           ) {
             return { committed: false as const, current, pending };
           }
-          current.state = "active";
-          current.updatedAt = new Date().toISOString();
-          await this.putLease(current);
+          const activated = await this.leaseRepository.activateLease(current, {
+            at: new Date().toISOString(),
+          });
           await this.scheduleAlarm();
-          return { committed: true as const, current };
+          return { committed: true as const, current: activated };
         });
         if (!activation.committed) {
           if (createAttempt && !activation.pending) {
@@ -4454,7 +4517,7 @@ export class FleetCoordinator {
         idleTimeoutSeconds: config.idleTimeoutSeconds,
         estimatedHourlyUSD: cost.hourlyUSD,
         maxEstimatedUSD: cost.maxUSD,
-        state: "provisioning",
+        state: INITIAL_LEASE_STATE,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
         lastTouchedAt: now.toISOString(),
@@ -4804,8 +4867,7 @@ export class FleetCoordinator {
           }
           record = structuredClone(current ?? record);
           if (!current || current.state === "provisioning") {
-            record.state = "failed";
-            record.endedAt = failedAt;
+            provisioningFailedLease(record, failedAt);
           }
           mergeProvisioningFailureMetadata(
             record,
@@ -4842,8 +4904,7 @@ export class FleetCoordinator {
     }
     const finalizationBase = structuredClone(current);
     record = structuredClone(current);
-    record.state = "active";
-    clearProvisioningRecoveryMetadata(record);
+    finalizedProvisioningLease(record);
     record.cloudID = server.cloudID;
     record.serverType = serverType;
     if (server.hostID) {
@@ -5048,7 +5109,7 @@ export class FleetCoordinator {
         idleTimeoutSeconds: config.idleTimeoutSeconds,
         estimatedHourlyUSD: cost.hourlyUSD,
         maxEstimatedUSD: cost.maxUSD,
-        state: "provisioning",
+        state: INITIAL_LEASE_STATE,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
         lastTouchedAt: now.toISOString(),
@@ -6127,7 +6188,7 @@ export class FleetCoordinator {
             }
             return current;
           }
-          current.state = "failed";
+          recoveryFailedLease(current);
           applyRecoveredServerIdentity(current, recoveredServer);
           current.updatedAt = failedAt;
           current.endedAt = failedAt;
@@ -6211,18 +6272,15 @@ export class FleetCoordinator {
         applyRecoveredServerIdentity(current, recoveredServer);
         current.estimatedHourlyUSD = recoveredCost.hourlyUSD;
         current.maxEstimatedUSD = recoveredCost.maxUSD;
-        if (
-          workspaceCapability
-            ? workspaceCapability.recoveredReady(recoveredServer)
-            : recoveredServer.status === "running" && recoveredServer.host.trim()
-        ) {
-          current.state = "active";
-          current.host = workspaceCapability
+        const recoveredReady = workspaceCapability
+          ? workspaceCapability.recoveredReady(recoveredServer)
+          : Boolean(recoveredServer.status === "running" && recoveredServer.host.trim());
+        recoveredWorkspaceLease(current, {
+          ready: recoveredReady,
+          host: workspaceCapability
             ? workspaceCapability.recoveredHost(recoveredServer)
-            : recoveredServer.host;
-        } else {
-          current.state = "provisioning";
-        }
+            : recoveredServer.host,
+        });
         if (recoveredServer.region) {
           current.region = recoveredServer.region;
         }
@@ -6304,15 +6362,7 @@ export class FleetCoordinator {
       ) {
         return undefined;
       }
-      current.state = "failed";
-      current.provisioningResourceMayExist = false;
-      current.provisioningFailureRetryable = true;
-      delete current.provisioningRequestStartedAt;
-      delete current.provisioningCoordinatorVersion;
-      delete current.provisioningRequestSettledAt;
-      delete current.provisioningRecoveryObservedAt;
-      delete current.provisioningRecoveryMissingSince;
-      current.updatedAt = new Date().toISOString();
+      absentProvisioningLease(current, new Date().toISOString());
       await this.putLease(current);
       return current;
     });
@@ -7227,11 +7277,10 @@ export class FleetCoordinator {
       const now = new Date();
       if (workspaceProvisionDeadline(currentWorkspace) <= now.getTime()) {
         const message = "workspace provisioning deadline expired";
-        currentLease.state = "failed";
-        currentLease.failureError = message;
-        currentLease.provisioningFailureRetryable = false;
-        currentLease.updatedAt = now.toISOString();
-        currentLease.endedAt = currentLease.updatedAt;
+        expiredWorkspaceProvisioningLease(currentLease, {
+          message,
+          at: now.toISOString(),
+        });
         currentWorkspace.error = message;
         currentWorkspace.updatedAt = now.toISOString();
         delete currentWorkspace.reconcileAfter;
@@ -7280,9 +7329,7 @@ export class FleetCoordinator {
       }
       const failedAt = new Date().toISOString();
       const releaseRequested = Boolean(currentWorkspace?.releaseRequestedAt);
-      current.state = releaseRequested ? "released" : "failed";
-      current.updatedAt = failedAt;
-      current.endedAt = failedAt;
+      unresolvedWorkspaceProvisioningLease(current, { releaseRequested, at: failedAt });
       current.cloudID = "";
       current.serverID = 0;
       delete current.providerResourceID;
@@ -7670,7 +7717,7 @@ export class FleetCoordinator {
       idleTimeoutSeconds,
       estimatedHourlyUSD: 0,
       maxEstimatedUSD: 0,
-      state: "active",
+      state: REGISTERED_LEASE_STATE,
       createdAt: existing?.createdAt || nowISO,
       registeredAt: existing?.registeredAt || nowISO,
       updatedAt: nowISO,
@@ -8339,7 +8386,7 @@ export class FleetCoordinator {
       if (
         attachment?.kind !== "webvnc-agent" ||
         !completeBridgePrincipal(attachment) ||
-        this.leaseManagerAuthorized(lease, withCurrentAdminGrant(attachment, adminGrants))
+        leaseManagerAuthorized(lease, withCurrentAdminGrant(attachment, adminGrants))
       ) {
         continue;
       }
@@ -8352,13 +8399,13 @@ export class FleetCoordinator {
       codeAgent &&
       codeAgentAttachment?.kind === "code-agent" &&
       completeBridgePrincipal(codeAgentAttachment) &&
-      !this.leaseManagerAuthorized(lease, withCurrentAdminGrant(codeAgentAttachment, adminGrants))
+      !leaseManagerAuthorized(lease, withCurrentAdminGrant(codeAgentAttachment, adminGrants))
     ) {
       this.clearCodeAgent(lease.id, codeAgent);
       closeSocket(codeAgent, code, reason);
     }
     for (const viewer of this.openWebVNCViewers(lease.id)) {
-      if (this.leaseViewerAuthorized(lease, withCurrentAdminGrant(viewer, adminGrants))) {
+      if (leaseViewerAuthorized(lease, withCurrentAdminGrant(viewer, adminGrants))) {
         continue;
       }
       this.clearWebVNCViewer(lease.id, viewer.id, viewer.socket);
@@ -8369,7 +8416,7 @@ export class FleetCoordinator {
       if (
         attachment?.kind !== "code-viewer" ||
         attachment.leaseID !== lease.id ||
-        this.leaseViewerAuthorized(lease, withCurrentAdminGrant(attachment, adminGrants))
+        leaseViewerAuthorized(lease, withCurrentAdminGrant(attachment, adminGrants))
       ) {
         continue;
       }
@@ -8382,7 +8429,7 @@ export class FleetCoordinator {
       if (
         (attachment?.kind !== "egress-host" && attachment?.kind !== "egress-client") ||
         attachment.leaseID !== lease.id ||
-        this.leaseManagerAuthorized(lease, withCurrentAdminGrant(attachment, adminGrants))
+        leaseManagerAuthorized(lease, withCurrentAdminGrant(attachment, adminGrants))
       ) {
         continue;
       }
@@ -8393,27 +8440,6 @@ export class FleetCoordinator {
         this.clearEgressSession(lease.id, sessionID, code, reason),
       ),
     );
-  }
-
-  private leaseManagerAuthorized(
-    lease: LeaseRecord,
-    principal: { owner?: string; org?: string; admin?: boolean },
-  ): boolean {
-    if (!completeBridgePrincipal(principal)) {
-      return false;
-    }
-    const role = this.leaseAccessRoleForPrincipal(lease, principal);
-    return role === "owner" || role === "manage";
-  }
-
-  private leaseViewerAuthorized(
-    lease: LeaseRecord,
-    principal: { owner?: string; org?: string; admin?: boolean },
-  ): boolean {
-    if (!completeBridgePrincipal(principal)) {
-      return false;
-    }
-    return this.leaseAccessRoleForPrincipal(lease, principal) !== undefined;
   }
 
   private whoami(request: Request): Response {
@@ -9165,7 +9191,8 @@ export class FleetCoordinator {
       }
       await this.ensureRunLeaseAttribution(run);
       return (
-        this.runReferencesLease(run, lease.id) && this.runReadableToRequest(run, request, lease)
+        this.runReferencesLease(run, lease.id) &&
+        runReadableByPrincipal(run, actorFromRequest(request, this.env), lease)
       );
     });
     return portalLeaseDetail(
@@ -9608,10 +9635,13 @@ export class FleetCoordinator {
         if (!leaseIsLive(current) && !current.runtimeAdapterDeleteRequestedAt) {
           return { status: "completed", lease: current };
         }
-        const finalized = current.runtimeAdapterDeleteRequestedAt
-          ? finalizedRuntimeAdapterDeleteLease(current)
-          : finalizedReleasedLease(current, false);
-        await this.putLease(finalized);
+        let finalized: LeaseRecord;
+        if (current.runtimeAdapterDeleteRequestedAt) {
+          finalized = finalizedRuntimeAdapterDeleteLease(current);
+          await this.putLease(finalized);
+        } else {
+          finalized = await this.leaseRepository.releaseLease(current, { deleteServer: false });
+        }
         await this.clearWorkspaceReleaseError(finalized);
         await this.markAWSIngressReconcilePending(finalized);
         await this.scheduleAlarm();
@@ -9660,10 +9690,13 @@ export class FleetCoordinator {
         if (!leaseIsLive(current) && !current.runtimeAdapterDeleteRequestedAt) {
           return { status: "completed", lease: current };
         }
-        const finalized = current.runtimeAdapterDeleteRequestedAt
-          ? finalizedRuntimeAdapterDeleteLease(current)
-          : finalizedReleasedLease(current, false);
-        await this.putLease(finalized);
+        let finalized: LeaseRecord;
+        if (current.runtimeAdapterDeleteRequestedAt) {
+          finalized = finalizedRuntimeAdapterDeleteLease(current);
+          await this.putLease(finalized);
+        } else {
+          finalized = await this.leaseRepository.releaseLease(current, { deleteServer: false });
+        }
         await this.clearWorkspaceReleaseError(finalized);
         await this.markAWSIngressReconcilePending(finalized);
         await this.scheduleAlarm();
@@ -9797,7 +9830,7 @@ export class FleetCoordinator {
   ): Promise<Response> {
     const run = await this.getRun(runID);
     const lease = run ? await this.ensureRunLeaseAttribution(run) : undefined;
-    if (!run || !this.runReadableToRequest(run, request, lease)) {
+    if (!run || !runReadableByPrincipal(run, actorFromRequest(request, this.env), lease)) {
       return notFound();
     }
     if (request.method.toUpperCase() !== "GET") {
@@ -10946,7 +10979,7 @@ export class FleetCoordinator {
     if (principal.admin === true && current.admin !== true) {
       return undefined;
     }
-    if (!this.leaseViewerAuthorized(lease, current)) {
+    if (!leaseViewerAuthorized(lease, current)) {
       return undefined;
     }
     if (current.auth === "github" && (await this.githubBridgeGrantFailureReason(current))) {
@@ -12648,7 +12681,7 @@ export class FleetCoordinator {
       ticket.admin === true
         ? withCurrentAdminGrant(ticket, await this.currentAdminGrantValidation())
         : ticket;
-    if (!this.leaseManagerAuthorized(lease, leaseBridgeTicketPrincipal(currentTicket))) {
+    if (!leaseManagerAuthorized(lease, leaseBridgeTicketPrincipal(currentTicket))) {
       return undefined;
     }
     if (
@@ -13021,7 +13054,7 @@ export class FleetCoordinator {
         const entry: ReadyPoolEntry = {
           key,
           leaseID,
-          state: "ready",
+          state: INITIAL_READY_POOL_STATE,
           owner: lease.owner,
           org: lease.org,
           provider: lease.provider,
@@ -13072,7 +13105,12 @@ export class FleetCoordinator {
             .filter((existing) => existing.key !== key || Boolean(existing.identity) !== typed)
             .map((existing) => this.deleteReadyPoolEntry(existing, Boolean(existing.identity))),
         );
-        await this.putReadyPoolEntry(entry, typed);
+        try {
+          await this.readyPoolRepository.registerEntry(entry, typed);
+        } catch (error) {
+          if (!(error instanceof ReadyPoolTransitionRefused)) throw error;
+          return json({ error: "lease_pool_busy", message: error.message }, { status: 409 });
+        }
         if (fillClaim) {
           await this.state.storage.delete(readyPoolFillClaimKey(fillClaim.token, typed));
           await this.incrementReadyPoolCounters(request, key, { fillClaimsCompleted: 1 }, typed);
@@ -13123,22 +13161,27 @@ export class FleetCoordinator {
         let blockedByManageAccess = false;
         for (const entry of entries) {
           const lease = leases.get(entry.leaseID);
-          if (
-            lease &&
-            entry.state === "ready" &&
-            !unavailableLeases.has(entry.leaseID) &&
-            lease.state === "active" &&
-            Date.parse(lease.expiresAt) > nowMs
-          ) {
-            if (typed && !this.readyPoolIdentityMatchesLease(entry.identity!, lease)) {
-              // oxlint-disable-next-line eslint/no-await-in-loop -- mismatch must be durably drained before another candidate can be borrowed.
-              await this.drainMismatchedReadyPoolEntry(entry, typed);
-              continue;
-            }
-            if (!this.leaseManageableByRequest(lease, request, isAdminRequest(request))) {
-              blockedByManageAccess = true;
-              continue;
-            }
+          const decision = classifyReadyPoolBorrow(entry, {
+            lease,
+            nowMs,
+            unavailableLeases,
+            identityMatches:
+              typed && lease ? this.readyPoolIdentityMatchesLease(entry.identity!, lease) : true,
+            manageable:
+              lease !== undefined &&
+              this.leaseManageableByRequest(lease, request, isAdminRequest(request)),
+            typed,
+          });
+          if (decision === "drain") {
+            // oxlint-disable-next-line eslint/no-await-in-loop -- mismatch must be durably drained before another candidate can be borrowed.
+            await this.drainMismatchedReadyPoolEntry(entry, typed);
+            continue;
+          }
+          if (decision === "forbidden") {
+            blockedByManageAccess = true;
+            continue;
+          }
+          if (decision === "borrow" && lease) {
             candidates.push({ entry, lease });
           }
         }
@@ -13163,26 +13206,21 @@ export class FleetCoordinator {
         }
         const { entry, lease } = first;
         const now = new Date(nowMs).toISOString();
-        const borrowed: ReadyPoolEntry = {
-          ...entry,
-          state: "busy",
-          borrowedBy: requestOwner(request),
-          borrowedAt: now,
-          borrowToken: crypto.randomUUID(),
-          lastUsedAt: now,
-          updatedAt: now,
-          expiresAt: lease.expiresAt,
-        };
-        if (input.heartbeat === true) {
-          borrowed.borrowHeartbeatRequired = true;
-          borrowed.borrowHeartbeatAt = now;
-          borrowed.borrowExpiresAt = new Date(nowMs + readyPoolBorrowTimeoutMs).toISOString();
-        } else {
-          delete borrowed.borrowHeartbeatRequired;
-          delete borrowed.borrowHeartbeatAt;
-          delete borrowed.borrowExpiresAt;
+        let borrowed: ReadyPoolEntry;
+        try {
+          borrowed = await this.readyPoolRepository.borrowEntry(entry, {
+            typed,
+            owner: requestOwner(request),
+            token: crypto.randomUUID(),
+            now,
+            nowMs,
+            heartbeat: input.heartbeat === true,
+            leaseExpiresAt: lease.expiresAt,
+          });
+        } catch (error) {
+          if (!(error instanceof ReadyPoolTransitionRefused)) throw error;
+          return json({ error: "no_ready_lease", message: error.message }, { status: 409 });
         }
-        await this.putReadyPoolEntry(borrowed, typed);
         await this.incrementReadyPoolCounters(request, key, { warmHits: 1 }, typed);
         await this.scheduleAlarm();
         return json({
@@ -13256,15 +13294,12 @@ export class FleetCoordinator {
           );
         }
         const now = new Date(nowMs).toISOString();
-        const updated: ReadyPoolEntry = {
-          ...current,
-          borrowHeartbeatRequired: true,
-          borrowHeartbeatAt: now,
-          borrowExpiresAt: new Date(nowMs + readyPoolBorrowTimeoutMs).toISOString(),
-          updatedAt: now,
-          expiresAt: lease?.expiresAt ?? current.expiresAt,
-        };
-        await this.putReadyPoolEntry(updated, typed);
+        const updated = await this.readyPoolRepository.heartbeatBorrow(current, {
+          typed,
+          now,
+          nowMs,
+          leaseExpiresAt: lease?.expiresAt,
+        });
         await this.incrementReadyPoolCounters(request, key, { borrowHeartbeats: 1 }, typed);
         await this.scheduleAlarm();
         return json({ entry: publicReadyPoolEntry(redactReadyPoolEntry(updated)) });
@@ -13627,8 +13662,13 @@ export class FleetCoordinator {
             { status: 403 },
           );
         }
-        const drained = this.nextReturnedReadyPoolEntry(current, lease, "draining", input.reason);
-        await this.putReadyPoolEntry(drained, typed);
+        const drained = await this.readyPoolRepository.returnEntry(current, {
+          typed,
+          result: "draining",
+          reason: input.reason,
+          now: new Date().toISOString(),
+          leaseExpiresAt: lease?.expiresAt,
+        });
         let returnedLease = lease;
         if (lease && lease.state === "active") {
           returnedLease = await this.releaseResolvedLease(lease, {
@@ -13647,46 +13687,32 @@ export class FleetCoordinator {
         return json(returned);
       }
       if (!lease || lease.state !== "active" || Date.parse(lease.expiresAt) <= Date.now()) {
-        const stale = this.nextReturnedReadyPoolEntry(current, lease, "stale", input.reason);
-        await this.putReadyPoolEntry(stale, typed);
+        const stale = await this.readyPoolRepository.returnEntry(current, {
+          typed,
+          result: "stale",
+          reason: input.reason,
+          now: new Date().toISOString(),
+          leaseExpiresAt: lease?.expiresAt,
+        });
         await this.state.runExclusive(() => this.scheduleAlarm());
         return json({
           entry: publicReadyPoolEntry(stale),
           lease: lease ? publicLeaseRecord(lease) : undefined,
         });
       }
-      const returned = this.nextReturnedReadyPoolEntry(current, lease, "ready", input.reason);
-      await this.putReadyPoolEntry(returned, typed);
+      const returned = await this.readyPoolRepository.returnEntry(current, {
+        typed,
+        result: "ready",
+        reason: input.reason,
+        now: new Date().toISOString(),
+        leaseExpiresAt: lease?.expiresAt,
+      });
       await this.state.runExclusive(() => this.scheduleAlarm());
       return json({
         entry: publicReadyPoolEntry(returned),
         lease: publicLeaseRecord(lease),
       });
     });
-  }
-
-  private nextReturnedReadyPoolEntry(
-    current: ReadyPoolEntry,
-    lease: LeaseRecord | undefined,
-    state: ReadyPoolEntry["state"],
-    reason?: string,
-  ): ReadyPoolEntry {
-    const now = new Date().toISOString();
-    const failures = state === "ready" ? 0 : (current.failureCount ?? 0) + 1;
-    const returned: ReadyPoolEntry = {
-      ...withoutReadyPoolBorrow(current),
-      state,
-      lastResult: nonSecretString(reason) || state,
-      failureCount: failures,
-      updatedAt: now,
-      expiresAt: lease?.expiresAt ?? current.expiresAt,
-    };
-    if (state === "ready") {
-      returned.lastReadyAt = now;
-    } else if (current.lastReadyAt) {
-      returned.lastReadyAt = current.lastReadyAt;
-    }
-    return returned;
   }
 
   private async maintainReadyPools(nowMs: number): Promise<void> {
@@ -13742,16 +13768,16 @@ export class FleetCoordinator {
         entry.state !== "stale" &&
         !(entry.state === "draining" && providerCleanupPending)
       ) {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- ordered writes prevent stale maintenance from racing a newer entry transition.
-        await this.putReadyPoolEntry(
-          withoutReadyPoolBorrow({
-            ...entry,
-            state: "stale",
-            updatedAt: new Date(nowMs).toISOString(),
-            lastResult: "lease expired or missing",
-          }),
-          typed,
-        );
+        try {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- ordered writes prevent stale maintenance from racing a newer entry transition.
+          await this.readyPoolRepository.retireEntry(entry, {
+            typed,
+            kind: "stale",
+            at: new Date(nowMs).toISOString(),
+          });
+        } catch (error) {
+          if (!(error instanceof ReadyPoolTransitionRefused)) throw error;
+        }
         continue;
       }
       if (
@@ -13802,16 +13828,16 @@ export class FleetCoordinator {
     nowMs: number,
     typed = false,
   ): Promise<void> {
-    await this.putReadyPoolEntry(
-      withoutReadyPoolBorrow({
-        ...entry,
-        state: "quarantined",
-        updatedAt: new Date(nowMs).toISOString(),
-        lastResult: reason,
-        failureCount: (entry.failureCount ?? 0) + 1,
-      }),
-      typed,
-    );
+    try {
+      await this.readyPoolRepository.retireEntry(entry, {
+        typed,
+        kind: "quarantined",
+        reason,
+        at: new Date(nowMs).toISOString(),
+      });
+    } catch (error) {
+      if (!(error instanceof ReadyPoolTransitionRefused)) throw error;
+    }
     await this.incrementReadyPoolCountersForScope(
       entry.owner,
       entry.org,
@@ -13912,16 +13938,15 @@ export class FleetCoordinator {
     typed: boolean,
   ): Promise<void> {
     if (entry.state === "draining") return;
-    await this.putReadyPoolEntry(
-      withoutReadyPoolBorrow({
-        ...entry,
-        state: "draining",
-        updatedAt: new Date().toISOString(),
-        lastResult: "typed ready-pool lease image or architecture changed",
-        failureCount: (entry.failureCount ?? 0) + 1,
-      }),
-      typed,
-    );
+    try {
+      await this.readyPoolRepository.retireEntry(entry, {
+        typed,
+        kind: "draining",
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      if (!(error instanceof ReadyPoolTransitionRefused)) throw error;
+    }
   }
 
   private async listLeases(request: Request): Promise<Response> {
@@ -14592,8 +14617,8 @@ export class FleetCoordinator {
       class: lease?.class ?? input.class ?? "",
       serverType: lease?.serverType ?? input.serverType ?? "",
       command: Array.isArray(input.command) ? input.command.map(String) : [],
-      state: "running",
-      phase: "starting",
+      state: INITIAL_RUN_STATE,
+      phase: INITIAL_RUN_PHASE,
       logBytes: 0,
       logTruncated: false,
       startedAt: now,
@@ -14614,8 +14639,8 @@ export class FleetCoordinator {
     if (label) {
       run.label = label;
     }
-    await this.putRun(run);
-    await this.appendRunEventRecord(run, { type: "run.started", phase: "starting" });
+    const started = await this.runLifecycle.createRun(run);
+    await this.broadcastRunEvent(run, started);
     return json({ run: publicRunRecord(run) }, { status: 201 });
   }
 
@@ -14651,14 +14676,14 @@ export class FleetCoordinator {
     if (method === "GET" && action === undefined) {
       const run = await this.getRun(runID);
       const lease = run ? await this.ensureRunLeaseAttribution(run) : undefined;
-      return run && this.runReadableToRequest(run, request, lease)
+      return run && runReadableByPrincipal(run, actorFromRequest(request, this.env), lease)
         ? json({ run: publicRunRecord(run) })
         : notFound();
     }
     if (method === "GET" && action === "logs") {
       const run = await this.getRun(runID);
       const lease = run ? await this.ensureRunLeaseAttribution(run) : undefined;
-      if (!run || !this.runReadableToRequest(run, request, lease)) {
+      if (!run || !runReadableByPrincipal(run, actorFromRequest(request, this.env), lease)) {
         return notFound();
       }
       const log = await this.readRunLog(runID);
@@ -14669,7 +14694,7 @@ export class FleetCoordinator {
     if (method === "GET" && action === "receipt") {
       const run = await this.getRun(runID);
       const lease = run ? await this.ensureRunLeaseAttribution(run) : undefined;
-      if (!run || !this.runReadableToRequest(run, request, lease)) {
+      if (!run || !runReadableByPrincipal(run, actorFromRequest(request, this.env), lease)) {
         return notFound();
       }
       return run.terminalReceipt
@@ -14679,7 +14704,7 @@ export class FleetCoordinator {
     if (method === "GET" && action === "events") {
       const run = await this.getRun(runID);
       const lease = run ? await this.ensureRunLeaseAttribution(run) : undefined;
-      if (!run || !this.runReadableToRequest(run, request, lease)) {
+      if (!run || !runReadableByPrincipal(run, actorFromRequest(request, this.env), lease)) {
         return notFound();
       }
       const url = new URL(request.url);
@@ -14689,7 +14714,7 @@ export class FleetCoordinator {
     }
     if (method === "POST" && action === "events") {
       const run = await this.getRun(runID);
-      if (!run || !this.runWritableByRequest(run, request)) {
+      if (!run || !runWritableByPrincipal(run, actorFromRequest(request, this.env))) {
         return notFound();
       }
       const input = await readJson<RunEventRequest>(request);
@@ -14713,7 +14738,7 @@ export class FleetCoordinator {
 
   private async appendRunTelemetry(request: Request, runID: string): Promise<Response> {
     const run = await this.getRun(runID);
-    if (!run || !this.runWritableByRequest(run, request)) {
+    if (!run || !runWritableByPrincipal(run, actorFromRequest(request, this.env))) {
       return notFound();
     }
     const input = await readJson<RunTelemetryRequest>(request);
@@ -14727,8 +14752,8 @@ export class FleetCoordinator {
   }
 
   private async finishRun(request: Request, runID: string): Promise<Response> {
-    const run = await this.getRun(runID);
-    if (!run || !this.runWritableByRequest(run, request)) {
+    const run = await this.runLifecycle.loadWritableRun(runID, actorFromRequest(request, this.env));
+    if (!run) {
       return notFound();
     }
     const input = await readJson<RunFinishRequest>(request);
@@ -14755,10 +14780,15 @@ export class FleetCoordinator {
       receipt: input.receipt,
       evidence: input.evidence,
     });
-    if (run.state !== "running") {
-      return run.terminalFinishSHA256 === requestedFingerprint
-        ? json({ run: publicRunRecord(run) })
-        : json({ error: "terminal_run_conflict" }, { status: 409 });
+    // A repeated finish replays the committed result; a different
+    // fingerprint or binding is a conflict. The authoritative
+    // classification is repeated inside the repository transaction.
+    const classification = this.runLifecycle.classifyFinishAttempt(run, requestedFingerprint);
+    if (classification === "duplicate") {
+      return json({ run: publicRunRecord(run) });
+    }
+    if (classification === "conflict") {
+      return json({ error: "terminal_run_conflict" }, { status: 409 });
     }
     let receipt: TerminalRunReceipt | undefined;
     if (input.receipt !== undefined) {
@@ -14799,74 +14829,22 @@ export class FleetCoordinator {
         { status: 400 },
       );
     }
-    const terminalLogPrefix = runTerminalLogPrefix(
+    const committed = await this.runLifecycle.finalizeRun({
       runID,
-      requestedFingerprint,
-      crypto.randomUUID(),
-    );
-    let committed:
-      | { kind: "missing" }
-      | { kind: "duplicate"; run: RunRecord }
-      | { kind: "conflict"; run: RunRecord }
-      | { kind: "committed"; run: RunRecord; event: RunEventRecord };
-    try {
-      await writeTerminalRunLog(this.state.storage, terminalLogPrefix, logInput.log);
-      committed = await this.state.storage.transaction(async (storage) => {
-        const current = await storage.get<RunRecord>(runKey(runID));
-        if (!current) return { kind: "missing" as const };
-        if (current.state !== "running") {
-          return current.terminalFinishSHA256 === requestedFingerprint
-            ? { kind: "duplicate" as const, run: current }
-            : { kind: "conflict" as const, run: current };
-        }
-        if (!sameTerminalRunBinding(current, run)) {
-          return { kind: "conflict" as const, run: current };
-        }
-        const next = { ...current };
-        next.exitCode = exitCode;
-        next.syncMs = normalizedSyncMs;
-        next.commandMs = normalizedCommandMs;
-        next.state = exitCode === 0 ? "succeeded" : "failed";
-        next.phase = next.state;
-        const endedAt = now.toISOString();
-        next.endedAt = endedAt;
-        const started = Date.parse(next.startedAt);
-        const ended = Date.parse(endedAt);
-        if (Number.isFinite(started) && Number.isFinite(ended)) {
-          next.durationMs = ended - started;
-        }
-        next.logBytes = logInput.bytes;
-        next.logTruncated = logInput.truncated;
-        if (blockedStage) next.blockedStage = blockedStage;
-        if (retryLikely) next.retryLikely = retryLikely;
-        if (input.results) next.results = boundedTestResults(input.results);
-        if (telemetry) next.telemetry = mergeRunTelemetry(next.telemetry, telemetry);
-        if (receipt) next.terminalReceipt = receipt;
-        if (input.evidence) next.evidence = input.evidence;
-        next.terminalFinishSHA256 = requestedFingerprint;
-        next.terminalLogPrefix = terminalLogPrefix;
-        const seq = (next.eventCount ?? 0) + 1;
-        const event = boundedRunEvent(next.id, seq, endedAt, {
-          type: "command.finished",
-          phase: next.state,
-          exitCode: next.exitCode,
-        });
-        next.eventCount = seq;
-        next.lastEventAt = endedAt;
-        await storage.put(runEventKey(next.id, seq), event);
-        await storage.put(runKey(next.id), next);
-        return { kind: "committed" as const, run: next, event };
-      });
-    } catch (error) {
-      await this.deleteStoragePrefix(terminalLogPrefix).catch(() => undefined);
-      throw error;
-    }
-    if (
-      committed.kind !== "committed" &&
-      (committed.kind === "missing" || committed.run.terminalLogPrefix !== terminalLogPrefix)
-    ) {
-      await this.deleteStoragePrefix(terminalLogPrefix).catch(() => undefined);
-    }
+      fingerprint: requestedFingerprint,
+      binding: run,
+      exitCode,
+      syncMs: normalizedSyncMs,
+      commandMs: normalizedCommandMs,
+      log: { text: logInput.log, bytes: logInput.bytes, truncated: logInput.truncated },
+      blockedStage,
+      retryLikely,
+      results: input.results ? boundedTestResults(input.results) : undefined,
+      telemetry: telemetry ? mergeRunTelemetry(run.telemetry, telemetry) : undefined,
+      receipt,
+      evidence: input.evidence,
+      now,
+    });
     if (committed.kind === "missing") return notFound();
     if (committed.kind === "conflict") {
       return json({ error: "terminal_run_conflict" }, { status: 409 });
@@ -14937,7 +14915,9 @@ export class FleetCoordinator {
       if (!admin && !run.leaseOwners?.length && !currentLease && validLeaseID(run.leaseID)) {
         currentLease = await this.getLease(run.leaseID);
       }
-      return admin || this.runReadableToRequest(run, request, currentLease);
+      return (
+        admin || runReadableByPrincipal(run, actorFromRequest(request, this.env), currentLease)
+      );
     });
     return json({ runs: runs.map(publicRunRecord) });
   }
@@ -16444,8 +16424,10 @@ export class FleetCoordinator {
         }
         const failedAt = new Date();
         if (error instanceof ProviderResourceUnresolvedError) {
-          retainUnresolvedProviderResource(current, failure, failedAt.toISOString());
-          await this.putLease(current);
+          await this.leaseRepository.retainUnresolvedLease(current, {
+            message: failure,
+            at: failedAt.toISOString(),
+          });
           return;
         }
         current.cleanupAttempts = (current.cleanupAttempts ?? 0) + 1;
@@ -16473,8 +16455,10 @@ export class FleetCoordinator {
       const interruption = "provider provisioning was interrupted";
       current.updatedAt = failedAt;
       if (server) {
-        current.state = lease.state === "released" ? "released" : "failed";
-        current.endedAt = failedAt;
+        interruptedProvisioningLease(current, {
+          releaseRequested: lease.state === "released",
+          at: failedAt,
+        });
         delete current.provisioningRequestStartedAt;
         delete current.provisioningCoordinatorVersion;
         delete current.provisioningRequestSettledAt;
@@ -16515,8 +16499,10 @@ export class FleetCoordinator {
           await this.putLease(current);
           return;
         }
-        current.state = lease.state === "released" ? "released" : "failed";
-        current.endedAt = failedAt;
+        interruptedProvisioningLease(current, {
+          releaseRequested: lease.state === "released",
+          at: failedAt,
+        });
         delete current.provisioningRequestStartedAt;
         delete current.provisioningCoordinatorVersion;
         delete current.provisioningRequestSettledAt;
@@ -16678,29 +16664,12 @@ export class FleetCoordinator {
         const nowDate = new Date();
         const nowISO = nowDate.toISOString();
         if (isRegisteredLease(lease)) {
-          lease.state = "expired";
-          lease.updatedAt = nowISO;
-          lease.endedAt = nowISO;
-          delete lease.releaseDeletesServer;
-          clearLeaseCleanupMetadata(lease);
-          if (!lease.runtimeAdapterDeleteRequestedAt) {
-            clearRuntimeAdapterDeleteMetadata(lease);
-          }
-          delete lease.cleanupStartedAt;
-          delete lease.cleanupClaimExpiresAt;
-          await this.putLease(lease, { noCache: true });
+          await this.leaseRepository.expireRegisteredLease(lease, { at: nowISO });
           await this.closeLeaseBridges(lease.id, 1008, "lease expired");
           return;
         }
         if (lease.state === "provisioning" && !lease.cloudID) {
-          lease.state = "failed";
-          lease.updatedAt = nowISO;
-          lease.endedAt = nowISO;
-          if (lease.provisioningRequestStartedAt) lease.provisioningResourceMayExist = true;
-          lease.cleanupFailedAt = nowISO;
-          lease.cleanupError =
-            "lease expired before provider returned a cloud resource; cleanup remains unresolved";
-          await this.putLease(lease, { noCache: true });
+          await this.leaseRepository.failUnprovisionedExpiredLease(lease, { at: nowISO });
           return;
         }
         if (claimed.length >= leaseCleanupBatchSize) {
@@ -16738,28 +16707,13 @@ export class FleetCoordinator {
             const nowDate = new Date();
             const nowISO = nowDate.toISOString();
             if (failure) {
-              recordLeaseCleanupFailure(current, failure.error, failure.message, nowISO);
-              await this.putLease(current);
+              await this.applyLeaseCleanupFailure(current, failure.error, failure.message, nowISO);
               console.warn(
                 `lease cleanup failed lease=${current.id} provider=${current.provider} cloud=${current.cloudID}: ${failure.message}`,
               );
               return;
             }
-            current.state = leaseIsLive(current) ? "expired" : current.state;
-            current.updatedAt = nowISO;
-            current.endedAt = nowISO;
-            if (current.provisioningResourceMayExist) {
-              if (!current.failureError && current.cleanupError) {
-                current.failureError = current.cleanupError;
-              }
-            }
-            clearProvisioningRecoveryMetadata(current);
-            delete current.releaseDeletesServer;
-            clearLeaseCleanupMetadata(current);
-            delete current.providerKeyCleanupPending;
-            delete current.providerKeyCleanupID;
-            delete current.cleanupStartedAt;
-            delete current.cleanupClaimExpiresAt;
+            completedLeaseCleanup(current, nowISO);
             await this.putLease(current);
             await this.clearWorkspaceReleaseError(current);
             await this.markAWSIngressReconcilePending(current);
@@ -18227,23 +18181,48 @@ export class FleetCoordinator {
     } else {
       await this.state.storage.delete(runPruneCursorKey);
     }
+    await this.sweepTerminalAttempts();
   }
 
   private async deleteTerminalRun(runID: string, cutoff: number): Promise<void> {
-    await this.state.runExclusive(async () => {
-      const current = await this.getRun(runID);
-      const terminalAt = current ? terminalRunTimestamp(current) : undefined;
-      if (!current || terminalAt === undefined || terminalAt > cutoff) {
+    await this.runLifecycle.pruneTerminalRun(runID, cutoff);
+  }
+
+  /**
+   * Retire abandoned terminalization attempts alongside the run
+   * retention sweep. The repository refuses to sweep an attempt whose log
+   * a committed run references, so a live finish log can never be removed
+   * here; abandoned attempts are only removed once they age out.
+   */
+  private async sweepTerminalAttempts(): Promise<void> {
+    await this.runLifecycle.sweepTerminalAttempts(
+      Date.now() - terminalRunRetentionMs(this.env.CRABBOX_RUN_RETENTION_DAYS),
+    );
+  }
+
+  /**
+   * Apply a failed cleanup to the lease through the transition that fits:
+   * unresolved provider debt and manual resolution are terminal
+   * transitions owned by the lease repository, a retryable failure stays
+   * a retry on the same record.
+   */
+  private async applyLeaseCleanupFailure(
+    lease: LeaseRecord,
+    error: unknown,
+    message: string,
+    at: string,
+  ): Promise<void> {
+    switch (classifyLeaseCleanupFailure(error)) {
+      case "unresolved":
+        await this.leaseRepository.retainUnresolvedLease(lease, { message, at });
         return;
-      }
-      await this.deleteStoragePrefix(runEventPrefix(runID));
-      if (current.terminalLogPrefix?.startsWith(runTerminalLogRoot(runID))) {
-        await this.deleteStoragePrefix(current.terminalLogPrefix);
-      }
-      await this.deleteStoragePrefix(runLogChunkPrefix(runID));
-      await this.state.storage.delete(runLogKey(runID));
-      await this.state.storage.delete(runKey(runID));
-    });
+      case "manual":
+        await this.leaseRepository.expireLeaseForManualCleanup(lease, { error: message, at });
+        return;
+      default:
+        applyRetryableLeaseCleanupFailure(lease, message, at);
+        await this.putLease(lease);
+    }
   }
 
   private async deleteStoragePrefix(prefix: string): Promise<void> {
@@ -18436,81 +18415,12 @@ export class FleetCoordinator {
     request: Request,
     admin: boolean,
   ): "owner" | LeaseShareRole | "device" | undefined {
-    const role = this.leaseAccessRoleForPrincipal(lease, {
+    const role = leaseAccessRoleForPrincipal(lease, {
       owner: requestOwner(request),
       org: requestOrg(request, this.env),
       admin,
     });
     return role && requestAuthType(request) === "device" ? "device" : role;
-  }
-
-  private leaseAccessRoleForPrincipal(
-    lease: LeaseRecord,
-    principal: { owner: string; org: string; admin: boolean },
-  ): "owner" | LeaseShareRole | undefined {
-    if (principal.admin) {
-      return "owner";
-    }
-    // Legacy org values are lossy and cannot safely prove any non-admin relationship,
-    // including an otherwise explicit user share carried by an ambiguous record.
-    if (!isCurrentOrgKey(lease.org) || !isCurrentOrgKey(principal.org)) {
-      return undefined;
-    }
-    const sameOrg = sameOrgIdentityKey(lease.org, principal.org);
-    if (lease.owner === principal.owner && sameOrg) return "owner";
-    const share = normalizedLeaseShare(lease.share);
-    const userRole = share.users[normalizeShareUser(principal.owner)];
-    const orgRole = sameOrg && lease.org !== MISSING_ORG_KEY ? share.org : undefined;
-    if (userRole === "manage" || orgRole === "manage") {
-      return "manage";
-    }
-    if (userRole === "use" || orgRole === "use") {
-      return "use";
-    }
-    return undefined;
-  }
-
-  private runWritableByRequest(run: RunRecord, request: Request): boolean {
-    return (
-      isAdminRequest(request) ||
-      (run.owner === requestOwner(request) && run.org === requestOrg(request, this.env))
-    );
-  }
-
-  private runReadableToRequest(run: RunRecord, request: Request, lease?: LeaseRecord): boolean {
-    if (this.runWritableByRequest(run, request)) {
-      return true;
-    }
-    const owner = requestOwner(request);
-    const org = requestOrg(request, this.env);
-    return (
-      run.leaseOwners?.some(
-        (attribution) => attribution.owner === owner && attribution.org === org,
-      ) ||
-      (!run.leaseOwners?.length && lease?.owner === owner && lease.org === org)
-    );
-  }
-
-  private runReadableToControl(
-    run: RunRecord,
-    attachment: Extract<BridgeAttachment, { kind: "control" }>,
-    lease?: LeaseRecord,
-  ): boolean {
-    if (!attachment.admin && !isCurrentOrgKey(attachment.org)) {
-      return false;
-    }
-    return Boolean(
-      attachment.admin ||
-      (run.owner === attachment.owner && sameOrgIdentityKey(run.org, attachment.org)) ||
-      run.leaseOwners?.some(
-        (attribution) =>
-          attribution.owner === attachment.owner &&
-          sameOrgIdentityKey(attribution.org, attachment.org),
-      ) ||
-      (!run.leaseOwners?.length &&
-        lease?.owner === attachment.owner &&
-        sameOrgIdentityKey(lease.org, attachment.org)),
-    );
   }
 
   private setRunLeaseAttribution(run: RunRecord, lease: LeaseRecord): void {
@@ -18723,11 +18633,7 @@ export class FleetCoordinator {
         continue;
       }
       const after = attachment.subscriptions?.[run.id];
-      if (
-        after === undefined ||
-        after >= event.seq ||
-        !this.runReadableToControl(run, attachment)
-      ) {
+      if (after === undefined || after >= event.seq || !runReadableToPrincipal(run, attachment)) {
         continue;
       }
       // oxlint-disable-next-line eslint/no-await-in-loop -- validate each subscriber before its event can be sent.
@@ -18975,9 +18881,8 @@ export class FleetCoordinator {
         return { cleanup: false as const, lease: latest };
       }
       const previous = latest ? structuredClone(latest) : undefined;
-      const cleanupLease = provisionedLeaseRecord(latest ?? record, config, server, serverType);
+      const cleanupLease = rollbackCleanupLease(record, latest, config, server, serverType);
       if (latest?.state === "released" && latest.releaseDeletesServer === false) {
-        cleanupLease.state = "released";
         cleanupLease.keep = true;
         clearLeaseCleanupMetadata(cleanupLease);
         delete cleanupLease.cleanupStartedAt;
@@ -18989,7 +18894,6 @@ export class FleetCoordinator {
       }
       const cleanupStarted = new Date();
       const cleanupStartedAt = cleanupStarted.toISOString();
-      cleanupLease.state = latest?.state ?? cleanupLease.state;
       cleanupLease.cleanupStartedAt = cleanupStartedAt;
       cleanupLease.cleanupClaimExpiresAt = new Date(
         cleanupStarted.getTime() + leaseCleanupClaimStaleMs,
@@ -19025,14 +18929,14 @@ export class FleetCoordinator {
     } catch (error) {
       const failure = await this.state.runExclusive(async () => {
         const latest = await this.getLease(record.id);
-        const cleanupLease = provisionedLeaseRecord(
-          latest ?? preparation.lease,
+        const cleanupLease = rollbackCleanupLease(
+          preparation.lease,
+          latest,
           config,
           server,
           serverType,
         );
         if (latest?.state === "released" && latest.releaseDeletesServer === false) {
-          cleanupLease.state = "released";
           cleanupLease.keep = true;
           clearLeaseCleanupMetadata(cleanupLease);
           delete cleanupLease.cleanupStartedAt;
@@ -19046,18 +18950,16 @@ export class FleetCoordinator {
           return { suppressed: true as const, lease: latest ?? cleanupLease };
         }
         const failedAt = new Date().toISOString();
-        cleanupLease.state = latest?.state ?? "active";
         if (cleanupLease.state === "released") {
           cleanupLease.releaseDeletesServer = true;
         }
         cleanupLease.expiresAt = failedAt;
-        recordLeaseCleanupFailure(
+        await this.applyLeaseCleanupFailure(
           cleanupLease,
           error,
           coordinatorErrorMessage(this.env, error),
           failedAt,
         );
-        await this.putLease(cleanupLease);
         await this.markAWSIngressReconcilePending(cleanupLease);
         await this.scheduleAlarm();
         return { suppressed: false as const, lease: cleanupLease };
@@ -19264,40 +19166,43 @@ export class FleetCoordinator {
               current.cleanupError))),
       );
       if (!shouldDelete) {
-        const released = finalizedReleasedLease(current, deleteServer, options.keep);
-        await this.putLease(released);
+        const released = await this.leaseRepository.releaseLease(current, {
+          deleteServer,
+          keep: options.keep,
+        });
         await this.clearWorkspaceReleaseError(released);
         await this.markAWSIngressReconcilePending(released);
         await this.armAlarmNoLaterThan(Date.now());
         return { cleanup: false as const, blocked: false as const, lease: released };
       }
       if (!options.awaitProviderCleanup) {
-        const pending = finalizedReleasedLease(current, true, options.keep);
         // A zero-duration cleanup claim keeps queued deletion visible to rollback readers
         // while allowing either coordinator version to reclaim it immediately.
         const queuedAt = new Date().toISOString();
-        pending.releaseDeletesServer = true;
-        pending.cleanupStartedAt = queuedAt;
-        pending.cleanupClaimExpiresAt = queuedAt;
-        await this.putLease(pending);
+        const pending = await this.leaseRepository.releaseLease(current, {
+          deleteServer: true,
+          keep: options.keep,
+          cleanupClaim: { startedAt: queuedAt, expiresAt: queuedAt },
+        });
         await this.markAWSIngressReconcilePending(pending);
         await this.armAlarmNoLaterThan(Date.now());
         return { cleanup: false as const, blocked: false as const, lease: pending };
       }
       const now = new Date();
-      const claimed = finalizedReleasedLease(current, true, options.keep);
-      claimed.cleanupStartedAt = now.toISOString();
-      claimed.cleanupClaimExpiresAt = new Date(
-        now.getTime() + leaseCleanupClaimStaleMs,
-      ).toISOString();
-      claimed.releaseDeletesServer = true;
-      await this.putLease(claimed);
+      const claimed = await this.leaseRepository.releaseLease(current, {
+        deleteServer: true,
+        keep: options.keep,
+        cleanupClaim: {
+          startedAt: now.toISOString(),
+          expiresAt: new Date(now.getTime() + leaseCleanupClaimStaleMs).toISOString(),
+        },
+      });
       await this.markAWSIngressReconcilePending(claimed);
       await this.scheduleAlarm();
       return {
         cleanup: true as const,
         blocked: false as const,
-        claim: claimed.cleanupStartedAt,
+        claim: now.toISOString(),
         lease: structuredClone(claimed),
       };
     });
@@ -19336,13 +19241,12 @@ export class FleetCoordinator {
           return;
         }
         current.releaseDeletesServer = true;
-        recordLeaseCleanupFailure(
+        await this.applyLeaseCleanupFailure(
           current,
           error,
           coordinatorErrorMessage(this.env, error),
           new Date().toISOString(),
         );
-        await this.putLease(current);
         await this.scheduleAlarm();
       });
       throw error;
@@ -19357,11 +19261,11 @@ export class FleetCoordinator {
       ) {
         return current ?? preparation.lease;
       }
-      const released = finalizedReleasedLease(current, true, preparation.keep);
-      clearProvisioningRecoveryMetadata(released);
-      delete released.providerKeyCleanupPending;
-      delete released.providerKeyCleanupID;
-      await this.putLease(released);
+      const released = await this.leaseRepository.releaseLease(current, {
+        deleteServer: true,
+        keep: preparation.keep,
+        finalize: true,
+      });
       await this.clearWorkspaceReleaseError(released);
       await this.markAWSIngressReconcilePending(released);
       await this.scheduleAlarm();
@@ -19860,37 +19764,6 @@ function readyPoolCapacityCounts(
   return counts;
 }
 
-function readyPoolBorrowDeadline(entry: ReadyPoolEntry): number | undefined {
-  if (entry.borrowHeartbeatRequired !== true) {
-    return undefined;
-  }
-  const explicit = Date.parse(entry.borrowExpiresAt ?? "");
-  if (Number.isFinite(explicit)) {
-    return explicit;
-  }
-  const anchor = Date.parse(entry.borrowHeartbeatAt ?? entry.borrowedAt ?? entry.updatedAt);
-  return Number.isFinite(anchor) ? anchor + readyPoolBorrowTimeoutMs : Number.NEGATIVE_INFINITY;
-}
-
-function withoutReadyPoolBorrow(entry: ReadyPoolEntry): ReadyPoolEntry {
-  const {
-    borrowedAt: _borrowedAt,
-    borrowedBy: _borrowedBy,
-    borrowHeartbeatRequired: _borrowHeartbeatRequired,
-    borrowHeartbeatAt: _borrowHeartbeatAt,
-    borrowExpiresAt: _borrowExpiresAt,
-    borrowToken: _borrowToken,
-    ...rest
-  } = entry;
-  void _borrowedAt;
-  void _borrowedBy;
-  void _borrowHeartbeatRequired;
-  void _borrowHeartbeatAt;
-  void _borrowExpiresAt;
-  void _borrowToken;
-  return rest;
-}
-
 function nonNegativeReadyPoolCapacity(value: unknown, fallback: number): number | undefined {
   const capacity = value === undefined ? fallback : value;
   return typeof capacity === "number" &&
@@ -19967,10 +19840,6 @@ function readyPoolFieldMatches(
   }
   const got = exact ? (stored ?? "") : nonSecretString(stored);
   return got === want || (allowMissing && got === "");
-}
-
-function readyPoolKey(key: string, leaseID: string, typed = false): string {
-  return `${typed ? typedReadyPoolPrefix : readyPoolPrefix}${key}:${leaseID}`;
 }
 
 function readyPoolLegacyDesiredKey(
@@ -20063,10 +19932,6 @@ function readyPoolCountersKey(owner: string, org: string, key: string, typed = f
     .join(":")}`;
 }
 
-function runKey(runID: string): string {
-  return `run:${runID}`;
-}
-
 function externalRunnerPrefix(): string {
   return "runner:";
 }
@@ -20075,42 +19940,6 @@ function externalRunnerKey(provider: string, runnerID: string, owner: string, or
   return `${externalRunnerPrefix()}${[provider, runnerID, org, owner]
     .map((value) => encodeURIComponent(value))
     .join(":")}`;
-}
-
-function runLogKey(runID: string): string {
-  return `runlog:${runID}`;
-}
-
-function runLogChunkPrefix(runID: string): string {
-  return `runlog:${runID}:chunk:`;
-}
-
-function runTerminalLogRoot(runID: string): string {
-  return `runlog:${runID}:finish:`;
-}
-
-function runTerminalLogPrefix(runID: string, fingerprint: string, attemptID: string): string {
-  return `${runTerminalLogRoot(runID)}${fingerprint.replace(/^sha256:/u, "")}:${attemptID}:`;
-}
-
-function terminalRunLogValueKey(prefix: string): string {
-  return `${prefix}value`;
-}
-
-function terminalRunLogChunkPrefix(prefix: string): string {
-  return `${prefix}chunk:`;
-}
-
-function terminalRunLogChunkKey(prefix: string, index: number): string {
-  return `${terminalRunLogChunkPrefix(prefix)}${String(index).padStart(6, "0")}`;
-}
-
-function runEventPrefix(runID: string): string {
-  return `runevent:${runID}:`;
-}
-
-function runEventKey(runID: string, seq: number): string {
-  return `${runEventPrefix(runID)}${String(seq).padStart(12, "0")}`;
 }
 
 function createdAWSImageKey(imageID: string): string {
@@ -23006,16 +22835,6 @@ function providerFromQuery(value: string | null): Provider | undefined {
   return undefined;
 }
 
-function providerRegionForConfig(config: LeaseConfig): string | undefined {
-  if (config.provider === "gcp") return config.gcpZone;
-  if (config.provider === "azure") return config.azureLocation;
-  return config.provider === "aws" ? config.awsRegion : undefined;
-}
-
-function providerProjectForConfig(config: LeaseConfig): string | undefined {
-  return config.provider === "gcp" ? config.gcpProject : undefined;
-}
-
 function providerImageResourceName(provider: Provider, name: string, leaseID: string): string {
   if (provider === "aws") {
     return name;
@@ -23141,19 +22960,6 @@ function terminalRunRetentionMs(value: string | undefined): number {
   const days =
     Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : defaultTerminalRunRetentionDays;
   return Math.min(days, 3650) * 24 * 60 * 60 * 1000;
-}
-
-function terminalRunTimestamp(run: RunRecord): number | undefined {
-  if (run.state === "running") {
-    return undefined;
-  }
-  for (const value of [run.endedAt, run.lastEventAt, run.startedAt]) {
-    const timestamp = Date.parse(value ?? "");
-    if (Number.isFinite(timestamp)) {
-      return timestamp;
-    }
-  }
-  return undefined;
 }
 
 function clampLimit(value: string | null, fallback: number): number {
@@ -23831,19 +23637,6 @@ function validOptionalBridgePrincipal(value: {
   return absent || complete;
 }
 
-function completeBridgePrincipal(value: {
-  owner?: unknown;
-  org?: unknown;
-  admin?: unknown;
-}): value is { owner: string; org: string; admin: boolean } {
-  return (
-    typeof value.owner === "string" &&
-    typeof value.org === "string" &&
-    typeof value.admin === "boolean" &&
-    (value.admin || isCurrentOrgKey(value.org))
-  );
-}
-
 function revocableUserBridge(attachment: BridgeAttachment): attachment is Extract<
   BridgeAttachment,
   {
@@ -24234,48 +24027,6 @@ function normalizeRunLogInput(input: RunFinishRequest): {
   };
 }
 
-async function writeTerminalRunLog(
-  storage: ProviderStateStorageView,
-  prefix: string,
-  log: string,
-): Promise<void> {
-  if (textEncoder.encode(log).byteLength <= runLogChunkBytes) {
-    await storage.put(terminalRunLogValueKey(prefix), log);
-    return;
-  }
-  await Promise.all(
-    splitRunLogByBytes(log).map((chunk, index) =>
-      storage.put(terminalRunLogChunkKey(prefix, index), chunk),
-    ),
-  );
-}
-
-async function deleteStoragePrefix(
-  storage: ProviderStateStorageView,
-  prefix: string,
-): Promise<void> {
-  for (;;) {
-    // oxlint-disable-next-line eslint/no-await-in-loop -- deletion advances by removing each bounded first page.
-    const page = await storage.list({ prefix, limit: storageRecordScanBatchSize });
-    if (page.size === 0) return;
-    // oxlint-disable-next-line eslint/no-await-in-loop -- finish each bounded delete batch before loading the next one.
-    await Promise.all([...page.keys()].map((key) => storage.delete(key)));
-    if (page.size < storageRecordScanBatchSize) return;
-  }
-}
-
-function splitRunLogByBytes(log: string): string[] {
-  const encoded = textEncoder.encode(log);
-  const chunks: string[] = [];
-  for (let start = 0; start < encoded.byteLength;) {
-    let end = Math.min(start + runLogChunkBytes, encoded.byteLength);
-    while (end < encoded.byteLength && (encoded[end]! & 0xc0) === 0x80) end--;
-    chunks.push(runLogTextDecoder.decode(encoded.subarray(start, end)));
-    start = end;
-  }
-  return chunks;
-}
-
 function retainedRunLogText(value: string, maxBytes: number): string {
   const encoded = textEncoder.encode(value);
   let start = Math.max(0, encoded.byteLength - maxBytes);
@@ -24348,47 +24099,6 @@ function boundedRunEvent(
   return event;
 }
 
-function applyRunEventSummary(run: RunRecord, event: RunEventRecord): void {
-  // Late deliveries remain in the audit trail without rewriting committed terminal evidence.
-  if (run.terminalFinishSHA256) {
-    return;
-  }
-  if (event.phase) {
-    run.phase = event.phase;
-  } else {
-    const phase = phaseForRunEvent(event);
-    if (phase) {
-      run.phase = phase;
-    }
-  }
-  if (event.leaseID) {
-    run.leaseID = event.leaseID;
-  }
-  if (event.slug) {
-    run.slug = event.slug;
-  }
-  if (event.provider) {
-    run.provider = event.provider;
-  }
-  if (event.target) {
-    run.target = event.target;
-  }
-  if (event.windowsMode) {
-    run.windowsMode = event.windowsMode;
-  }
-  if (event.class) {
-    run.class = event.class;
-  }
-  if (event.serverType) {
-    run.serverType = event.serverType;
-  }
-  if (event.type === "run.failed") {
-    run.state = "failed";
-    run.phase = "failed";
-    run.endedAt = event.createdAt;
-  }
-}
-
 function sanitizeRunLabel(value: unknown): string | undefined {
   if (typeof value !== "string") {
     return undefined;
@@ -24403,29 +24113,6 @@ function sanitizeRunClassification(value: unknown): string | undefined {
   }
   const text = value.trim();
   return /^[a-z0-9][a-z0-9_-]{0,63}$/.test(text) ? text : undefined;
-}
-
-function phaseForRunEvent(event: RunEventRecord): string {
-  switch (event.type) {
-    case "leasing.started":
-      return "leasing";
-    case "lease.created":
-      return "leased";
-    case "bootstrap.waiting":
-      return "bootstrap";
-    case "sync.started":
-      return "sync";
-    case "sync.finished":
-      return "synced";
-    case "command.started":
-    case "stdout":
-    case "stderr":
-      return "command";
-    case "lease.released":
-      return "released";
-    default:
-      return "";
-  }
 }
 
 function boundedTestResults(results: TestResultSummary): TestResultSummary {
@@ -24804,28 +24491,6 @@ function isActiveProviderAccessRecord(lease: LeaseRecord, now: number): boolean 
   return leaseIsLive(lease) && Date.parse(lease.expiresAt) > now;
 }
 
-function leaseIsLive(lease: LeaseRecord): boolean {
-  return lease.state === "active" || lease.state === "provisioning";
-}
-
-function leaseHeartbeatStateError(
-  lease: LeaseRecord,
-  now = Date.now(),
-): "lease_ended" | "lease_expired" | undefined {
-  if (!leaseIsLive(lease)) {
-    return "lease_ended";
-  }
-  const expiresAt = Date.parse(lease.expiresAt);
-  if (!Number.isFinite(expiresAt) || expiresAt <= now) {
-    return "lease_expired";
-  }
-  return undefined;
-}
-
-function isRegisteredLease(lease: LeaseRecord): boolean {
-  return lease.lifecycle === "registered";
-}
-
 function managedLeaseProvider(lease: LeaseRecord): Provider | undefined {
   // A registered record never grants provider authority, even when its name is aws/azure/etc.
   return !isRegisteredLease(lease) && isCoordinatorProvider(lease.provider)
@@ -24877,53 +24542,28 @@ function sameLeaseAfterLegacyCleanupIdentityCapture(
   return sameLeaseRecord(normalized, expected);
 }
 
-function leaseCleanupIsUnresolved(lease: LeaseRecord): boolean {
-  return Boolean(
-    lease.provisioningResourceMayExist === true &&
-    lease.provisioningFailureRetryable === false &&
-    lease.failureError &&
-    lease.cleanupError &&
-    !lease.cleanupRetryAt,
-  );
+type LeaseCleanupFailureKind = "unresolved" | "manual" | "retryable";
+
+/** How a failed cleanup resolves: unresolved debt, manual resolution, or a retry. */
+function classifyLeaseCleanupFailure(error: unknown): LeaseCleanupFailureKind {
+  if (error instanceof ProviderResourceUnresolvedError) {
+    return "unresolved";
+  }
+  if (error instanceof ProviderCleanupManualResolutionError) {
+    return "manual";
+  }
+  return "retryable";
 }
 
-function retainUnresolvedProviderResource(lease: LeaseRecord, message: string, at: string): void {
-  if (leaseIsLive(lease)) {
-    lease.state = "failed";
-    lease.endedAt = at;
-  }
-  lease.updatedAt = at;
-  lease.failureError = message;
-  lease.cleanupError = message;
-  lease.cleanupFailedAt = at;
-  lease.provisioningResourceMayExist = true;
-  lease.provisioningFailureRetryable = false;
-  delete lease.cleanupRetryAt;
+/** A retryable cleanup failure: schedule the next attempt on the same record. */
+function applyRetryableLeaseCleanupFailure(lease: LeaseRecord, message: string, at: string): void {
+  lease.cleanupAttempts = (lease.cleanupAttempts ?? 0) + 1;
   delete lease.cleanupStartedAt;
   delete lease.cleanupClaimExpiresAt;
-  // Preserve original dispatch/scope and user intent. No next attempt can make
-  // progress without identity resolution, and elapsed TTL is not observed deletion.
-}
-
-function recordLeaseCleanupFailure(
-  lease: LeaseRecord,
-  error: unknown,
-  message: string,
-  at: string,
-): void {
-  if (error instanceof ProviderResourceUnresolvedError) {
-    retainUnresolvedProviderResource(lease, message, at);
-  } else if (error instanceof ProviderCleanupManualResolutionError) {
-    terminalizeManualProviderCleanup(lease, message, at);
-  } else {
-    lease.cleanupAttempts = (lease.cleanupAttempts ?? 0) + 1;
-    delete lease.cleanupStartedAt;
-    delete lease.cleanupClaimExpiresAt;
-    lease.cleanupError = message;
-    lease.cleanupFailedAt = at;
-    lease.cleanupRetryAt = new Date(Date.parse(at) + leaseCleanupRetryDelayMs).toISOString();
-    lease.updatedAt = at;
-  }
+  lease.cleanupError = message;
+  lease.cleanupFailedAt = at;
+  lease.cleanupRetryAt = new Date(Date.parse(at) + leaseCleanupRetryDelayMs).toISOString();
+  lease.updatedAt = at;
 }
 
 function leaseNeedsCleanup(lease: LeaseRecord, now: number): boolean {
@@ -24980,34 +24620,6 @@ function withRequestedTailscaleMetadata(lease: LeaseRecord, config: LeaseConfig)
     tailscale.exitNodeAllowLanAccess = config.tailscaleExitNodeAllowLanAccess;
   }
   return { ...lease, tailscale };
-}
-
-function provisionedLeaseRecord(
-  lease: LeaseRecord,
-  config: LeaseConfig,
-  server: ProviderMachine,
-  serverType: string,
-): LeaseRecord {
-  const providerProject = lease.providerProject ?? providerProjectForConfig(config);
-  const providerKey = server.providerKey?.trim() || config.providerKey;
-  const providerKeyCleanupOwned =
-    (config.provider === "aws" || config.provider === "hetzner") &&
-    providerKey === providerKeyForLease(lease.id);
-  return {
-    ...lease,
-    state: "active",
-    cloudID: server.cloudID,
-    serverID: server.id,
-    ...(server.providerResourceID ? { providerResourceID: server.providerResourceID } : {}),
-    serverName: server.name,
-    serverType,
-    providerKey,
-    providerKeyCleanupOwned,
-    host: server.host,
-    region: server.region ?? lease.region ?? providerRegionForConfig(config) ?? "",
-    ...(providerProject ? { providerProject } : {}),
-    ...(server.hostID ? { hostId: server.hostID } : {}),
-  };
 }
 
 function leaseHasCurrentCleanupOrFinalRelease(lease: LeaseRecord): boolean {
@@ -25358,56 +24970,6 @@ function cleanupClaimDeadline(lease: LeaseRecord): number {
   return Number.isFinite(startedAt) ? startedAt + leaseCleanupClaimStaleMs : Number.NaN;
 }
 
-function clearLeaseCleanupMetadata(lease: LeaseRecord): void {
-  delete lease.cleanupAttempts;
-  delete lease.cleanupError;
-  delete lease.cleanupFailedAt;
-  delete lease.cleanupRetryAt;
-}
-
-function clearProvisioningRecoveryMetadata(lease: LeaseRecord): void {
-  delete lease.provisioningRequestStartedAt;
-  delete lease.provisioningCoordinatorVersion;
-  delete lease.provisioningRequestSettledAt;
-  delete lease.provisioningRecoveryObservedAt;
-  delete lease.provisioningRecoveryMissingSince;
-  if (lease.provisioningResourceMayExist !== undefined) lease.provisioningResourceMayExist = false;
-  if (lease.provisioningFailureRetryable !== undefined) lease.provisioningFailureRetryable = false;
-}
-
-function terminalizeManualProviderCleanup(
-  lease: LeaseRecord,
-  error: string,
-  terminalAt: string,
-): void {
-  if (leaseIsLive(lease)) {
-    lease.state = "expired";
-  }
-  lease.keep = true;
-  lease.releaseDeletesServer = false;
-  lease.failureError = error;
-  lease.updatedAt = terminalAt;
-  lease.endedAt = terminalAt;
-  clearLeaseCleanupMetadata(lease);
-  delete lease.cleanupStartedAt;
-  delete lease.cleanupClaimExpiresAt;
-  delete lease.provisioningResourceMayExist;
-  delete lease.provisioningFailureRetryable;
-  delete lease.provisioningCoordinatorVersion;
-  delete lease.provisioningRequestSettledAt;
-  delete lease.provisioningRecoveryObservedAt;
-  delete lease.provisioningRecoveryMissingSince;
-}
-
-function clearRuntimeAdapterDeleteMetadata(lease: LeaseRecord): void {
-  delete lease.runtimeAdapterDeleteRequestedAt;
-  delete lease.runtimeAdapterDeleteClaimID;
-  delete lease.runtimeAdapterDeleteRetryAt;
-  delete lease.runtimeAdapterDeleteDispatchUntil;
-  delete lease.runtimeAdapterDeleteAttempts;
-  delete lease.runtimeAdapterDeleteError;
-}
-
 function runtimeAdapterDeleteVersionMatches(
   current: LeaseRecord,
   anchor: LeaseRecord,
@@ -25432,93 +24994,6 @@ function finalizedRuntimeAdapterDeleteLease(current: LeaseRecord): LeaseRecord {
   lease.updatedAt = new Date().toISOString();
   clearRuntimeAdapterDeleteMetadata(lease);
   return lease;
-}
-
-function finalizedReleasedLease(
-  current: LeaseRecord,
-  deleteServer: boolean,
-  keep?: boolean,
-): LeaseRecord {
-  const lease = structuredClone(current);
-  const unresolvedCreation =
-    !lease.cloudID &&
-    Boolean(lease.provisioningRequestStartedAt || lease.provisioningResourceMayExist);
-  const wasUnprovisionedRelease =
-    !lease.cloudID &&
-    (lease.state === "provisioning" || lease.state === "released" || unresolvedCreation);
-  const now = new Date().toISOString();
-  lease.state = "released";
-  lease.updatedAt = now;
-  lease.releasedAt = now;
-  lease.endedAt = now;
-  if (!unresolvedCreation) {
-    delete lease.provisioningCoordinatorVersion;
-    delete lease.provisioningRequestSettledAt;
-    delete lease.provisioningRecoveryObservedAt;
-    delete lease.provisioningRecoveryMissingSince;
-    clearLeaseCleanupMetadata(lease);
-  } else {
-    // Release records user intent, not cancellation of an already-dispatched
-    // provider request. Keep its original recovery evidence and visible debt.
-    lease.provisioningResourceMayExist = true;
-    lease.cleanupError ??= "provider creation is unresolved; cleanup has not been confirmed";
-  }
-  if (wasUnprovisionedRelease) {
-    lease.releaseDeletesServer = deleteServer;
-  } else if (
-    !deleteServer &&
-    !isRegisteredLease(lease) &&
-    (lease.cloudID || lease.providerKeyCleanupPending)
-  ) {
-    lease.releaseDeletesServer = false;
-  } else {
-    delete lease.releaseDeletesServer;
-  }
-  clearRuntimeAdapterDeleteMetadata(lease);
-  delete lease.cleanupStartedAt;
-  delete lease.cleanupClaimExpiresAt;
-  if (keep !== undefined) {
-    lease.keep = keep;
-  }
-  return lease;
-}
-
-function normalizeShareUser(value: string | undefined): string {
-  return (value ?? "").trim().toLowerCase();
-}
-
-function sanitizeShareRole(value: string | undefined): LeaseShareRole | undefined {
-  return value === "manage" || value === "use" ? value : undefined;
-}
-
-type NormalizedLeaseShare = {
-  users: Record<string, LeaseShareRole>;
-  org?: LeaseShareRole;
-  updatedAt?: string;
-  updatedBy?: string;
-};
-
-function normalizedLeaseShare(share: LeaseShare | undefined): NormalizedLeaseShare {
-  const users: Record<string, LeaseShareRole> = {};
-  for (const [rawUser, rawRole] of Object.entries(share?.users ?? {})) {
-    const user = normalizeShareUser(rawUser);
-    const role = sanitizeShareRole(rawRole);
-    if (user && role) {
-      users[user] = role;
-    }
-  }
-  const role = sanitizeShareRole(share?.org);
-  const normalized: NormalizedLeaseShare = { users };
-  if (role) {
-    normalized.org = role;
-  }
-  if (share?.updatedAt) {
-    normalized.updatedAt = share.updatedAt;
-  }
-  if (share?.updatedBy) {
-    normalized.updatedBy = share.updatedBy;
-  }
-  return normalized;
 }
 
 function leaseShareAccessShrank(

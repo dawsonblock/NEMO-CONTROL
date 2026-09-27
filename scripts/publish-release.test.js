@@ -11,7 +11,7 @@ const tag = "v0.37.0";
 const releaseId = 123;
 const runId = 9001;
 const workflowId = 77;
-const repository = "openclaw/crabbox";
+const repository = "dawsonblock/crabedence-V1";
 
 // The publication fixtures replay real signed release tags, which CI
 // provides (the scripts job checks out with fetch-depth: 0). A local
@@ -305,37 +305,31 @@ function prepareFixture({
       },
     ],
   });
-  const branchWorkflowRuleset = {
+  const branchCheckRuleset = {
     id: 705,
-    source_type: "Organization",
-    source: "openclaw",
+    source_type: "Repository",
+    source: repository,
     target: "branch",
     enforcement: "active",
     bypass_actors: [],
     conditions: { ref_name: { include: ["~DEFAULT_BRANCH"], exclude: [] } },
     rules: [
       {
-        type: "workflows",
+        type: "required_status_checks",
         parameters: {
-          do_not_enforce_on_create: false,
-          workflows: [
-            {
-              path: ".github/workflows/crabbox-release-check.yml",
-              ref: "refs/heads/main",
-              repository_id: 1304559357,
-            },
-          ],
+          strict_required_status_checks_policy: true,
+          required_status_checks: [{ context: "Release Check", integration_id: 15368 }],
         },
       },
     ],
   };
-  writeJson(path.join(api, "ruleset-branch-workflow.json"), branchWorkflowRuleset);
-  writeJson(path.join(api, "ruleset-branch-workflow-missing.json"), {
-    ...branchWorkflowRuleset,
+  writeJson(path.join(api, "ruleset-branch-check.json"), branchCheckRuleset);
+  writeJson(path.join(api, "ruleset-branch-check-missing.json"), {
+    ...branchCheckRuleset,
     rules: [],
   });
-  writeJson(path.join(api, "ruleset-branch-workflow-bypassable.json"), {
-    ...branchWorkflowRuleset,
+  writeJson(path.join(api, "ruleset-branch-check-bypassable.json"), {
+    ...branchCheckRuleset,
     bypass_actors: [
       {
         actor_id: 16654667,
@@ -344,61 +338,43 @@ function prepareFixture({
       },
     ],
   });
-  writeJson(path.join(api, "ruleset-branch-workflow-wrong-source.json"), {
-    ...branchWorkflowRuleset,
-    source_type: "Repository",
-    source: repository,
+  writeJson(path.join(api, "ruleset-branch-check-wrong-source.json"), {
+    ...branchCheckRuleset,
+    source_type: "Organization",
+    source: "openclaw",
   });
-  writeJson(path.join(api, "ruleset-branch-workflow-wrong-file.json"), {
-    ...branchWorkflowRuleset,
+  writeJson(path.join(api, "ruleset-branch-check-wrong-context.json"), {
+    ...branchCheckRuleset,
     rules: [
       {
-        type: "workflows",
+        type: "required_status_checks",
         parameters: {
-          do_not_enforce_on_create: false,
-          workflows: [
-            {
-              path: ".github/workflows/other.yml",
-              ref: "refs/heads/main",
-              repository_id: 1304559357,
-            },
-          ],
+          strict_required_status_checks_policy: true,
+          required_status_checks: [{ context: "Other Check", integration_id: 15368 }],
         },
       },
     ],
   });
-  writeJson(path.join(api, "ruleset-branch-workflow-wrong-ref.json"), {
-    ...branchWorkflowRuleset,
+  writeJson(path.join(api, "ruleset-branch-check-non-strict.json"), {
+    ...branchCheckRuleset,
     rules: [
       {
-        type: "workflows",
+        type: "required_status_checks",
         parameters: {
-          do_not_enforce_on_create: false,
-          workflows: [
-            {
-              path: ".github/workflows/crabbox-release-check.yml",
-              ref: "refs/heads/feature",
-              repository_id: 1304559357,
-            },
-          ],
+          strict_required_status_checks_policy: false,
+          required_status_checks: [{ context: "Release Check", integration_id: 15368 }],
         },
       },
     ],
   });
-  writeJson(path.join(api, "ruleset-branch-workflow-wrong-repository.json"), {
-    ...branchWorkflowRuleset,
+  writeJson(path.join(api, "ruleset-branch-check-wrong-integration.json"), {
+    ...branchCheckRuleset,
     rules: [
       {
-        type: "workflows",
+        type: "required_status_checks",
         parameters: {
-          do_not_enforce_on_create: false,
-          workflows: [
-            {
-              path: ".github/workflows/crabbox-release-check.yml",
-              ref: "refs/heads/main",
-              repository_id: 42,
-            },
-          ],
+          strict_required_status_checks_policy: true,
+          required_status_checks: [{ context: "Release Check", integration_id: 42 }],
         },
       },
     ],
@@ -769,19 +745,19 @@ else if (endpoint === "repos/${repository}/rulesets/704") {
 }
 else if (endpoint === "repos/${repository}/rulesets/705") {
   outputFile(
-    process.env.MOCK_MODE === "missing-workflow-rules"
-      ? "ruleset-branch-workflow-missing.json"
-      : process.env.MOCK_MODE === "workflow-bypassable"
-        ? "ruleset-branch-workflow-bypassable.json"
-        : process.env.MOCK_MODE === "workflow-wrong-source"
-          ? "ruleset-branch-workflow-wrong-source.json"
-          : process.env.MOCK_MODE === "workflow-wrong-file"
-            ? "ruleset-branch-workflow-wrong-file.json"
-            : process.env.MOCK_MODE === "workflow-wrong-ref"
-              ? "ruleset-branch-workflow-wrong-ref.json"
-              : process.env.MOCK_MODE === "workflow-wrong-repository"
-                ? "ruleset-branch-workflow-wrong-repository.json"
-                : "ruleset-branch-workflow.json",
+    process.env.MOCK_MODE === "missing-check-rules"
+      ? "ruleset-branch-check-missing.json"
+      : process.env.MOCK_MODE === "check-bypassable"
+        ? "ruleset-branch-check-bypassable.json"
+        : process.env.MOCK_MODE === "check-wrong-source"
+          ? "ruleset-branch-check-wrong-source.json"
+          : process.env.MOCK_MODE === "check-wrong-context"
+            ? "ruleset-branch-check-wrong-context.json"
+            : process.env.MOCK_MODE === "check-non-strict"
+              ? "ruleset-branch-check-non-strict.json"
+              : process.env.MOCK_MODE === "check-wrong-integration"
+                ? "ruleset-branch-check-wrong-integration.json"
+                : "ruleset-branch-check.json",
   );
 }
 else if (endpoint === "repos/${repository}/git/ref/tags/${tag}") outputFile("tag-ref.json");
@@ -1042,43 +1018,43 @@ testWithTags("bypassable history protection fails before any mutation", () => {
   });
 });
 
-testWithTags("missing organization release workflow fails before any mutation", () => {
+testWithTags("missing required Release Check status check fails before any mutation", () => {
   withFixture({}, ({ run, mutations }) => {
-    const result = run("missing-workflow-rules");
+    const result = run("missing-check-rules");
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /OpenClaw organization release workflow/);
+    assert.match(result.stderr, /required Release Check status check/);
     assert.deepEqual(mutations(), []);
   });
 });
 
-testWithTags("bypassable organization release workflow fails before any mutation", () => {
+testWithTags("bypassable Release Check ruleset fails before any mutation", () => {
   withFixture({}, ({ run, mutations }) => {
-    const result = run("workflow-bypassable");
+    const result = run("check-bypassable");
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /OpenClaw organization release workflow/);
+    assert.match(result.stderr, /required Release Check status check/);
     assert.deepEqual(mutations(), []);
   });
 });
 
 for (const mode of [
-  "workflow-wrong-source",
-  "workflow-wrong-file",
-  "workflow-wrong-ref",
-  "workflow-wrong-repository",
+  "check-wrong-source",
+  "check-wrong-context",
+  "check-non-strict",
+  "check-wrong-integration",
 ]) {
   testWithTags(`${mode} fails before any mutation`, () => {
     withFixture({}, ({ run, mutations }) => {
       const result = run(mode);
       assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /OpenClaw organization release workflow/);
+      assert.match(result.stderr, /required Release Check status check/);
       assert.deepEqual(mutations(), []);
     });
   });
 }
 
-testWithTags("exact organization release workflow permits publication", () => {
+testWithTags("exact required Release Check status check permits publication", () => {
   withFixture({}, ({ run, mutations }) => {
-    const result = run("workflow-exact");
+    const result = run("check-exact");
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(mutations().map((line) => line.split("\t")[0]), ["PATCH"]);
   });
@@ -1137,17 +1113,16 @@ testWithTags("disabled release immutability fails before publication", () => {
   withFixture({}, ({ run, mutations }) => {
     const result = run("immutable-disabled");
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /organization-enforced release immutability is required/);
+    assert.match(result.stderr, /repository release immutability is required/);
     assert.deepEqual(mutations(), []);
   });
 });
 
-testWithTags("repository-only release immutability fails before publication", () => {
+testWithTags("repository-enforced release immutability permits publication", () => {
   withFixture({}, ({ run, mutations }) => {
     const result = run("immutable-repository-only");
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /organization-enforced release immutability is required/);
-    assert.deepEqual(mutations(), []);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(mutations().map((line) => line.split("\t")[0]), ["PATCH"]);
   });
 });
 

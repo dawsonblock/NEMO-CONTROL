@@ -921,6 +921,26 @@ Record the upstream manifest digest, metadata hashes, native Tart version,
 macOS workload result, and cleanup evidence in the PR. Preserve explicit custom
 image references and never silently fall back to a mutable tag.
 
+## Known Qualification Flakes
+
+These do not indicate a source regression, but they are real signals about
+timing margin and should be replaced with controllable clocks or event
+synchronization where practical. Do not dismiss a repeat of one of these as
+"just flaky" without an isolated rerun on an idle machine.
+
+- `internal/reconcile` — `TestLiveBatchClaimHeartbeatProtectsQueuedRecords`
+  (live PostgreSQL). Failed once during a race run that overlapped the
+  `internal/cli` suite, then passed in isolation in 1.05s and in a clean
+  full-package race run on an idle machine. The test depends on wall-clock
+  scheduling between two workers; under suite load the second worker can
+  steal a queued record whose claim the batch heartbeat should hold.
+- `internal/providers/tart` race group — sits close to the gate's 120s
+  ceiling on slower machines (locally 91-118s against a 120s ceiling; CI
+  measured ~86s on the same code). Marginal, not deterministic.
+- `internal/idempotency` live lease-expiry tests — observed
+  `LEASE_EXPIRED` timing failures under Docker Desktop scheduling on macOS;
+  clean on rerun and in CI.
+
 ## Release Checklist
 
 The authoritative serialized release contract is [Release engineering](RELEASING.md).

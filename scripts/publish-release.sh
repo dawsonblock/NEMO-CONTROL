@@ -308,9 +308,12 @@ cmp "$WORK/predownload-state.json" "$WORK/postdownload-state.json"
 # post-PATCH drift without attempting corrective mutations.
 printf '{"draft":false}\n' >"$WORK/publish.json"
 api_get "repos/$REPOSITORY/immutable-releases" >"$WORK/immutable-releases.json"
-jq -e '.enabled == true and .enforced_by_owner == true' \
+# enforced_by_owner only exists for organization-enforced immutability; a
+# personal-account repository can only enable it at repository level, which is
+# the strongest form available to this release.
+jq -e '.enabled == true' \
   "$WORK/immutable-releases.json" >/dev/null || {
-  echo "organization-enforced release immutability is required before publication" >&2
+  echo "repository release immutability is required before publication" >&2
   exit 1
 }
 verify_protected_source final

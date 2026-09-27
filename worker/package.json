@@ -1,6 +1,6 @@
 {
   "name": "@openclaw/crabbox-worker",
-  "version": "0.52.0-rc.2",
+  "version": "0.53.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -46,7 +46,7 @@
     "oxlint-tsgolint": "^7.0.2001",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",
-    "wrangler": "^4.127.0"
+    "wrangler": "^4.135.0"
   },
   "engines": {
     "node": ">=22.12.0"

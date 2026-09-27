@@ -180,10 +180,14 @@ executor can still see the world it can no longer mutate.
 ### Signer policy and forensic evidence
 
 CRITICAL evidence is signed by provisioned Ed25519 keys. Development mode may
-auto-generate a signer; production mode (`CRABBOX_MODE=production`) and any
-multi-replica deployment (`CRABBOX_REPLICAS > 1`) fail closed without an
-externally provisioned key (`CRABBOX_EVIDENCE_KEY`), because each replica that
-mints its own key silently creates an independent evidence identity. Signer
+auto-generate a signer; a cluster topology (`CRABBOX_TOPOLOGY=cluster`),
+production mode (`CRABBOX_MODE=production`), and any multi-replica deployment
+(`CRABBOX_REPLICAS > 1`) fail closed without an externally provisioned key
+(`CRABBOX_EVIDENCE_KEY`), because each replica that mints its own key silently
+creates an independent evidence identity. The topology is explicit in
+production — a missing `CRABBOX_TOPOLOGY` is a startup error, never an assumed
+single production replica, and a declaration that contradicts the replica
+count or store backend is refused. Signer
 publication is crash-durable — atomic no-clobber write, file sync, directory
 sync — and rotation keeps retired fingerprints in the trusted ring so
 historical receipts remain verifiable.
@@ -256,6 +260,14 @@ crabbox serve-execution
 # CRABEDENCE_STORE_PATH overrides the SQLite file;
 # CRABEDENCE_DATABASE_URL selects/configures PostgreSQL for
 # multi-replica or clustered deployments.
+# CRABBOX_TOPOLOGY=single|cluster declares the deployment topology —
+# required in production; cluster requires PostgreSQL and a provisioned
+# CRABBOX_EVIDENCE_KEY.
+# CRABEDENCE_PROVIDER_MAX_CONCURRENT bounds simultaneous provider calls
+# per adapter; CRABEDENCE_PROVIDER_DEGRADED_AFTER,
+# CRABEDENCE_PROVIDER_OPEN_AFTER, and CRABEDENCE_PROVIDER_OPEN_COOLDOWN
+# tune the provider circuit breaker. Reconciliation is never gated by
+# provider capacity.
 ```
 
 The `crabbox exec` command is a stdin/stdout bridge for testing and ad-hoc
