@@ -35,7 +35,7 @@ jobs:
           cache: true
 
       - name: Cache Go toolchain installs
-        uses: actions/cache@6f8bcb29d35b64681a4100b6675ca4b51b95e216 # v5.0.1
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/go/bin
