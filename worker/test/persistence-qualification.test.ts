@@ -19,10 +19,13 @@ import {
 } from "../src/run-lifecycle";
 import {
   DurableObjectRunRepository,
+  RunGcRefused,
+  deleteStoragePrefix,
   readTerminalRunLog,
   runEventKey,
   runGcKey,
   runKey,
+  runLogKey,
   terminalAttemptKey,
 } from "../src/run-repository";
 import type { LeaseRecord, ReadyPoolEntry, RunRecord } from "../src/types";
@@ -44,6 +47,8 @@ import type { LeaseRecord, ReadyPoolEntry, RunRecord } from "../src/types";
  */
 
 const acme = orgKeyForLabel("acme");
+
+const terminalFingerprint = `sha256:${"a".repeat(64)}`;
 
 class CrashStorage implements RunRepositoryStorage {
   readonly map = new Map<string, unknown>();
@@ -185,7 +190,7 @@ const borrowInput = (owner: string, token: string) => ({
 
 const commitInput = (binding: RunRecord, overrides: Record<string, unknown> = {}) => ({
   runID: binding.id,
-  fingerprint: "sha256:aaaa",
+  fingerprint: terminalFingerprint,
   binding,
   exitCode: 0,
   syncMs: 1,
@@ -390,7 +395,7 @@ describe("terminal garbage-collection crash boundaries", () => {
       }),
     ).rejects.toThrow(/injected crash/);
     storage.crashTransaction = undefined;
-    const key = terminalAttemptKey(run.id, "sha256:aaaa");
+    const key = terminalAttemptKey(run.id, terminalFingerprint);
     const attempt = (await storage.get<{ state: string; logPrefix: string }>(key))!;
     expect(attempt.state).toBe("log_written");
     return { key, logPrefix: attempt.logPrefix };
@@ -447,7 +452,7 @@ describe("terminal garbage-collection crash boundaries", () => {
     await repository.createRunningRun(run);
     const committed = await repository.commitTerminalRun(commitInput(run));
     expect(committed.kind).toBe("committed");
-    const key = terminalAttemptKey(run.id, "sha256:aaaa");
+    const key = terminalAttemptKey(run.id, terminalFingerprint);
     const consumed = (await storage.get<{ state: string; logPrefix: string }>(key))!;
     expect(consumed.state).toBe("consumed");
 
@@ -692,5 +697,168 @@ describe("ready pool crash boundaries", () => {
     expect(
       (await storage.get(readyPoolKey(entry.key, entry.leaseID))) as ReadyPoolEntry,
     ).toMatchObject({ borrowHeartbeatAt: "2026-09-24T01:01:00.000Z" });
+  });
+});
+
+// ─── Corrupted GC records ─────────────────────────────────────────────
+
+describe("corrupted GC records fail closed", () => {
+  const corruptAttempt = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+    runID: "run-2",
+    fingerprint: terminalFingerprint,
+    state: "reserved",
+    logPrefix: `runlog:run-2:finish:${"a".repeat(64)}:attempt:`,
+    reservedAt: "2000-01-01T00:00:00.000Z",
+    ...overrides,
+  });
+
+  it("refuses a tombstone whose key does not name its run", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    // The tombstone sits at run-1's key but claims run-2's namespace.
+    storage.map.set(runGcKey("run-1"), {
+      runID: "run-2",
+      claimedAt: "2026-09-24T00:00:00.000Z",
+    });
+    storage.map.set(runEventKey("run-2", 1), { runID: "run-2", seq: 1 });
+    const before = new Map(storage.map);
+
+    await expect(repository.resumeTerminalRunGc()).rejects.toThrow(RunGcRefused);
+
+    // The record cannot prove what it owns, so nothing was deleted.
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses a tombstone with an empty run ID before any deletion", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    // An empty run ID would name EVERY run's events and attempts.
+    storage.map.set("run-gc:", { runID: "", claimedAt: "2026-09-24T00:00:00.000Z" });
+    storage.map.set(runEventKey("run-1", 1), { runID: "run-1", seq: 1 });
+    storage.map.set(runLogKey("run-1"), "aggregate log");
+    const before = new Map(storage.map);
+
+    await expect(repository.resumeTerminalRunGc()).rejects.toThrow(RunGcRefused);
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses a tombstone that names a log outside its run", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    storage.map.set(runGcKey("run-1"), {
+      runID: "run-1",
+      terminalLogPrefix: "runlog:run-2:finish:foreign:attempt:",
+      claimedAt: "2026-09-24T00:00:00.000Z",
+    });
+    storage.map.set("runlog:run-2:finish:foreign:attempt:value", "another run's evidence");
+    const before = new Map(storage.map);
+
+    await expect(repository.resumeTerminalRunGc()).rejects.toThrow(RunGcRefused);
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses an attempt with an empty log prefix before any deletion", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    // An empty prefix lists the whole storage namespace; obeying this
+    // record would delete every key in it.
+    storage.map.set(
+      terminalAttemptKey("run-1", terminalFingerprint),
+      corruptAttempt({ runID: "run-1", logPrefix: "" }),
+    );
+    storage.map.set("runlog:run-1:chunk:000000", "unrelated bytes");
+    const before = new Map(storage.map);
+
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses an attempt whose key does not match its identity", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    // The key names run-1; the record claims run-2's namespace.
+    storage.map.set(terminalAttemptKey("run-1", terminalFingerprint), corruptAttempt());
+    const before = new Map(storage.map);
+
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses an attempt that names a log outside its run", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    storage.map.set(
+      terminalAttemptKey("run-1", terminalFingerprint),
+      corruptAttempt({ runID: "run-1", logPrefix: "runlog:run-2:finish:foreign:attempt:" }),
+    );
+    storage.map.set("runlog:run-2:finish:foreign:attempt:value", "another run's evidence");
+    const before = new Map(storage.map);
+
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses an attempt in an unknown state", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    storage.map.set(
+      terminalAttemptKey("run-2", terminalFingerprint),
+      corruptAttempt({ state: "claimed" }),
+    );
+    const before = new Map(storage.map);
+
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("retires the valid records while a refused one stays as its own ledger", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    storage.crashTransaction = storage.transactionCount + 3;
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(/injected crash/);
+    storage.crashTransaction = undefined;
+    const validKey = terminalAttemptKey(run.id, terminalFingerprint);
+    const validPrefix = (await storage.get<{ logPrefix: string }>(validKey))!.logPrefix;
+    const refusedKey = terminalAttemptKey("run-2", terminalFingerprint);
+    storage.map.set(refusedKey, corruptAttempt({ logPrefix: "" }));
+
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+
+    // The abandoned attempt and its bytes were retired; the refused
+    // record was left exactly as it was.
+    expect(await storage.get(validKey)).toBeUndefined();
+    expect((await storage.list({ prefix: validPrefix })).size).toBe(0);
+    expect(await storage.get(refusedKey)).toBeDefined();
+  });
+
+  it("still resumes a valid tombstone that records no finish log", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    storage.map.set(runGcKey("run-1"), {
+      runID: "run-1",
+      claimedAt: "2026-09-24T00:00:00.000Z",
+    });
+    storage.map.set(runEventKey("run-1", 1), { runID: "run-1", seq: 1 });
+    storage.map.set(runLogKey("run-1"), "aggregate log");
+
+    expect(await repository.resumeTerminalRunGc()).toBe(1);
+    expect(await storage.get(runGcKey("run-1"))).toBeUndefined();
+    expect((await storage.list({ prefix: "runevent:run-1:" })).size).toBe(0);
+    expect(await storage.get(runLogKey("run-1"))).toBeUndefined();
+  });
+
+  it("refuses to delete an empty prefix even outside a record", async () => {
+    const storage = new CrashStorage();
+    storage.map.set(runKey("run-1"), runFixture());
+    await expect(deleteStoragePrefix(storage, "")).rejects.toThrow(RunGcRefused);
+    expect(storage.map.size).toBe(1);
   });
 });

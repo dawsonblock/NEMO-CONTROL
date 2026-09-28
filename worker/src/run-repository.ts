@@ -11,6 +11,7 @@
 import {
   buildTerminalRunUpdate,
   classifyTerminalRunAttempt,
+  RunIDCollisionError,
   runStartedEvent,
   terminalAttemptHasLog,
   terminalAttemptIsConsumed,
@@ -20,6 +21,7 @@ import {
   type RunCommitResult,
   type RunRepository,
   type TerminalAttemptRecord,
+  type TerminalAttemptState,
   type TerminalRunCommitInput,
 } from "./run-lifecycle";
 import type { RunEventRecord, RunRecord } from "./types";
@@ -145,6 +147,11 @@ export async function readTerminalRunLog(storage: RunStorageView, prefix: string
 }
 
 export async function deleteStoragePrefix(storage: RunStorageView, prefix: string): Promise<void> {
+  if (prefix === "") {
+    // An empty prefix lists the entire storage namespace; no caller may
+    // delete without naming what it owns.
+    throw new RunGcRefused("refusing to delete an empty storage prefix");
+  }
   for (;;) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- deletion advances by removing each bounded first page.
     const page = await storage.list({ prefix, limit: prefixDeletePageSize });
@@ -165,6 +172,80 @@ function splitRunLogByBytes(log: string): string[] {
     start = end;
   }
   return chunks;
+}
+
+// ─── GC record validation ─────────────────────────────────────────────
+
+/** A persisted GC record that cannot prove what it owns; deletion refused. */
+export class RunGcRefused extends Error {}
+
+const sha256Pattern = /^sha256:[0-9a-f]{64}$/u;
+const terminalAttemptStates: ReadonlySet<TerminalAttemptState> = new Set([
+  "reserved",
+  "log_written",
+  "consumed",
+  "retiring",
+]);
+
+function validTimestamp(value: string | undefined): boolean {
+  return value !== undefined && Number.isFinite(Date.parse(value));
+}
+
+/**
+ * Prove a `run-gc:` tombstone owns exactly what it names before deleting
+ * anything. GC deletes by prefix, so a corrupted record must fail closed
+ * rather than redirect deletion at another run's namespace: an empty run
+ * ID would name every run's events and attempts, and a foreign log prefix
+ * could walk the whole storage namespace. The key comparison is the
+ * identity proof — the record must be the one its own run ID derives.
+ */
+function validateRunGcRecord(key: string, record: RunGcRecord): void {
+  if (record.runID === "" || key !== runGcKey(record.runID)) {
+    throw new RunGcRefused(`run-gc record ${key} does not match its run ID`);
+  }
+  if (
+    record.terminalLogPrefix !== undefined &&
+    !record.terminalLogPrefix.startsWith(runTerminalLogRoot(record.runID))
+  ) {
+    throw new RunGcRefused(`run-gc record ${key} names a log outside its run`);
+  }
+  if (!validTimestamp(record.claimedAt)) {
+    throw new RunGcRefused(`run-gc record ${key} has no valid claim time`);
+  }
+}
+
+/**
+ * The same proof for a terminalization attempt: the key must be the one
+ * its (run ID, fingerprint) pair derives, the state must be one this
+ * repository writes, and the log prefix must live under the run's own
+ * finish-log root — never empty, never another run's.
+ */
+function validateTerminalAttemptRecord(key: string, attempt: TerminalAttemptRecord): void {
+  if (
+    attempt.runID === "" ||
+    !sha256Pattern.test(attempt.fingerprint) ||
+    key !== terminalAttemptKey(attempt.runID, attempt.fingerprint)
+  ) {
+    throw new RunGcRefused(`terminal attempt ${key} does not match its identity`);
+  }
+  if (!terminalAttemptStates.has(attempt.state)) {
+    throw new RunGcRefused(`terminal attempt ${key} has an unknown state`);
+  }
+  if (!attempt.logPrefix.startsWith(runTerminalLogRoot(attempt.runID))) {
+    throw new RunGcRefused(`terminal attempt ${key} names a log outside its run`);
+  }
+  if (!validTimestamp(attempt.reservedAt)) {
+    throw new RunGcRefused(`terminal attempt ${key} has no valid reservation time`);
+  }
+  if (attempt.logDigest !== undefined && !sha256Pattern.test(attempt.logDigest)) {
+    throw new RunGcRefused(`terminal attempt ${key} has an invalid log digest`);
+  }
+  if (attempt.logWrittenAt !== undefined && !validTimestamp(attempt.logWrittenAt)) {
+    throw new RunGcRefused(`terminal attempt ${key} has no valid log-write time`);
+  }
+  if (attempt.consumedAt !== undefined && !validTimestamp(attempt.consumedAt)) {
+    throw new RunGcRefused(`terminal attempt ${key} has no valid consumption time`);
+  }
 }
 
 // ─── Repository adapter ───────────────────────────────────────────────
@@ -204,6 +285,16 @@ export class DurableObjectRunRepository implements RunRepository {
       // aborts (or retries) never leaves the caller holding a record the
       // durable state does not reflect.
       const next = structuredClone(run);
+      // A run ID owns its namespace. Refuse an ID that is already a run
+      // or an in-flight retirement tombstone instead of overwriting the
+      // existing record or being created inside a retirement whose
+      // resume would delete the new run's events, logs, and attempts.
+      if (
+        (await txn.get<RunRecord>(runKey(next.id))) !== undefined ||
+        (await txn.get<RunGcRecord>(runGcKey(next.id))) !== undefined
+      ) {
+        throw new RunIDCollisionError(next.id);
+      }
       const now = new Date().toISOString();
       const seq = (next.eventCount ?? 0) + 1;
       const event = runStartedEvent(next.id, seq, now);
@@ -393,16 +484,19 @@ export class DurableObjectRunRepository implements RunRepository {
    * Claim one listed attempt if it is abandoned and old enough, then
    * retire it. A `retiring` attempt is already claimed — that is what
    * makes a crash mid-sweep recoverable — so it is resumed directly.
+   * Either way the listed record must first prove it owns its storage key
+   * and log prefix; a corrupted record is refused rather than obeyed.
    */
   private async sweepTerminalAttempt(
     key: string,
     listed: TerminalAttemptRecord,
     cutoff: number,
   ): Promise<boolean> {
+    validateTerminalAttemptRecord(key, listed);
     let attempt = listed;
     if (!terminalAttemptIsRetiring(attempt)) {
       const reservedAt = Date.parse(attempt.reservedAt);
-      if (!Number.isFinite(reservedAt) || reservedAt > cutoff) {
+      if (reservedAt > cutoff) {
         return false;
       }
       const claimed = await this.storage.transaction(async (txn) => {
@@ -481,7 +575,7 @@ export class DurableObjectRunRepository implements RunRepository {
       if (!claimed) {
         return;
       }
-      await this.retireTerminalRun(claimed);
+      await this.retireTerminalRun(runGcKey(runID), claimed);
     });
   }
 
@@ -495,10 +589,10 @@ export class DurableObjectRunRepository implements RunRepository {
     const pending = await this.storage.list<RunGcRecord>({ prefix: runGcPrefix });
     let resumed = 0;
     let firstFailure: unknown;
-    for (const [, record] of pending) {
+    for (const [key, record] of pending) {
       try {
         // oxlint-disable-next-line eslint/no-await-in-loop -- each tombstone is resumed from its own durable record before the next is considered.
-        await this.retireTerminalRun(record);
+        await this.retireTerminalRun(key, record);
         resumed += 1;
       } catch (error) {
         firstFailure ??= error;
@@ -513,9 +607,12 @@ export class DurableObjectRunRepository implements RunRepository {
   /**
    * Delete a hidden run's subordinate data and then its tombstone. Every
    * step is idempotent and runs only once the tombstone exists, so a
-   * crash anywhere here is resumed by the next pass.
+   * crash anywhere here is resumed by the next pass. The tombstone is
+   * validated against its storage key and its owned prefixes first, so a
+   * corrupted record is refused rather than obeyed.
    */
-  private async retireTerminalRun(record: RunGcRecord): Promise<void> {
+  private async retireTerminalRun(key: string, record: RunGcRecord): Promise<void> {
+    validateRunGcRecord(key, record);
     const { runID } = record;
     await deleteStoragePrefix(this.storage, runEventPrefix(runID));
     if (record.terminalLogPrefix) {
@@ -527,6 +624,6 @@ export class DurableObjectRunRepository implements RunRepository {
     // crash mid-deletion can leave an orphaned attempt but never a run
     // that references a deleted attempt.
     await deleteStoragePrefix(this.storage, terminalAttemptRunPrefix(runID));
-    await this.storage.delete(runGcKey(runID));
+    await this.storage.delete(key);
   }
 }

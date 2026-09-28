@@ -372,6 +372,7 @@ import {
   INITIAL_RUN_STATE,
   RunLifecycleService,
   applyRunEventSummary,
+  newRunID,
   terminalRunTimestamp,
 } from "./run-lifecycle";
 import { terminalFinishSHA256, validateRunEvidence, verifyTerminalReceipt } from "./run-receipt";
@@ -22126,12 +22127,6 @@ async function workspaceResponseError(response: Response, fallback: string): Pro
     }
   }
   return fallback;
-}
-
-function newRunID(): string {
-  const bytes = new Uint8Array(6);
-  crypto.getRandomValues(bytes);
-  return `run_${[...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
 function newWebVNCSessionID(prefix: "agent" | "viewer"): string {

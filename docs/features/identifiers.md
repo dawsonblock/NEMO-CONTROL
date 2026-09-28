@@ -173,14 +173,17 @@ lease ID with `_` rewritten to `-`).
 Each `crabbox run` gets a run ID:
 
 ```text
-run_abcdef123456
+run_abcdef1234567890abcdef1234567890
 ```
 
-Like lease IDs, run IDs are the `run_` prefix plus 12 lowercase hex characters
-from 6 random bytes. A configured coordinator mints the durable run record; the
-CLI uses that issued ID for execution metadata. Coordinator-free runs mint the
-same shape locally before dispatch. A run ID is stable across a single
-invocation; retrying the same command produces a new run.
+Run IDs are the `run_` prefix plus 32 lowercase hex characters from 16 random
+bytes. A configured coordinator mints the durable run record; the CLI uses that
+issued ID for execution metadata. Coordinator-free runs mint the same shape
+locally before dispatch. A run ID is stable across a single invocation;
+retrying the same command produces a new run. The coordinator refuses to create
+a run under an ID that already owns durable storage — an existing run or an
+in-flight retirement — so a collision re-mints instead of overwriting another
+run's history.
 
 Coordinator-issued IDs are durable handles accepted by `crabbox history`,
 `crabbox events`, `crabbox attach`, `crabbox logs`, and `crabbox results`.

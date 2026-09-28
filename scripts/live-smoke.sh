@@ -293,7 +293,7 @@ provider_smoke() (
   log_step "$provider run slug=$slug"
   capture_run_live runout run_in_repo "$cb" run --provider "$provider" --id "$slug" --shell -- "$live_command"
   local runid
-  runid="$(printf '%s\n' "$runout" | rg -o 'run_[a-f0-9]{12}' | tail -1 || true)"
+  runid="$(printf '%s\n' "$runout" | rg -o 'run_[a-f0-9]{12,32}' | tail -1 || true)"
   if needs_coordinator_preamble; then
     run_in_repo "$cb" history --lease "$lease" --limit 5
     if [[ -n "$runid" ]]; then
@@ -497,7 +497,7 @@ coder_smoke() {
   local runout
   capture_run_live runout run_in_repo "$cb" run --provider coder --id "$slug" --shell -- "$live_command"
   local runid
-  runid="$(printf '%s\n' "$runout" | rg -o 'run_[a-f0-9]{12}' | tail -1 || true)"
+  runid="$(printf '%s\n' "$runout" | rg -o 'run_[a-f0-9]{12,32}' | tail -1 || true)"
   run_in_repo "$cb" history --lease "$lease" --limit 5
   if [[ -n "$runid" ]]; then
     run_in_repo "$cb" logs "$runid" | tail -80
@@ -712,7 +712,7 @@ sealos_smoke() {
   local runout
   capture_run_live runout run_in_repo "$cb" run "${route_args[@]}" --id "$slug" --shell -- "$live_command"
   local runid
-  runid="$(printf '%s\n' "$runout" | rg -o 'run_[a-f0-9]{12}' | tail -1 || true)"
+  runid="$(printf '%s\n' "$runout" | rg -o 'run_[a-f0-9]{12,32}' | tail -1 || true)"
   if [[ -n "$runid" ]]; then
     run_in_repo "$cb" logs "$runid" | tail -80
   fi

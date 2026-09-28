@@ -540,7 +540,7 @@ func TestRunCommandInjectsReservedMetadataAcrossSSHCommandModes(t *testing.T) {
 			if !strings.Contains(logText, "CRABBOX_SLUG=''") {
 				t.Fatalf("empty slug metadata missing from SSH command:\n%s", logText)
 			}
-			runIDMatch := regexp.MustCompile(`CRABBOX_RUN_ID='(run_[a-f0-9]{12})'`).FindStringSubmatch(logText)
+			runIDMatch := regexp.MustCompile(`CRABBOX_RUN_ID='(run_[a-f0-9]{32})'`).FindStringSubmatch(logText)
 			if len(runIDMatch) != 2 {
 				t.Fatalf("CLI-generated run metadata missing from SSH command:\n%s", logText)
 			}
@@ -2002,7 +2002,7 @@ func TestRunCommandWritesFreshLocalContainerLeaseOutputAfterClaim(t *testing.T) 
 	if session.Provider != "local-container" || session.LeaseID != localContainerRunSessionTestLeaseID || session.Slug != "session-slug" || session.Reused || !session.Kept {
 		t.Fatalf("session=%#v", session)
 	}
-	if !regexp.MustCompile(`^run_[a-f0-9]{12}$`).MatchString(session.RunID) {
+	if !regexp.MustCompile(`^run_[a-f0-9]{32}$`).MatchString(session.RunID) {
 		t.Fatalf("runId=%q", session.RunID)
 	}
 	if want := "crabbox stop --provider local-container --target linux --id " + localContainerRunSessionTestLeaseID; session.CleanupCommand != want {
@@ -2707,7 +2707,7 @@ func TestRunCommandInjectsReservedMetadataIntoDelegatedRequest(t *testing.T) {
 	if env[runEnvLeaseID] != "cbx_delegated" || env[runEnvSlug] != "" {
 		t.Fatalf("delegated lease metadata=%#v", env)
 	}
-	if !regexp.MustCompile(`^run_[a-f0-9]{12}$`).MatchString(env[runEnvRunID]) {
+	if !regexp.MustCompile(`^run_[a-f0-9]{32}$`).MatchString(env[runEnvRunID]) {
 		t.Fatalf("delegated run ID=%q", env[runEnvRunID])
 	}
 	if runModuleRuntimeTestRequests[0].RunID != env[runEnvRunID] {
@@ -2792,7 +2792,7 @@ func TestRunCommandInjectsReservedMetadataIntoStaticSSH(t *testing.T) {
 	logText := string(data)
 	for _, pattern := range []string{
 		`CRABBOX_LEASE_ID=.*static_127-0-0-1`,
-		`CRABBOX_RUN_ID=.*run_[a-f0-9]{12}`,
+		`CRABBOX_RUN_ID=.*run_[a-f0-9]{32}`,
 		`CRABBOX_SLUG=`,
 	} {
 		if !regexp.MustCompile(pattern).MatchString(logText) {
@@ -5118,7 +5118,7 @@ exit 0
 	if readErr != nil {
 		t.Fatal(readErr)
 	}
-	if !strings.Contains(string(logData), "rm -f --") || !regexp.MustCompile(`\.crabbox/env/run_[a-f0-9]{12}\.env`).Match(logData) {
+	if !strings.Contains(string(logData), "rm -f --") || !regexp.MustCompile(`\.crabbox/env/run_[a-f0-9]{32}\.env`).Match(logData) {
 		t.Fatalf("cleanup command missing from ssh log:\n%s", logData)
 	}
 }
