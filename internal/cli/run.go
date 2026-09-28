@@ -83,7 +83,7 @@ func (a App) warmupWithLeaseObserver(ctx context.Context, args []string, observe
 	}
 	if strings.TrimSpace(*requestedLeaseID) != "" {
 		if !canonicalLeaseIDPattern.MatchString(strings.TrimSpace(*requestedLeaseID)) {
-			return exit(2, "--lease-id must match cbx_<12 lowercase hex characters>")
+			return exit(2, "--lease-id must match cbx_<12 or 32 lowercase hex characters>")
 		}
 		capable, ok := backend.(IdempotentLeaseIDBackend)
 		if !ok || !capable.SupportsRequestedLeaseID() {
@@ -5070,10 +5070,16 @@ func serverProviderKey(server Server) string {
 
 func validCrabboxProviderKey(name string) bool {
 	const prefix = "crabbox-cbx-"
-	if !strings.HasPrefix(name, prefix) || len(name) != len(prefix)+12 {
+	if !strings.HasPrefix(name, prefix) {
 		return false
 	}
-	for _, c := range name[len(prefix):] {
+	// The suffix is the lease ID's hex body: 12 characters for IDs minted
+	// by earlier versions, 32 for current ones.
+	suffix := name[len(prefix):]
+	if len(suffix) != 12 && len(suffix) != 32 {
+		return false
+	}
+	for _, c := range suffix {
 		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
 			return false
 		}

@@ -406,6 +406,7 @@ import {
 } from "./runtime-adapter-relay";
 import {
   InvalidLeaseSlugError,
+  isCanonicalLeaseID,
   leaseSlugFromID,
   normalizeLeaseSlug,
   requestedLeaseSlug,
@@ -20628,7 +20629,7 @@ function runtimeAdapterLegacyDeleteCompletion(
 }
 
 function newLeaseID(): string {
-  const bytes = new Uint8Array(6);
+  const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return `cbx_${[...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
@@ -22253,7 +22254,7 @@ export function shouldActivateEgressSession(
 }
 
 function validLeaseID(value: string | undefined): value is string {
-  return typeof value === "string" && /^cbx_[a-f0-9]{12}$/.test(value);
+  return typeof value === "string" && isCanonicalLeaseID(value);
 }
 
 function validCreateAttemptID(value: string | undefined): value is string {

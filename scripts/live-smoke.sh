@@ -178,7 +178,7 @@ has_provider() {
 }
 
 extract_lease() {
-  grep -Eo '(cbx_[a-f0-9]{12}|sem_[A-Za-z0-9][A-Za-z0-9._-]*)' | head -1
+  grep -Eo '(cbx_[a-f0-9]{12,32}|sem_[A-Za-z0-9][A-Za-z0-9._-]*)' | head -1
 }
 
 extract_slug() {

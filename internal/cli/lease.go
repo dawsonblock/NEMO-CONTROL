@@ -14,9 +14,10 @@ import (
 )
 
 func newLeaseID() string {
-	var b [6]byte
+	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		return "cbx_" + strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000"), ".", "")
+		digits := strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", "")
+		return "cbx_" + (digits + "00000000000000000000000000000000")[:32]
 	}
 	return "cbx_" + hex.EncodeToString(b[:])
 }

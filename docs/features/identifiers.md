@@ -17,13 +17,16 @@ across them.
 Canonical lease IDs look like:
 
 ```text
-cbx_abcdef123456
+cbx_abcdef1234567890abcdef1234567890
 ```
 
-The format is fixed: the literal `cbx_` prefix followed by 12 lowercase hex
-characters. `newLeaseID` mints one from 6 random bytes, and the regex
-`^cbx_[a-f0-9]{12}$` (`isCanonicalLeaseID`) decides whether a value is a
-canonical ID; anything that fails the pattern is treated as a slug.
+The format is the literal `cbx_` prefix followed by 32 lowercase hex
+characters — 16 random bytes, minted by `newLeaseID`. The 12-character form
+(`cbx_abcdef123456`) minted by earlier versions remains canonical, and
+`isCanonicalLeaseID` (`^cbx_(?:[a-f0-9]{12}|[a-f0-9]{32})$`) accepts both
+widths; anything that fails the pattern is treated as a slug, so a canonical
+ID never falls back to slug resolution. Fixed-ID automation may supply either
+width.
 
 The CLI normally mints a provisional lease ID before calling the broker. A
 broker may return a different final ID, in which case the CLI moves the local

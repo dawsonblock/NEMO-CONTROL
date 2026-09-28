@@ -8384,7 +8384,7 @@ describe("fleet lease identity and idle", () => {
     );
     expect(create.status).toBe(202);
     const created = (await create.json()) as { providerResourceId: string };
-    expect(created.providerResourceId).toMatch(/^cbx_[a-f0-9]{12}$/);
+    expect(created.providerResourceId).toMatch(/^cbx_[a-f0-9]{32}$/);
     expect(created).toMatchObject({
       status: "provisioning",
       profile,
@@ -27037,7 +27037,7 @@ describe("fleet lease identity and idle", () => {
     );
     expect(generated.status).toBe(201);
     const generatedBody = (await generated.json()) as { lease: LeaseRecord };
-    expect(generatedBody.lease.id).toMatch(/^cbx_[a-f0-9]{12}$/);
+    expect(generatedBody.lease.id).toMatch(/^cbx_[a-f0-9]{32}$/);
     expect(creates).toBe(2);
     expect((await storage.list({ prefix: "create-attempt:" })).size).toBe(0);
   });
@@ -28387,7 +28387,7 @@ describe("fleet lease identity and idle", () => {
     const fixedID = "cbx_ca1100000008";
     const registrationID = "cbx_ca1100000009";
     const ordinaryID = "cbx_ca110000000a";
-    const workspaceID = "cbx_ca110000000b";
+    const workspaceID = "cbx_ca110000000b00000000000000000000";
     const canceledTokens = new Map([
       [fixedID, "cat_80000000000000000000000000000008"],
       [registrationID, "cat_80000000000000000000000000000009"],
@@ -28521,9 +28521,9 @@ describe("fleet lease identity and idle", () => {
 
   it("keeps pending and canonical-bound create attempts as global ID blockers", async () => {
     const storage = new MemoryStorage();
-    const pendingID = "cbx_ca110000000c";
-    const boundID = "cbx_ca110000000d";
-    const freeID = "cbx_ca110000000e";
+    const pendingID = "cbx_ca110000000c00000000000000000000";
+    const boundID = "cbx_ca110000000d00000000000000000000";
+    const freeID = "cbx_ca110000000e00000000000000000000";
     storage.seed(`create-attempt:${pendingID}`, {
       version: 1,
       requestedLeaseID: pendingID,

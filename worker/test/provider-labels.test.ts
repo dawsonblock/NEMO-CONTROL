@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LeaseConfig } from "../src/config";
 import { gcpLabelValue, gcpProviderLabelValue } from "../src/gcp";
+import { leaseIDForProviderKey, providerKeyForLease } from "../src/provider-key";
 import { leaseProviderLabels, providerMachineOwnedByLease } from "../src/provider-labels";
 import type { LeaseRecord, ProviderMachine } from "../src/types";
 
@@ -353,5 +354,16 @@ describe("provider labels", () => {
         "aws",
       ),
     ).toBe(false);
+  });
+});
+
+describe("provider key lease mapping", () => {
+  it("round-trips both canonical lease-ID widths", () => {
+    for (const leaseID of ["cbx_abcdef123456", `cbx_${"a".repeat(32)}`]) {
+      expect(leaseIDForProviderKey(providerKeyForLease(leaseID))).toBe(leaseID);
+    }
+    // Anything else is not a Crabbox-owned provider key.
+    expect(leaseIDForProviderKey("crabbox-cbx-abc")).toBeUndefined();
+    expect(leaseIDForProviderKey("crabbox-other-abcdef123456")).toBeUndefined();
   });
 });

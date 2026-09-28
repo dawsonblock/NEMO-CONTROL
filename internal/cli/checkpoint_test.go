@@ -664,17 +664,17 @@ func TestCheckpointForkRejectsInvalidFlagCombinations(t *testing.T) {
 		{
 			name: "fixed lease must be canonical",
 			args: []string{"chk_missing", "--lease-id", "cbx_NOT_CANONICAL"},
-			want: "--lease-id must match cbx_<12 lowercase hex characters>",
+			want: "--lease-id must match cbx_<12 or 32 lowercase hex characters>",
 		},
 		{
 			name: "explicitly empty fixed lease fails closed",
 			args: []string{"chk_missing", "--lease-id="},
-			want: "--lease-id must match cbx_<12 lowercase hex characters>",
+			want: "--lease-id must match cbx_<12 or 32 lowercase hex characters>",
 		},
 		{
 			name: "whitespace-only fixed lease fails closed",
 			args: []string{"chk_missing", "--lease-id", "   "},
-			want: "--lease-id must match cbx_<12 lowercase hex characters>",
+			want: "--lease-id must match cbx_<12 or 32 lowercase hex characters>",
 		},
 		{
 			name: "direct parallels snapshots reject fixed leases",
