@@ -21,6 +21,7 @@ import {
   DurableObjectRunRepository,
   readTerminalRunLog,
   runEventKey,
+  runGcKey,
   runKey,
   terminalAttemptKey,
 } from "../src/run-repository";
@@ -57,10 +58,14 @@ class CrashStorage implements RunRepositoryStorage {
   /** Throw when the Nth write of a given key prefix happens (1-based). */
   crashWritePrefix: string | undefined;
   crashWriteNumber: number | undefined = 1;
+  /** Throw when the Nth delete of a given key prefix happens (1-based). */
+  crashDeletePrefix: string | undefined;
+  crashDeleteNumber: number | undefined = 1;
   transactionCount = 0;
   private transactionDepth = 0;
   private transactionWrites = 0;
   private writes = new Map<string, number>();
+  private deletes = new Map<string, number>();
   private tail: Promise<unknown> = Promise.resolve();
 
   async get<T>(key: string): Promise<T | undefined> {
@@ -68,6 +73,17 @@ class CrashStorage implements RunRepositoryStorage {
   }
 
   async put<T>(key: string, value: T): Promise<void> {
+    if (this.crashWritePrefix && key.startsWith(this.crashWritePrefix)) {
+      const count = (this.writes.get(this.crashWritePrefix) ?? 0) + 1;
+      this.writes.set(this.crashWritePrefix, count);
+      if (this.crashWriteNumber === count) {
+        throw new Error(`injected crash writing ${key}`);
+      }
+    }
+    this.map.set(key, value);
+    // The crash lands AFTER the write, so a transactional write is
+    // genuinely applied before the crash and the transaction's rollback
+    // has to undo it. Crashing before the write would prove nothing.
     if (this.transactionDepth > 0) {
       this.transactionWrites += 1;
       if (
@@ -77,17 +93,16 @@ class CrashStorage implements RunRepositoryStorage {
         throw new Error(`injected crash after transactional write ${this.transactionWrites}`);
       }
     }
-    if (this.crashWritePrefix && key.startsWith(this.crashWritePrefix)) {
-      const count = (this.writes.get(this.crashWritePrefix) ?? 0) + 1;
-      this.writes.set(this.crashWritePrefix, count);
-      if (this.crashWriteNumber === count) {
-        throw new Error(`injected crash writing ${key}`);
-      }
-    }
-    this.map.set(key, value);
   }
 
   async delete(key: string): Promise<unknown> {
+    if (this.crashDeletePrefix && key.startsWith(this.crashDeletePrefix)) {
+      const count = (this.deletes.get(this.crashDeletePrefix) ?? 0) + 1;
+      this.deletes.set(this.crashDeletePrefix, count);
+      if (this.crashDeleteNumber === count) {
+        throw new Error(`injected crash deleting ${key}`);
+      }
+    }
     return this.map.delete(key);
   }
 
@@ -192,7 +207,11 @@ async function classifyRun(
   const events = await storage.list({ prefix: `runevent:${runID}:` });
   if (!run) {
     // No record but events on disk would be a partially initialized audit
-    // record — creation is atomic, so this must never happen.
+    // record — creation is atomic, so this must never happen. The one
+    // legal explanation is a retention tombstone: the run was hidden
+    // atomically together with its cleanup ledger, and the resume that
+    // follows finishes the deletion.
+    if (await storage.get(runGcKey(runID))) return "recoverable";
     return events.size > 0 ? "impossible" : "recoverable";
   }
   if (run.state === "running") {
@@ -351,6 +370,149 @@ describe("terminalization crash boundaries", () => {
       storage.map.set(logKey, "tampered");
     }
     expect(await classifyRun(storage, run.id)).toBe("impossible");
+  });
+});
+
+describe("terminal garbage-collection crash boundaries", () => {
+  /** Leave a `log_written` attempt behind by failing transaction B. */
+  const abandonAttempt = async (
+    storage: CrashStorage,
+    repository: DurableObjectRunRepository,
+    run: RunRecord,
+    log = "hello\n",
+  ): Promise<{ key: string; logPrefix: string }> => {
+    await repository.createRunningRun(run);
+    storage.crashTransaction = storage.transactionCount + 3;
+    await expect(
+      repository.commitTerminalRun({
+        ...commitInput(run),
+        log: { text: log, bytes: log.length, truncated: false },
+      }),
+    ).rejects.toThrow(/injected crash/);
+    storage.crashTransaction = undefined;
+    const key = terminalAttemptKey(run.id, "sha256:aaaa");
+    const attempt = (await storage.get<{ state: string; logPrefix: string }>(key))!;
+    expect(attempt.state).toBe("log_written");
+    return { key, logPrefix: attempt.logPrefix };
+  };
+
+  it("resumes a claimed retirement on a fresh repository after a crash", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    const { key, logPrefix } = await abandonAttempt(storage, repository, run);
+
+    // The sweep commits the `retiring` claim, then crashes before it can
+    // delete the bytes: the durable state is a claimed attempt, and the
+    // claim is the only record of what still has to be deleted.
+    storage.crashDeletePrefix = logPrefix;
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(/injected crash/);
+    storage.crashDeletePrefix = undefined;
+    expect((await storage.get<{ state: string }>(key))!.state).toBe("retiring");
+    expect((await storage.list({ prefix: logPrefix })).size).toBeGreaterThan(0);
+
+    // A fresh process resumes the retirement instead of skipping it.
+    const restarted = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    expect(await restarted.sweepTerminalAttempts(Date.now())).toBe(1);
+    expect(await storage.get(key)).toBeUndefined();
+    expect((await storage.list({ prefix: logPrefix })).size).toBe(0);
+  });
+
+  it("keeps a partially deleted log's attempt as the durable ledger", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    // Four finish-log chunks: the deletion can be interrupted midway.
+    const { key, logPrefix } = await abandonAttempt(storage, repository, run, "x".repeat(200_000));
+    expect((await storage.list({ prefix: logPrefix })).size).toBe(4);
+
+    storage.crashDeletePrefix = logPrefix;
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(/injected crash/);
+    storage.crashDeletePrefix = undefined;
+    // Part of the log is gone and the attempt survives as its ledger: the
+    // bytes are never orphaned behind a deleted ownership record.
+    expect((await storage.get<{ state: string }>(key))!.state).toBe("retiring");
+    expect((await storage.list({ prefix: logPrefix })).size).toBeGreaterThan(0);
+
+    const restarted = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    expect(await restarted.sweepTerminalAttempts(Date.now())).toBe(1);
+    expect(await storage.get(key)).toBeUndefined();
+    expect((await storage.list({ prefix: logPrefix })).size).toBe(0);
+  });
+
+  it("reclaims a consumed attempt whose run no longer exists", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    const committed = await repository.commitTerminalRun(commitInput(run));
+    expect(committed.kind).toBe("committed");
+    const key = terminalAttemptKey(run.id, "sha256:aaaa");
+    const consumed = (await storage.get<{ state: string; logPrefix: string }>(key))!;
+    expect(consumed.state).toBe("consumed");
+
+    // A crash during an older retention pass: the run record is gone but
+    // its consumed attempt and finish-log bytes survived, with no
+    // tombstone to name them. The attempt anchors nothing now.
+    await storage.delete(runKey(run.id));
+    await storage.put(key, { ...consumed, reservedAt: "2000-01-01T00:00:00.000Z" });
+
+    expect(await repository.sweepTerminalAttempts(Date.now())).toBe(1);
+    expect(await storage.get(key)).toBeUndefined();
+    expect((await storage.list({ prefix: consumed.logPrefix })).size).toBe(0);
+  });
+
+  it("hides a terminal run behind a tombstone and resumes an interrupted retirement", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    await repository.commitTerminalRun(commitInput(run));
+    expect(await classifyRun(storage, run.id)).toBe("valid");
+    const cutoff = Date.parse("2026-09-24T01:00:00.000Z");
+
+    // Crash after the tombstone transaction committed (the run record is
+    // already gone) and before the consumed attempt was deleted.
+    storage.crashDeletePrefix = `terminal-attempt:${run.id}:`;
+    await expect(repository.deleteTerminalRun(run.id, cutoff)).rejects.toThrow(/injected crash/);
+    storage.crashDeletePrefix = undefined;
+    expect(await storage.get(runKey(run.id))).toBeUndefined();
+    expect(await storage.get(runGcKey(run.id))).toBeDefined();
+    // An invisible run with a durable cleanup ledger is recoverable, not
+    // impossible: the classifier can tell the two apart by the tombstone.
+    expect(await classifyRun(storage, run.id)).toBe("recoverable");
+
+    // A fresh process finishes the retirement from the tombstone.
+    const restarted = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    expect(await restarted.resumeTerminalRunGc()).toBe(1);
+    expect(await storage.get(runGcKey(run.id))).toBeUndefined();
+    expect((await storage.list({ prefix: `terminal-attempt:${run.id}:` })).size).toBe(0);
+    expect((await storage.list({ prefix: `runevent:${run.id}:` })).size).toBe(0);
+    expect(await classifyRun(storage, run.id)).toBe("recoverable");
+  });
+
+  it("keeps a run visible when its retirement claim did not commit", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    await repository.commitTerminalRun(commitInput(run));
+    const cutoff = Date.parse("2026-09-24T01:00:00.000Z");
+
+    // Crash inside the tombstone transaction: the tombstone and the
+    // record deletion roll back together, so the run stays visible and
+    // verifiable rather than half-hidden.
+    storage.crashTransaction = storage.transactionCount + 1;
+    await expect(repository.deleteTerminalRun(run.id, cutoff)).rejects.toThrow(/injected crash/);
+    storage.crashTransaction = undefined;
+    expect(await storage.get(runGcKey(run.id))).toBeUndefined();
+    expect(await classifyRun(storage, run.id)).toBe("valid");
+
+    // Recovery converges on the same outcome.
+    await repository.deleteTerminalRun(run.id, cutoff);
+    expect(await storage.get(runKey(run.id))).toBeUndefined();
+    expect(await storage.get(runGcKey(run.id))).toBeUndefined();
+    expect(await classifyRun(storage, run.id)).toBe("recoverable");
   });
 });
 
