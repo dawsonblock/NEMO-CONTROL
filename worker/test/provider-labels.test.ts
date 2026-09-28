@@ -373,42 +373,43 @@ describe("provider key lease mapping", () => {
   });
 });
 
-describe("mixed-generation lease coexistence", () => {
-  const lease = (id: string, slug: string, cloudID: string) => ({
-    id,
-    slug,
-    provider: "aws" as const,
-    cloudID,
-    owner: "alice@example.com",
-  });
-  const machine = (entry: ReturnType<typeof lease>) => ({
-    provider: "aws" as const,
-    cloudID: entry.cloudID,
-    labels: {
-      crabbox: "true",
-      created_by: "crabbox",
-      lease: entry.id,
-      owner: "alice_example.com",
-      provider: "aws",
-      slug: entry.slug,
-    },
-  });
+const coexistenceLease = (id: string, slug: string, cloudID: string) => ({
+  id,
+  slug,
+  provider: "aws" as const,
+  cloudID,
+  owner: "alice@example.com",
+});
 
+const coexistenceMachine = (entry: ReturnType<typeof coexistenceLease>) => ({
+  provider: "aws" as const,
+  cloudID: entry.cloudID,
+  labels: {
+    crabbox: "true",
+    created_by: "crabbox",
+    lease: entry.id,
+    owner: "alice_example.com",
+    provider: "aws",
+    slug: entry.slug,
+  },
+});
+
+describe("mixed-generation lease coexistence", () => {
   it("resolves a legacy 12-hex lease and a current 32-hex lease independently", () => {
     // The rolling-upgrade case: both generations are live at once, so each
     // surface must resolve each lease to its own identity and never across.
-    const legacy = lease("cbx_abcdef123456", "legacy-lobster", "i-000000000001");
-    const current = lease(`cbx_${"a".repeat(32)}`, "current-lobster", "i-000000000002");
+    const legacy = coexistenceLease("cbx_abcdef123456", "legacy-lobster", "i-000000000001");
+    const current = coexistenceLease(`cbx_${"a".repeat(32)}`, "current-lobster", "i-000000000002");
 
     for (const [entry, other] of [
       [legacy, current],
       [current, legacy],
     ] as const) {
       // Provider ownership: each width owns exactly its own resource.
-      expect(providerMachineOwnedByLease(machine(entry), entry, "aws")).toBe(true);
-      expect(providerMachineOwnedByLease(machine(other), entry, "aws")).toBe(false);
+      expect(providerMachineOwnedByLease(coexistenceMachine(entry), entry, "aws")).toBe(true);
+      expect(providerMachineOwnedByLease(coexistenceMachine(other), entry, "aws")).toBe(false);
       // Labels: the stored label map validates back to its own lease only.
-      const labels = machine(entry).labels;
+      const labels = coexistenceMachine(entry).labels;
       expect(providerLabelsOwnedByLease(labels, entry, "aws")).toBe(true);
       expect(providerLabelsOwnedByLease(labels, other, "aws")).toBe(false);
       // Lookup: the provider key maps back to the exact ID of its own width.

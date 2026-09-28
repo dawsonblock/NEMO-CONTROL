@@ -6,12 +6,12 @@ import {
   hetznerServerOwnedByLease,
 } from "./hetzner";
 import { providerKeyForLease } from "./provider-key";
-import { isCanonicalLeaseID } from "./slug";
 import {
   providerLabelsOwnedByLease,
   providerLabelValue,
   workspacePrewarmProviderOwner,
 } from "./provider-labels";
+import { isCanonicalLeaseID } from "./slug";
 import type { HetznerCleanupEvidence, HetznerServer, LeaseRecord } from "./types";
 
 type SaveEvidence = (evidence: HetznerCleanupEvidence) => Promise<void>;
