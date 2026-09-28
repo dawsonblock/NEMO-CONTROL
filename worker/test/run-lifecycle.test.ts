@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import { orgKeyForLabel } from "../src/org-identity";
 import {
+  RunIDCollisionError,
+  RunLifecycleService,
   applyRunEventSummary,
   buildTerminalRunUpdate,
   classifyTerminalRunAttempt,
   isTerminalRunState,
+  newRunID,
   terminalRunStateForExitCode,
   terminalRunTimestamp,
+  type RunRepository,
   type RunRepositoryStorage,
   type RunStorageView,
   type TerminalRunCommitInput,
@@ -15,12 +19,15 @@ import {
 import {
   DurableObjectRunRepository,
   runEventKey,
+  runGcKey,
   runKey,
   terminalAttemptKey,
 } from "../src/run-repository";
 import type { RunEventRecord, RunRecord } from "../src/types";
 
 const acme = orgKeyForLabel("acme");
+
+const terminalFingerprint = `sha256:${"a".repeat(64)}`;
 
 const runFixture = (overrides: Partial<RunRecord> = {}): RunRecord =>
   ({
@@ -47,7 +54,7 @@ const commitInput = (
   overrides: Partial<TerminalRunCommitInput> = {},
 ): TerminalRunCommitInput => ({
   runID: binding.id,
-  fingerprint: "sha256:aaaa",
+  fingerprint: terminalFingerprint,
   binding,
   exitCode: 0,
   syncMs: 10,
@@ -110,12 +117,12 @@ describe("run state machine", () => {
       [0, 1, 137].map((exitCode) => {
         const current = runFixture({
           state,
-          terminalFinishSHA256: state === "running" ? undefined : "sha256:aaaa",
+          terminalFinishSHA256: state === "running" ? undefined : terminalFingerprint,
         });
         return {
           state,
           exitCode,
-          classification: classifyTerminalRunAttempt(current, "sha256:aaaa", current),
+          classification: classifyTerminalRunAttempt(current, terminalFingerprint, current),
           otherFingerprint: classifyTerminalRunAttempt(current, "sha256:bbbb", current),
           nextState:
             state === "running"
@@ -144,13 +151,13 @@ describe("run state machine", () => {
   });
 
   it("reports a missing record as missing, never as a transition", () => {
-    expect(classifyTerminalRunAttempt(null, "sha256:aaaa", runFixture())).toBe("missing");
+    expect(classifyTerminalRunAttempt(null, terminalFingerprint, runFixture())).toBe("missing");
   });
 
   it("refuses a transition when the terminal binding does not match", () => {
     const stored = runFixture({ leaseID: "lease-1" });
     const rebound = runFixture({ leaseID: "lease-2" });
-    expect(classifyTerminalRunAttempt(stored, "sha256:aaaa", rebound)).toBe("conflict");
+    expect(classifyTerminalRunAttempt(stored, terminalFingerprint, rebound)).toBe("conflict");
   });
 
   it("keeps the run running until a terminal state is committed", () => {
@@ -182,7 +189,7 @@ describe("run event projection", () => {
   it("never rewrites committed terminal evidence with a late event", () => {
     const committed = runFixture({
       state: "succeeded",
-      terminalFinishSHA256: "sha256:aaaa",
+      terminalFinishSHA256: terminalFingerprint,
       endedAt: "2026-09-24T00:01:00.000Z",
     });
     const before = { ...committed };
@@ -242,7 +249,7 @@ describe("DurableObjectRunRepository", () => {
     expect(result.event.type).toBe("command.finished");
     expect(result.event.seq).toBe(2);
     const stored = (await storage.get(runKey(run.id))) as RunRecord;
-    expect(stored.terminalFinishSHA256).toBe("sha256:aaaa");
+    expect(stored.terminalFinishSHA256).toBe(terminalFingerprint);
     expect(stored.terminalLogPrefix).toContain("runlog:run-1:finish:");
     const logKeys = [...storage.map.keys()].filter((key) =>
       key.startsWith(stored.terminalLogPrefix ?? ""),
@@ -265,7 +272,7 @@ describe("DurableObjectRunRepository", () => {
     );
     expect(replay.kind).toBe("duplicate");
     if (replay.kind !== "duplicate") return;
-    expect(replay.run.terminalFinishSHA256).toBe("sha256:aaaa");
+    expect(replay.run.terminalFinishSHA256).toBe(terminalFingerprint);
     expect(replay.run.eventCount).toBe(committed.eventCount);
     expect(await storage.get(runKey(run.id))).toEqual(committed);
     // No second terminal event was written.
@@ -489,7 +496,7 @@ describe("terminal attempt staging", () => {
     await repository.createRunningRun(run);
     const committed = await repository.commitTerminalRun(commitInput(run));
     expect(committed.kind).toBe("committed");
-    const attemptKey = terminalAttemptKey(run.id, "sha256:aaaa");
+    const attemptKey = terminalAttemptKey(run.id, terminalFingerprint);
     const consumed = (await storage.get<{ state: string; logPrefix: string }>(attemptKey))!;
     expect(consumed.state).toBe("consumed");
 
@@ -533,7 +540,7 @@ describe("terminal attempt staging", () => {
     );
     storage.failTransactionNumber = undefined;
 
-    const attemptKey = terminalAttemptKey(run.id, "sha256:aaaa");
+    const attemptKey = terminalAttemptKey(run.id, terminalFingerprint);
     const abandoned = (await storage.get(attemptKey)) as { state: string };
     expect(abandoned.state).toBe("log_written");
 
@@ -543,5 +550,88 @@ describe("terminal attempt staging", () => {
     const refused = await repository.commitTerminalRun(commitInput(run));
     expect(refused.kind).toBe("conflict");
     expect((await storage.get(runKey(run.id))) as RunRecord).toMatchObject({ state: "running" });
+  });
+});
+
+// ─── Run ID collisions ────────────────────────────────────────────────
+
+describe("run ID collisions", () => {
+  it("mints 128-bit run IDs", () => {
+    const first = newRunID();
+    const second = newRunID();
+    expect(first).toMatch(/^run_[0-9a-f]{32}$/u);
+    expect(second).toMatch(/^run_[0-9a-f]{32}$/u);
+    expect(first).not.toBe(second);
+  });
+
+  it("refuses a creation whose ID already owns a run, without overwriting it", async () => {
+    const storage = new MemoryStorage();
+    const repository = new DurableObjectRunRepository(hostFor(storage));
+    const existing = runFixture({ id: "run_existing" });
+    await repository.createRunningRun(existing);
+    const stored = structuredClone(await storage.get(runKey(existing.id)));
+
+    const colliding = runFixture({ id: "run_existing", command: ["other"] });
+    await expect(repository.createRunningRun(colliding)).rejects.toThrow(RunIDCollisionError);
+
+    // The existing record and its event survive untouched, and the
+    // refused creation left nothing behind.
+    expect(await storage.get(runKey(existing.id))).toEqual(stored);
+    expect((await storage.list({ prefix: "runevent:run_existing:" })).size).toBe(1);
+  });
+
+  it("refuses a creation inside an in-flight retirement", async () => {
+    const storage = new MemoryStorage();
+    const repository = new DurableObjectRunRepository(hostFor(storage));
+    storage.map.set(runGcKey("run_retiring"), {
+      runID: "run_retiring",
+      claimedAt: "2026-09-24T00:00:00.000Z",
+    });
+
+    // Creating under the tombstone's ID would let the resumed retirement
+    // delete the new run's events, logs, and attempts.
+    await expect(repository.createRunningRun(runFixture({ id: "run_retiring" }))).rejects.toThrow(
+      RunIDCollisionError,
+    );
+    expect(await storage.get(runKey("run_retiring"))).toBeUndefined();
+    expect(await storage.get(runGcKey("run_retiring"))).toBeDefined();
+  });
+
+  it("re-mints and retries through the lifecycle service", async () => {
+    const storage = new MemoryStorage();
+    const repository = new DurableObjectRunRepository(hostFor(storage));
+    const service = new RunLifecycleService(repository);
+    const existing = runFixture({ id: "run_existing" });
+    await service.createRun(existing);
+
+    const colliding = runFixture({ id: "run_existing" });
+    const event = await service.createRun(colliding);
+    expect(colliding.id).toMatch(/^run_[0-9a-f]{32}$/u);
+    expect(colliding.id).not.toBe("run_existing");
+    expect(event.runID).toBe(colliding.id);
+    expect(await storage.get(runKey(colliding.id))).toBeDefined();
+    // The original run still owns exactly one event.
+    expect((await storage.list({ prefix: "runevent:run_existing:" })).size).toBe(1);
+  });
+
+  it("gives up after the bounded retries when creation keeps colliding", async () => {
+    let calls = 0;
+    const repository: RunRepository = {
+      loadRun: async () => null,
+      createRunningRun: async () => {
+        calls += 1;
+        throw new RunIDCollisionError("run_collision");
+      },
+      commitTerminalRun: async () => ({ kind: "missing" }),
+      deleteTerminalRun: async () => {},
+      resumeTerminalRunGc: async () => 0,
+      sweepTerminalAttempts: async () => 0,
+    };
+    const service = new RunLifecycleService(repository);
+    const run = runFixture();
+    await expect(service.createRun(run)).rejects.toThrow(RunIDCollisionError);
+    // Five attempts: the initial creation plus the bounded re-mints.
+    expect(calls).toBe(5);
+    expect(run.id).toMatch(/^run_[0-9a-f]{32}$/u);
   });
 });

@@ -8384,7 +8384,7 @@ describe("fleet lease identity and idle", () => {
     );
     expect(create.status).toBe(202);
     const created = (await create.json()) as { providerResourceId: string };
-    expect(created.providerResourceId).toMatch(/^cbx_[a-f0-9]{12}$/);
+    expect(created.providerResourceId).toMatch(/^cbx_[a-f0-9]{32}$/);
     expect(created).toMatchObject({
       status: "provisioning",
       profile,
@@ -19173,6 +19173,32 @@ describe("fleet lease identity and idle", () => {
     expect(deleted).toBe("123");
   });
 
+  it("resolves a legacy 12-hex lease and a current 32-hex lease side by side", async () => {
+    const storage = new MemoryStorage();
+    const fleet = testFleet(storage);
+    const legacyID = "cbx_abcdef123456";
+    const currentID = `cbx_${"a".repeat(32)}`;
+    const headers = { "x-crabbox-owner": "owner@example.com", "x-crabbox-org": "example-org" };
+    for (const id of [legacyID, currentID]) {
+      storage.seed(
+        `lease:${id}`,
+        testLease({
+          id,
+          owner: "owner@example.com",
+          org: "example-org",
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      );
+    }
+
+    const legacy = await fleet.fetch(request("GET", `/v1/leases/${legacyID}`, { headers }));
+    const current = await fleet.fetch(request("GET", `/v1/leases/${currentID}`, { headers }));
+    expect(legacy.status).toBe(200);
+    expect(current.status).toBe(200);
+    await expect(legacy.json()).resolves.toMatchObject({ lease: { id: legacyID } });
+    await expect(current.json()).resolves.toMatchObject({ lease: { id: currentID } });
+  });
+
   it("keeps colliding exact org labels isolated across shares, runs, and filters", async () => {
     const storage = new MemoryStorage();
     const fleet = testFleet(storage);
@@ -27037,7 +27063,7 @@ describe("fleet lease identity and idle", () => {
     );
     expect(generated.status).toBe(201);
     const generatedBody = (await generated.json()) as { lease: LeaseRecord };
-    expect(generatedBody.lease.id).toMatch(/^cbx_[a-f0-9]{12}$/);
+    expect(generatedBody.lease.id).toMatch(/^cbx_[a-f0-9]{32}$/);
     expect(creates).toBe(2);
     expect((await storage.list({ prefix: "create-attempt:" })).size).toBe(0);
   });
@@ -28387,7 +28413,7 @@ describe("fleet lease identity and idle", () => {
     const fixedID = "cbx_ca1100000008";
     const registrationID = "cbx_ca1100000009";
     const ordinaryID = "cbx_ca110000000a";
-    const workspaceID = "cbx_ca110000000b";
+    const workspaceID = "cbx_ca110000000b00000000000000000000";
     const canceledTokens = new Map([
       [fixedID, "cat_80000000000000000000000000000008"],
       [registrationID, "cat_80000000000000000000000000000009"],
@@ -28521,9 +28547,9 @@ describe("fleet lease identity and idle", () => {
 
   it("keeps pending and canonical-bound create attempts as global ID blockers", async () => {
     const storage = new MemoryStorage();
-    const pendingID = "cbx_ca110000000c";
-    const boundID = "cbx_ca110000000d";
-    const freeID = "cbx_ca110000000e";
+    const pendingID = "cbx_ca110000000c00000000000000000000";
+    const boundID = "cbx_ca110000000d00000000000000000000";
+    const freeID = "cbx_ca110000000e00000000000000000000";
     storage.seed(`create-attempt:${pendingID}`, {
       version: 1,
       requestedLeaseID: pendingID,

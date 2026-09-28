@@ -372,6 +372,7 @@ import {
   INITIAL_RUN_STATE,
   RunLifecycleService,
   applyRunEventSummary,
+  newRunID,
   terminalRunTimestamp,
 } from "./run-lifecycle";
 import { terminalFinishSHA256, validateRunEvidence, verifyTerminalReceipt } from "./run-receipt";
@@ -405,6 +406,7 @@ import {
 } from "./runtime-adapter-relay";
 import {
   InvalidLeaseSlugError,
+  isCanonicalLeaseID,
   leaseSlugFromID,
   normalizeLeaseSlug,
   requestedLeaseSlug,
@@ -20627,7 +20629,7 @@ function runtimeAdapterLegacyDeleteCompletion(
 }
 
 function newLeaseID(): string {
-  const bytes = new Uint8Array(6);
+  const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return `cbx_${[...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
@@ -22128,12 +22130,6 @@ async function workspaceResponseError(response: Response, fallback: string): Pro
   return fallback;
 }
 
-function newRunID(): string {
-  const bytes = new Uint8Array(6);
-  crypto.getRandomValues(bytes);
-  return `run_${[...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
-}
-
 function newWebVNCSessionID(prefix: "agent" | "viewer"): string {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
@@ -22258,7 +22254,7 @@ export function shouldActivateEgressSession(
 }
 
 function validLeaseID(value: string | undefined): value is string {
-  return typeof value === "string" && /^cbx_[a-f0-9]{12}$/.test(value);
+  return typeof value === "string" && isCanonicalLeaseID(value);
 }
 
 function validCreateAttemptID(value: string | undefined): value is string {

@@ -30,6 +30,22 @@ export type RunState = RunRecord["state"];
 export const INITIAL_RUN_STATE: RunState = "running";
 export const INITIAL_RUN_PHASE = "starting";
 
+/**
+ * The run ID a new run is minted with: `run_` plus 128 random bits.
+ * Durable storage keys are derived from the ID, so the width is a
+ * namespace guarantee, not cosmetics; creation additionally refuses an ID
+ * that already owns storage (RunIDCollisionError), which the lifecycle
+ * service resolves by re-minting.
+ */
+export function newRunID(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return `run_${[...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** A creation was refused because the run ID already owns storage. */
+export class RunIDCollisionError extends Error {}
+
 /** Terminal states are immutable; only `running` may transition. */
 export function isTerminalRunState(state: RunState): boolean {
   return state !== "running";
@@ -261,7 +277,11 @@ export type RunCommitResult =
  */
 export interface RunRepository {
   loadRun(runID: string): Promise<RunRecord | null>;
-  /** Persist the running record, then its `run.started` event. */
+  /**
+   * Persist the running record, then its `run.started` event. An ID that
+   * already owns storage — an existing run or an in-flight retirement
+   * tombstone — is refused with RunIDCollisionError, never overwritten.
+   */
   createRunningRun(run: RunRecord): Promise<RunEventRecord>;
   /** Persist the terminal transition atomically, or classify the attempt. */
   commitTerminalRun(input: TerminalRunCommitInput): Promise<RunCommitResult>;
@@ -304,9 +324,26 @@ export class RunLifecycleService {
     return run;
   }
 
-  /** Persist a new running run and its `run.started` event. */
+  /**
+   * Persist a new running run and its `run.started` event. A refused ID
+   * collision is resolved by re-minting the run's ID and retrying, so the
+   * caller's record always carries the persisted ID and a colliding
+   * creation can never overwrite another run's namespace.
+   */
   async createRun(run: RunRecord): Promise<RunEventRecord> {
-    return this.repository.createRunningRun(run);
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- each attempt is one complete transaction that must settle before the ID is re-minted.
+        return await this.repository.createRunningRun(run);
+      } catch (error) {
+        // The bound turns a pathological storage state into an error
+        // instead of an endless loop.
+        if (!(error instanceof RunIDCollisionError) || attempt >= 4) {
+          throw error;
+        }
+        run.id = newRunID();
+      }
+    }
   }
 
   /** Classify a finish attempt against the current record (pre-check). */

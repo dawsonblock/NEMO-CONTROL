@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Hardening — 128-bit lease IDs
+
+- Coordinator and CLI: lease IDs are minted from 128 random bits (`cbx_` plus 32 hex characters, previously 6 bytes; the CLI's rand-failure fallback is canonical too). The 12-hex IDs minted by earlier versions remain canonical, so existing leases, claims, provider resources, SSH keys, and fixed-ID automation keep resolving.
+- Every canonical-shape check now accepts both widths: the CLI's `isCanonicalLeaseID` and `validCrabboxProviderKey`, the coordinator's `validLeaseID` (now a shared `isCanonicalLeaseID` in `slug.ts`) plus the Hetzner/GCP/provider-label/cleanup ownership guards and `leaseIDForProviderKey`, and the provider-name parsers in smolvm, asciibox, upstashbox, and hostinger.
+- Hostinger fits the slug to the 63-character hostname budget, so a 32-hex lease suffix cannot produce a rejected hostname.
+- Qualification: the slug and provider-key suites pin both widths, and the connector-smoke workflow test covers a 32-hex lease extraction.
+
+### Hardening — run-ID namespace integrity and fail-closed GC validation
+
+- Coordinator: run IDs are now minted from 128 random bits (`run_` plus 32 hex characters, previously 6 bytes), and `createRunningRun` refuses an ID that already owns storage — an existing `run:` record or an in-flight `run-gc:` retirement tombstone — inside the creation transaction instead of overwriting it. The lifecycle service re-mints a refused ID and retries (bounded), so a collision can never alias two runs or be created inside a retirement whose resume would delete the new run's events, logs, and attempts.
+- Coordinator: GC validates every persisted record against its storage key and owned prefixes before deleting anything. A `run-gc:` tombstone must sit at its own run's key and name only its own finish log; a terminalization attempt must match the key its (run ID, fingerprint) pair derives, carry a known state and a digest-shaped fingerprint, and name only a log under its run's finish-log root. A structurally untrustworthy record is refused with `RunGcRefused` — reported after the other records are considered, never obeyed — and `deleteStoragePrefix` refuses an empty prefix outright, since it would list the entire storage namespace.
+- CLI: locally minted run IDs (`crabbox run` without a coordinator) are 128-bit too, matching the coordinator-issued shape; the identifiers and env-forwarding docs describe the new shape.
+- Coordinator: the Cloudflare dynamic-workers runner mints the same canonical `run_` + 32-hex shape instead of `run_<uuid-with-dashes>`; client-supplied run IDs are accepted unchanged.
+- Qualification: added adversarial cases for corrupted GC records (key/identity mismatch, empty run ID, empty or foreign log prefix, unknown state) and run-ID collisions (overwrite refusal, in-flight retirement refusal, service re-mint, bounded give-up), plus a positive control that a valid tombstone without a recorded finish log still resumes.
+
 ## 0.53.1 - 2026-09-27
 
 ### Fixed — persistence integrity: stale-writer and terminal-GC races

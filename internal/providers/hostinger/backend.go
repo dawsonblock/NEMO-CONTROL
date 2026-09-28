@@ -820,7 +820,18 @@ func hostingerHostname(cfg Config, leaseID, slug string) string {
 	if prefix == "" {
 		prefix = "crabbox"
 	}
-	return fmt.Sprintf("%s-%s-%s", prefix, slug, strings.TrimPrefix(leaseID, "cbx_"))
+	suffix := strings.TrimPrefix(leaseID, "cbx_")
+	// The hostname budget is 63 characters and the suffix is the lease ID
+	// itself, so a 32-hex suffix leaves room for only a shortened slug;
+	// fit it instead of emitting a name validateHostingerHostname rejects.
+	maxSlugLen := 63 - len(prefix) - 2 - len(suffix)
+	if maxSlugLen < 1 {
+		maxSlugLen = 1
+	}
+	if len(slug) > maxSlugLen {
+		slug = strings.Trim(slug[:maxSlugLen], "-")
+	}
+	return fmt.Sprintf("%s-%s-%s", prefix, slug, suffix)
 }
 
 func validateHostingerHostname(hostname string) error {
@@ -1620,7 +1631,7 @@ func hostingerHostnamePrefix(cfg Config) string {
 }
 
 func validHostingerLeaseSuffix(value string) bool {
-	if len(value) != 12 {
+	if len(value) != 12 && len(value) != 32 {
 		return false
 	}
 	for _, r := range value {
