@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Documentation — identity rollout and Hostinger hostname budget
+
+- Identifiers now document the rollout order for 32-hex IDs: current readers accept both widths, but components from releases before v0.53.2 recognize only the 12-character form, so the CLI and coordinator must not be rolled back below v0.53.2 while 32-hex leases exist.
+- Hostinger documents and reports its 63-character hostname budget explicitly: the slug is shortened to fit, and a prefix that leaves no room for any slug on a newly minted lease now fails with a message naming the prefix before the purchase call.
+
 ### Hardening — 128-bit lease IDs
 
 - Coordinator and CLI: lease IDs are minted from 128 random bits (`cbx_` plus 32 hex characters, previously 6 bytes; the CLI's rand-failure fallback is canonical too). The 12-hex IDs minted by earlier versions remain canonical, so existing leases, claims, provider resources, SSH keys, and fixed-ID automation keep resolving.

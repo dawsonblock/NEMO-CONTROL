@@ -835,8 +835,14 @@ func hostingerHostname(cfg Config, leaseID, slug string) string {
 }
 
 func validateHostingerHostname(hostname string) error {
-	if len(hostname) == 0 || len(hostname) > 63 {
+	if len(hostname) == 0 {
 		return exit(2, "provider=%s generated hostname must contain 1-63 characters, got %q", providerName, hostname)
+	}
+	if len(hostname) > 63 {
+		// The hostname embeds the full lease ID, so an over-budget name means
+		// the configured prefix (not the slug, which is already shortened to
+		// fit) is what has to give.
+		return exit(2, "provider=%s generated hostname must contain 1-63 characters, got %q; it embeds the full lease ID, so shorten the configured hostname prefix", providerName, hostname)
 	}
 	for i, r := range hostname {
 		valid := r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-'

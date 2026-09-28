@@ -112,6 +112,27 @@ Crabbox-created machines also carry a `crabbox=true` marker label. `crabbox list
 and `crabbox cleanup` discover machines by that marker and then read the `lease`
 label to map a provider machine back to a Crabbox lease.
 
+### Rollout
+
+Upgrading is order-independent for readers: current code accepts both widths, so
+a new CLI, coordinator, or provider adapter recognizes every existing 12-hex
+lease. The reverse does not hold — components from releases before v0.53.2
+recognize only the 12-character form:
+
+- an older CLI treats a 32-hex `cbx_` value as a slug, so `--id cbx_<32 hex>`
+  cannot resolve it;
+- an older coordinator rejects it as an input lease ID (`invalid_lease_id`), and
+  its provider ownership and cleanup guards do not recognize it, which can leave
+  a provider resource stranded.
+
+Do not roll the CLI or coordinator back below v0.53.2 while 32-hex leases exist.
+Release or stop those leases with a current CLI first, or re-issue them; leases
+that were already 12-hex stay usable in either direction.
+
+Run IDs are opaque to lookups, so a 32-hex run record stays addressable by older
+tooling, but anything that pattern-matches the 12-hex form — extraction regexes
+in scripts, log greps — will not match a 32-hex ID.
+
 ## Slug
 
 Slugs are friendly, human-typeable lease names. They look like:
