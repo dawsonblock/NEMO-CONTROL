@@ -982,12 +982,13 @@ Then advance sequentially under that authorization as each technical gate passes
    recreate it merely because verifier hardening landed later.
 2. **Local candidate.** Build the exact eight-asset payload described in
    [Release engineering](RELEASING.md#immutable-release-record). Ordinary builds
-   remain credential-free. The macOS producer uses the managed release keychain
-   to sign both native CLI architectures, the Apple Silicon helper, and its
-   embedded VMD as
-   `Developer ID Application: OpenClaw Foundation (FWJYW4S8P8)`, with hardened
-   runtime and secure timestamps, then requires accepted notarization and
-   online `codesign --check-notarization` proof before packaging.
+   remain credential-free, and the declared contract is **unsigned and not
+   notarized** (`CRABBOX_RELEASE_APPLE_SIGNING=none`): `verify-macos-binary.sh`
+   requires the unsigned signature report and rejects identity signatures,
+   authorities, secure timestamps, and notarization tickets, so a signed or
+   notarized macOS artifact fails the gate. Signed Apple publication is a
+   separate contract upgrade gated on provisioning a real Developer ID identity
+   and on a source change to the embedded-VMD runtime trust policy.
 3. **Private draft.** After local verification succeeds, create exactly one
    GitHub draft for the captured pre-existing signed tag. Its title, exact eight
    assets, and body copied byte-for-byte from the tagged `CHANGELOG.md` section
@@ -1007,23 +1008,26 @@ Then advance sequentially under that authorization as each technical gate passes
    the release.
 6. **Homebrew update.** Publication establishes eligibility. Explicitly dispatch
    the tap's ordinary `update-formula.yml` with `formula=crabbox`, the tag,
-   `repository=openclaw/crabbox`, and the four-target `assets` JSON constructed
+   `repository=dawsonblock/crabedence-V1`, and the four-target `assets` JSON constructed
    by the runnable [handoff](RELEASING.md#operator-command-sequence). Do not wait
    for public native or Go smoke results. The updater owns all-four URL/hash
    maintenance and preserves maintained formula code. Retry the same handoff
    after a failure; an already-current update is success. Never rebuild,
    recreate a draft, or republish to retry Homebrew. Generic tap reconciliation
    remains a valid fallback.
-7. **Independent channel smokes.** Run public-download/native verification,
-   fresh proxy-only public Go installation, and the installed-Homebrew verifier
-   independently. Homebrew needs only tag, assets, tag object, source commit,
-   verifier commit, and release ID, not public run IDs or proof ZIPs. Before
-   formula evaluation it checks immutable public bytes and static provenance.
-   Tap maintainers own executable Ruby, evaluated only credential-free; native
-   structured metadata must match the exact formula identity, version, URL,
-   and checksum. This is not a Ruby sandbox. Fresh fetch/install or reinstall,
-   installed-byte, signature/notarization, architecture, version, and arm64 VMD
-   trust checks are bounded smokes; they do not authorize unrelated provider mutations.
+7. **Independent channel smokes.** Run public-download/native verification and
+   the installed-Homebrew verifier independently. The public `go install`
+   channel is not available for this fork — the module path resolves upstream —
+   so the hermetic `scripts/verify-go-install.sh` gate before candidate
+   production covers it instead. Homebrew needs only tag, assets, tag object,
+   source commit, verifier commit, and release ID, not public run IDs or proof
+   ZIPs. Before formula evaluation it checks immutable public bytes and static
+   provenance. Tap maintainers own executable Ruby, evaluated only
+   credential-free; native structured metadata must match the exact formula
+   identity, version, URL, and checksum. This is not a Ruby sandbox. Fresh
+   fetch/install or reinstall, installed-byte, declared unsigned-signature,
+   architecture, version, and arm64 VMD trust checks are bounded smokes; they
+   do not authorize unrelated provider mutations.
 8. **Closeout.** Record publication, tap update, and independent smoke results
    (including outstanding failures). Verify release notes match the finalized
    release section in the changelog. Keep later user-visible work under
