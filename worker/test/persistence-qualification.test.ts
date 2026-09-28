@@ -26,6 +26,7 @@ import {
   runGcKey,
   runKey,
   runLogKey,
+  runTerminalLogRoot,
   terminalAttemptKey,
 } from "../src/run-repository";
 import type { LeaseRecord, ReadyPoolEntry, RunRecord } from "../src/types";
@@ -860,5 +861,42 @@ describe("corrupted GC records fail closed", () => {
     storage.map.set(runKey("run-1"), runFixture());
     await expect(deleteStoragePrefix(storage, "")).rejects.toThrow(RunGcRefused);
     expect(storage.map.size).toBe(1);
+  });
+});
+
+// ─── Mixed-generation coexistence ─────────────────────────────────────
+
+describe("mixed-generation run coexistence", () => {
+  it("keeps a legacy 12-hex run and a current 32-hex run independent through retirement", async () => {
+    // Legacy run records survive a deploy, so a rolling upgrade has both
+    // widths live at once: retiring one must remove exactly its own
+    // namespace and leave the other's record, events, attempt, and log.
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const legacy = runFixture({ id: "run_abcdef123456" });
+    const current = runFixture({ id: `run_${"a".repeat(32)}` });
+    await repository.createRunningRun(legacy);
+    await repository.createRunningRun(current);
+    expect((await repository.commitTerminalRun(commitInput(legacy))).kind).toBe("committed");
+    expect((await repository.commitTerminalRun(commitInput(current))).kind).toBe("committed");
+    expect(await classifyRun(storage, legacy.id)).toBe("valid");
+    expect(await classifyRun(storage, current.id)).toBe("valid");
+
+    const legacyRun = (await storage.get<RunRecord>(runKey(legacy.id)))!;
+    const currentRun = (await storage.get<RunRecord>(runKey(current.id)))!;
+    expect(legacyRun.terminalLogPrefix).toContain(runTerminalLogRoot(legacy.id));
+    expect(currentRun.terminalLogPrefix).toContain(runTerminalLogRoot(current.id));
+    expect(legacyRun.terminalLogPrefix).not.toBe(currentRun.terminalLogPrefix);
+
+    await repository.deleteTerminalRun(legacy.id, Date.parse("2026-09-24T01:00:00.000Z"));
+    expect(await storage.get(runKey(legacy.id))).toBeUndefined();
+    expect(await storage.get(runGcKey(legacy.id))).toBeUndefined();
+    expect((await storage.list({ prefix: `runevent:${legacy.id}:` })).size).toBe(0);
+    expect((await storage.list({ prefix: `terminal-attempt:${legacy.id}:` })).size).toBe(0);
+    expect(await storage.get(runKey(current.id))).toBeDefined();
+    expect((await storage.list({ prefix: currentRun.terminalLogPrefix! })).size).toBeGreaterThan(0);
+    expect((await storage.list({ prefix: `runevent:${current.id}:` })).size).toBeGreaterThan(0);
+    expect((await storage.list({ prefix: `terminal-attempt:${current.id}:` })).size).toBe(1);
+    expect(await classifyRun(storage, current.id)).toBe("valid");
   });
 });
