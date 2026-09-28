@@ -78,6 +78,29 @@ export function terminalAttemptRunPrefix(runID: string): string {
 
 const terminalAttemptPrefix = "terminal-attempt:";
 
+/** The durable cleanup tombstone for one terminal run being retired. */
+export function runGcKey(runID: string): string {
+  return `run-gc:${runID}`;
+}
+
+const runGcPrefix = "run-gc:";
+
+/**
+ * A durable cleanup tombstone for one terminal run. Retention writes it
+ * and removes the visible run record in ONE transaction, then deletes the
+ * run's subordinate data idempotently and removes the tombstone last. A
+ * crash therefore leaves either a valid visible run or an invisible run
+ * with a tombstone naming exactly what still has to be deleted — never a
+ * visible run whose terminal log is already gone, and never leftover
+ * bytes with no ledger.
+ */
+export interface RunGcRecord {
+  runID: string;
+  /** The run's finish-log prefix, recorded only when it is the run's own. */
+  terminalLogPrefix?: string;
+  claimedAt: string;
+}
+
 // ─── Terminal log persistence ─────────────────────────────────────────
 
 const runLogChunkBytes = 64 * 1024;
@@ -319,8 +342,8 @@ export class DurableObjectRunRepository implements RunRepository {
    * Sweep terminalization attempts that are provably abandoned. An
    * attempt is LIVE — never swept, and neither are its bytes — while the
    * run references its log prefix, which is exactly what a committed
-   * terminal run does. A consumed attempt is the run's durable digest
-   * anchor and is removed with the run, not here.
+   * terminal run does. A consumed attempt whose run no longer exists
+   * anchors nothing and is reclaimed like any other abandoned attempt.
    *
    * The abandon decision is a transaction of its own: it reloads the run
    * and the attempt together and claims the attempt (state `retiring`)
@@ -328,26 +351,63 @@ export class DurableObjectRunRepository implements RunRepository {
    * runs after the claim sees `retiring` and refuses; one that commits
    * first makes the run reference the log, so the claim is refused. The
    * two outcomes cannot interleave into a run pointing at deleted bytes.
+   *
+   * `retiring` is a RESUMABLE state, not a terminal one: the claim is
+   * committed before any bytes are deleted, so a crash right after the
+   * claim — or a deletion that fails part-way — leaves the attempt as the
+   * durable ledger for the bytes that remain. The next sweep resumes the
+   * deletion instead of skipping the state forever, and the attempt
+   * record is removed only once its bytes are gone. A failed deletion
+   * therefore never orphans bytes behind a deleted ledger; the sweep
+   * finishes the other attempts and then reports the failure, so the
+   * retry that follows resumes from the durable claim.
    */
   async sweepTerminalAttempts(cutoff: number): Promise<number> {
     const attempts = await this.storage.list<TerminalAttemptRecord>({
       prefix: terminalAttemptPrefix,
     });
     let swept = 0;
+    let firstFailure: unknown;
     for (const [key, attempt] of attempts) {
-      // A consumed attempt is the run's durable digest anchor; it is
-      // removed with its run. A retiring attempt is already claimed.
-      if (terminalAttemptIsConsumed(attempt) || terminalAttemptIsRetiring(attempt)) {
-        continue;
+      let retired = false;
+      try {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- each attempt is claimed and retired from its own freshly read state before the next is considered.
+        retired = await this.sweepTerminalAttempt(key, attempt, cutoff);
+      } catch (error) {
+        // The attempt stays `retiring` (or unclaimed) and the failure is
+        // reported after the others are considered: the ledger survives,
+        // and the next sweep resumes the deletion.
+        firstFailure ??= error;
       }
+      if (retired) {
+        swept += 1;
+      }
+    }
+    if (firstFailure !== undefined) {
+      throw firstFailure;
+    }
+    return swept;
+  }
+
+  /**
+   * Claim one listed attempt if it is abandoned and old enough, then
+   * retire it. A `retiring` attempt is already claimed — that is what
+   * makes a crash mid-sweep recoverable — so it is resumed directly.
+   */
+  private async sweepTerminalAttempt(
+    key: string,
+    listed: TerminalAttemptRecord,
+    cutoff: number,
+  ): Promise<boolean> {
+    let attempt = listed;
+    if (!terminalAttemptIsRetiring(attempt)) {
       const reservedAt = Date.parse(attempt.reservedAt);
       if (!Number.isFinite(reservedAt) || reservedAt > cutoff) {
-        continue;
+        return false;
       }
-      // oxlint-disable-next-line eslint/no-await-in-loop -- each attempt is claimed from its own freshly read state before the next is considered.
       const claimed = await this.storage.transaction(async (txn) => {
         const current = await txn.get<TerminalAttemptRecord>(key);
-        if (!current || terminalAttemptIsConsumed(current) || terminalAttemptIsRetiring(current)) {
+        if (!current || terminalAttemptIsRetiring(current)) {
           return undefined;
         }
         const run = await txn.get<RunRecord>(runKey(current.runID));
@@ -361,37 +421,112 @@ export class DurableObjectRunRepository implements RunRepository {
         return next;
       });
       if (!claimed) {
-        continue;
+        return false;
       }
-      // GC now owns the attempt: deleting its bytes can no longer race a
-      // commit, because the commit accepts only log_written attempts.
-      // oxlint-disable-next-line eslint/no-await-in-loop -- the bytes are removed before the attempt that owned them.
-      await deleteStoragePrefix(this.storage, claimed.logPrefix).catch(() => undefined);
-      // oxlint-disable-next-line eslint/no-await-in-loop -- retire the attempt only after its bytes are gone.
-      await this.storage.delete(key);
-      swept += 1;
+      attempt = claimed;
     }
-    return swept;
+    return this.retireTerminalAttempt(key, attempt);
   }
 
+  /**
+   * Delete an attempt GC owns: its bytes first, then the record. The
+   * record is the durable ledger for those bytes, so a failure to delete
+   * them leaves it in `retiring` and the next sweep resumes; bytes are
+   * never orphaned behind a deleted ledger.
+   */
+  private async retireTerminalAttempt(
+    key: string,
+    attempt: TerminalAttemptRecord,
+  ): Promise<boolean> {
+    const run = await this.storage.get<RunRecord>(runKey(attempt.runID));
+    if (run?.terminalLogPrefix === attempt.logPrefix) {
+      // Unreachable through this repository — a terminal commit accepts
+      // only a `log_written` attempt — but never delete bytes a visible
+      // run references, even on a state that claims GC owns them.
+      return false;
+    }
+    // GC now owns the attempt: deleting its bytes can no longer race a
+    // commit, because the commit accepts only log_written attempts.
+    await deleteStoragePrefix(this.storage, attempt.logPrefix);
+    // Retire the attempt only after its bytes are gone.
+    await this.storage.delete(key);
+    return true;
+  }
+
+  /**
+   * Retire a terminal run: hide it behind a durable tombstone in ONE
+   * transaction, then delete everything it owns and the tombstone last.
+   * The tombstone is the crash ledger — a resumed retirement re-runs the
+   * idempotent deletions instead of guessing which of them survived.
+   */
   async deleteTerminalRun(runID: string, cutoff: number): Promise<void> {
     await this.host.runExclusive(async () => {
-      const current = (await this.storage.get<RunRecord>(runKey(runID))) ?? null;
-      const terminalAt = current ? terminalRunTimestamp(current) : undefined;
-      if (!current || terminalAt === undefined || terminalAt > cutoff) {
+      const claimed = await this.storage.transaction(async (txn) => {
+        const current = await txn.get<RunRecord>(runKey(runID));
+        const terminalAt = current ? terminalRunTimestamp(current) : undefined;
+        if (!current || terminalAt === undefined || terminalAt > cutoff) {
+          return undefined;
+        }
+        const record: RunGcRecord = {
+          runID,
+          claimedAt: new Date().toISOString(),
+          ...(current.terminalLogPrefix?.startsWith(runTerminalLogRoot(runID))
+            ? { terminalLogPrefix: current.terminalLogPrefix }
+            : {}),
+        };
+        await txn.put(runGcKey(runID), record);
+        await txn.delete(runKey(runID));
+        return record;
+      });
+      if (!claimed) {
         return;
       }
-      await deleteStoragePrefix(this.storage, runEventPrefix(runID));
-      if (current.terminalLogPrefix?.startsWith(runTerminalLogRoot(runID))) {
-        await deleteStoragePrefix(this.storage, current.terminalLogPrefix);
-      }
-      await deleteStoragePrefix(this.storage, runLogChunkPrefix(runID));
-      await this.storage.delete(runLogKey(runID));
-      await this.storage.delete(runKey(runID));
-      // The run's digest anchor is removed with it — never before it, so a
-      // crash mid-deletion can leave an orphaned attempt but never a run
-      // that references a deleted attempt.
-      await deleteStoragePrefix(this.storage, terminalAttemptRunPrefix(runID));
+      await this.retireTerminalRun(claimed);
     });
+  }
+
+  /**
+   * Finish every tombstoned retirement a crash interrupted. Each resume
+   * is idempotent and keeps its tombstone on failure, so the pass can be
+   * repeated until nothing is left; one failed resume does not stop the
+   * others, and the failure is reported after they are considered.
+   */
+  async resumeTerminalRunGc(): Promise<number> {
+    const pending = await this.storage.list<RunGcRecord>({ prefix: runGcPrefix });
+    let resumed = 0;
+    let firstFailure: unknown;
+    for (const [, record] of pending) {
+      try {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- each tombstone is resumed from its own durable record before the next is considered.
+        await this.retireTerminalRun(record);
+        resumed += 1;
+      } catch (error) {
+        firstFailure ??= error;
+      }
+    }
+    if (firstFailure !== undefined) {
+      throw firstFailure;
+    }
+    return resumed;
+  }
+
+  /**
+   * Delete a hidden run's subordinate data and then its tombstone. Every
+   * step is idempotent and runs only once the tombstone exists, so a
+   * crash anywhere here is resumed by the next pass.
+   */
+  private async retireTerminalRun(record: RunGcRecord): Promise<void> {
+    const { runID } = record;
+    await deleteStoragePrefix(this.storage, runEventPrefix(runID));
+    if (record.terminalLogPrefix) {
+      await deleteStoragePrefix(this.storage, record.terminalLogPrefix);
+    }
+    await deleteStoragePrefix(this.storage, runLogChunkPrefix(runID));
+    await this.storage.delete(runLogKey(runID));
+    // The run's digest anchor is removed with it — never before it, so a
+    // crash mid-deletion can leave an orphaned attempt but never a run
+    // that references a deleted attempt.
+    await deleteStoragePrefix(this.storage, terminalAttemptRunPrefix(runID));
+    await this.storage.delete(runGcKey(runID));
   }
 }

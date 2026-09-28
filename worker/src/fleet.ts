@@ -18159,28 +18159,31 @@ export class FleetCoordinator {
       if (storedCursor !== undefined) {
         await this.state.storage.delete(runPruneCursorKey);
       }
-      return;
-    }
-    let deleted = 0;
-    let lastScanned: string | undefined;
-    for (const [key, run] of page) {
-      lastScanned = key;
-      const terminalAt = terminalRunTimestamp(run);
-      if (key === runKey(run.id) && terminalAt !== undefined && terminalAt <= cutoff) {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- each run and its artifacts are removed before advancing the maintenance cursor.
-        await this.deleteTerminalRun(run.id, cutoff);
-        deleted += 1;
-        if (deleted >= terminalRunPruneBatchSize) {
-          break;
+    } else {
+      let deleted = 0;
+      let lastScanned: string | undefined;
+      for (const [key, run] of page) {
+        lastScanned = key;
+        const terminalAt = terminalRunTimestamp(run);
+        if (key === runKey(run.id) && terminalAt !== undefined && terminalAt <= cutoff) {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- each run and its artifacts are removed before advancing the maintenance cursor.
+          await this.deleteTerminalRun(run.id, cutoff);
+          deleted += 1;
+          if (deleted >= terminalRunPruneBatchSize) {
+            break;
+          }
         }
       }
+      const pageEnd = [...page.keys()].at(-1);
+      if (lastScanned && (lastScanned !== pageEnd || page.size === storageRecordScanBatchSize)) {
+        await this.state.storage.put(runPruneCursorKey, lastScanned);
+      } else {
+        await this.state.storage.delete(runPruneCursorKey);
+      }
     }
-    const pageEnd = [...page.keys()].at(-1);
-    if (lastScanned && (lastScanned !== pageEnd || page.size === storageRecordScanBatchSize)) {
-      await this.state.storage.put(runPruneCursorKey, lastScanned);
-    } else {
-      await this.state.storage.delete(runPruneCursorKey);
-    }
+    // Interrupted retirements and abandoned attempts live under their own
+    // prefixes, so they are swept even when the run scan found nothing.
+    await this.resumeTerminalRunGc();
     await this.sweepTerminalAttempts();
   }
 
@@ -18189,10 +18192,21 @@ export class FleetCoordinator {
   }
 
   /**
+   * Finish terminal-run retirements a crash interrupted. Retention hides
+   * a run behind its tombstone atomically, so the only durable trace of
+   * an interrupted retirement is the tombstone, which names exactly what
+   * still has to be deleted.
+   */
+  private async resumeTerminalRunGc(): Promise<void> {
+    await this.runLifecycle.resumeTerminalRunGc();
+  }
+
+  /**
    * Retire abandoned terminalization attempts alongside the run
    * retention sweep. The repository refuses to sweep an attempt whose log
    * a committed run references, so a live finish log can never be removed
-   * here; abandoned attempts are only removed once they age out.
+   * here; abandoned attempts are only removed once they age out, and a
+   * claim that survives a crash is resumed rather than skipped.
    */
   private async sweepTerminalAttempts(): Promise<void> {
     await this.runLifecycle.sweepTerminalAttempts(

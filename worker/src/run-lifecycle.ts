@@ -268,12 +268,21 @@ export interface RunRepository {
   /** Remove a terminal run and everything it owns. */
   deleteTerminalRun(runID: string, cutoff: number): Promise<void>;
   /**
+   * Finish terminal-run retirements a crash interrupted: each durable
+   * cleanup tombstone is resumed and removed. Retention hides a run
+   * behind its tombstone atomically, so an interrupted retirement is
+   * never a visible run pointing at deleted data — only an invisible run
+   * whose tombstone names the deletion that still has to happen.
+   */
+  resumeTerminalRunGc(): Promise<number>;
+  /**
    * Remove terminalization attempts that are provably abandoned: an
    * attempt whose log the run does not reference, older than the cutoff.
    * A committed terminal run's log is never swept, and a consumed
    * attempt is retained until its run is deleted. The abandon decision is
    * claimed atomically (state `retiring`) so it cannot race a concurrent
-   * terminal commit.
+   * terminal commit, and a claim survives a crash: the next sweep
+   * resumes the deletion instead of skipping the state forever.
    */
   sweepTerminalAttempts(cutoff: number): Promise<number>;
 }
@@ -315,6 +324,11 @@ export class RunLifecycleService {
     return this.repository.deleteTerminalRun(runID, cutoff);
   }
 
+  /** Finish terminal-run retirements a crash interrupted. */
+  async resumeTerminalRunGc(): Promise<number> {
+    return this.repository.resumeTerminalRunGc();
+  }
+
   /** Retire terminalization attempts that are provably abandoned. */
   async sweepTerminalAttempts(cutoff: number): Promise<number> {
     return this.repository.sweepTerminalAttempts(cutoff);
@@ -332,9 +346,14 @@ export class RunLifecycleService {
  *                  is recorded on the attempt
  *   consumed     — the terminal run record references this log; the
  *                  attempt is the run's durable digest anchor and is
- *                  removed WITH the run, never swept on its own
+ *                  removed WITH the run, reclaimed alone only once the
+ *                  run is gone
  *   retiring     — garbage collection has claimed the abandoned attempt;
- *                  the terminal commit must never consume it again
+ *                  the terminal commit must never consume it again, and
+ *                  the claim is durable: after a crash the sweeper
+ *                  resumes the deletion instead of skipping the state
+ *                  forever, and the record is removed only once its
+ *                  bytes are gone
  *
  * The invariant this exists to make checkable: a terminal run may
  * reference a finish log only if the immutable bytes exist and their
@@ -345,7 +364,9 @@ export class RunLifecycleService {
  * run's `terminalLogPrefix` and the attempt's `logDigest` are one durable
  * integrity unit, so removing the attempt alone would make a valid
  * terminal run unverifiable (the persistence qualification classifies
- * exactly that as impossible).
+ * exactly that as impossible). Once the run is gone — retention removed
+ * it, or a crash interrupted that removal — the attempt anchors nothing
+ * and is reclaimed like any other abandoned attempt.
  */
 export type TerminalAttemptState = "reserved" | "log_written" | "consumed" | "retiring";
 
