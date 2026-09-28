@@ -30935,6 +30935,32 @@ describe("fleet lease identity and idle", () => {
     expect(refreshes).toBe(1);
   });
 
+  it("publishes the deployed build identity on /v1/health", async () => {
+    const identified = testFleet(
+      new MemoryStorage(),
+      {},
+      {
+        CRABBOX_BUILD_COMMIT: "0123456789abcdef0123456789abcdef01234567",
+        CRABBOX_BUILD_VERSION: "0.53.1",
+      },
+    );
+    const health = await identified.fetch(request("GET", "/v1/health"));
+    expect(health.status).toBe(200);
+    await expect(health.json()).resolves.toMatchObject({
+      ok: true,
+      commit: "0123456789abcdef0123456789abcdef01234567",
+      version: "0.53.1",
+    });
+
+    // Without the deploy-provided vars the fields are absent, never guessed.
+    const anonymous = testFleet(new MemoryStorage());
+    const anonymousHealth = await anonymous.fetch(request("GET", "/v1/health"));
+    const body = (await anonymousHealth.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({ ok: true });
+    expect(body.commit).toBeUndefined();
+    expect(body.version).toBeUndefined();
+  });
+
   it("fails closed without an isolated Code origin while retaining health and bridge tickets", async () => {
     const storage = new MemoryStorage();
     const fleet = testFleet(storage);

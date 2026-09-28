@@ -818,6 +818,57 @@ describe("corrupted GC records fail closed", () => {
     expect(storage.map).toEqual(before);
   });
 
+  it("refuses an attempt whose log lives under a different fingerprint", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    // Same run root, different fingerprint segment: the run-root-only check
+    // accepted this and would have deleted the other fingerprint's bytes.
+    storage.map.set(
+      terminalAttemptKey("run-1", terminalFingerprint),
+      corruptAttempt({
+        runID: "run-1",
+        logPrefix: `runlog:run-1:finish:${"b".repeat(64)}:attempt:`,
+      }),
+    );
+    const before = new Map(storage.map);
+
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("revalidates the reloaded attempt before claiming it", async () => {
+    class DivergentStorage extends CrashStorage {
+      override async list<T>(options: { prefix: string; limit?: number }): Promise<Map<string, T>> {
+        const listed = await super.list<T>(options);
+        // Serve a structurally valid copy to the pre-transaction check while
+        // the durable record stays corrupt, so only the in-transaction
+        // revalidation can catch it.
+        return new Map(
+          [...listed].map(([key, value]) => {
+            const record = value as unknown as { runID: string };
+            return [
+              key,
+              {
+                ...(value as object),
+                logPrefix: `${runTerminalLogRoot(record.runID)}${"a".repeat(64)}:attempt:`,
+              } as unknown as T,
+            ];
+          }),
+        );
+      }
+    }
+    const storage = new DivergentStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const key = terminalAttemptKey("run-1", terminalFingerprint);
+    storage.map.set(key, corruptAttempt({ runID: "run-1", logPrefix: "" }));
+
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+
+    // The corrupt record was never claimed: it stays reserved, not retiring.
+    expect((await storage.get<{ state: string }>(key))!.state).toBe("reserved");
+  });
+
   it("retires the valid records while a refused one stays as its own ledger", async () => {
     const storage = new CrashStorage();
     const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });

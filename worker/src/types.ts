@@ -103,6 +103,10 @@ export interface Env {
   CRABBOX_DURABLE_PROVISIONING_ADMISSION?: string;
   CRABBOX_USER_TOKEN_TTL_SECONDS?: string;
   CRABBOX_RUN_RETENTION_DAYS?: string;
+  /** Exact commit this Worker was deployed from; set by the deploy workflow. */
+  CRABBOX_BUILD_COMMIT?: string;
+  /** Release version the deployed commit was built from; set by the deploy workflow. */
+  CRABBOX_BUILD_VERSION?: string;
   CRABBOX_GITHUB_CLIENT_ID?: string;
   CRABBOX_GITHUB_CLIENT_SECRET?: string;
   CRABBOX_GITHUB_ALLOWED_ORG?: string;

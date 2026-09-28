@@ -404,6 +404,7 @@ import {
   type RuntimeAdapterRelayRequest,
   type RuntimeAdapterRelayResponse,
 } from "./runtime-adapter-relay";
+import { buildIdentity } from "./runtime-identity";
 import {
   InvalidLeaseSlugError,
   isCanonicalLeaseID,
@@ -1298,7 +1299,7 @@ export class FleetCoordinator {
         return adminError;
       }
       if (method === "GET" && parts.join("/") === "v1/health") {
-        return json({ ok: true, fleet: fleetID });
+        return json({ ok: true, fleet: fleetID, ...buildIdentity(this.env) });
       }
       if (method === "POST" && parts.join("/") === "v1/internal/scheduled") {
         return await this.scheduledMaintenance(request);

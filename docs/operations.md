@@ -336,6 +336,19 @@ CRABBOX_DEPLOY_SMOKE_URLS="https://$BROKER_HOST/v1/health" \
   scripts/deploy-worker-smoke.sh
 ```
 
+Production deploys are automated by `.github/workflows/coordinator-deploy.yml`,
+which tracks `main` and passes the deployed commit and the `VERSION` file to the
+Worker (`CRABBOX_BUILD_COMMIT` / `CRABBOX_BUILD_VERSION`). `GET /v1/health`
+publishes them as `commit` and `version`:
+
+- `version` names the last released source (`VERSION`, for example `0.53.1`);
+- `commit` names the exact deployed source.
+
+Because `main` deploys ahead of releases, the version alone is not a sufficient
+identity for a running coordinator: treat `commit` as the deployment identity
+and `version` as the release line, and use the commit for rollback and incident
+decisions.
+
 ### Node.js And PostgreSQL
 
 Requirements: Node.js 22.12+, PostgreSQL 13+, one always-on service replica, and

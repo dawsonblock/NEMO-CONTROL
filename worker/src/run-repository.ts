@@ -44,8 +44,18 @@ export function runTerminalLogRoot(runID: string): string {
   return `runlog:${runID}:finish:`;
 }
 
+/**
+ * The finish-log prefix root one (run, fingerprint) attempt pair owns. The
+ * attempt id extends it, but the root is the ownership proof: bytes under it
+ * belong to this run's attempt for this fingerprint and nothing else, so GC
+ * never has to trust a prefix that is merely under the same run.
+ */
+function terminalAttemptLogPrefixRoot(runID: string, fingerprint: string): string {
+  return `${runTerminalLogRoot(runID)}${fingerprint.replace(/^sha256:/u, "")}:`;
+}
+
 function runTerminalLogPrefix(runID: string, fingerprint: string, attemptID: string): string {
-  return `${runTerminalLogRoot(runID)}${fingerprint.replace(/^sha256:/u, "")}:${attemptID}:`;
+  return `${terminalAttemptLogPrefixRoot(runID, fingerprint)}${attemptID}:`;
 }
 
 export function terminalRunLogValueKey(prefix: string): string {
@@ -231,8 +241,10 @@ function validateTerminalAttemptRecord(key: string, attempt: TerminalAttemptReco
   if (!terminalAttemptStates.has(attempt.state)) {
     throw new RunGcRefused(`terminal attempt ${key} has an unknown state`);
   }
-  if (!attempt.logPrefix.startsWith(runTerminalLogRoot(attempt.runID))) {
-    throw new RunGcRefused(`terminal attempt ${key} names a log outside its run`);
+  if (
+    !attempt.logPrefix.startsWith(terminalAttemptLogPrefixRoot(attempt.runID, attempt.fingerprint))
+  ) {
+    throw new RunGcRefused(`terminal attempt ${key} names a log outside its fingerprint`);
   }
   if (!validTimestamp(attempt.reservedAt)) {
     throw new RunGcRefused(`terminal attempt ${key} has no valid reservation time`);
@@ -504,6 +516,10 @@ export class DurableObjectRunRepository implements RunRepository {
         if (!current || terminalAttemptIsRetiring(current)) {
           return undefined;
         }
+        // The listed copy was validated before the transaction; the reloaded
+        // record must prove the same ownership before it can be claimed, or
+        // corruption could be laundered into the `retiring` state.
+        validateTerminalAttemptRecord(key, current);
         const run = await txn.get<RunRecord>(runKey(current.runID));
         if (run?.terminalLogPrefix === current.logPrefix) {
           // Live: the run owns this log. Refuse the claim, so a commit
