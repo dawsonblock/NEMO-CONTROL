@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Hardening — runtime identity, final GC binding, and Unikraft width
+
+- Coordinator: `GET /v1/health` now publishes the runtime identity — the `VERSION` file the deployment was built from and the exact deployed commit — and the deploy workflow passes both (`CRABBOX_BUILD_VERSION`, `CRABBOX_BUILD_COMMIT`), so an unreleased `main` deployment can no longer be identified by a version number alone.
+- Coordinator: terminal-attempt GC binds an attempt's finish-log prefix to its own fingerprint, not merely its run, and revalidates the freshly reloaded attempt inside the sweep transaction before claiming it. A corrupted record can no longer be laundered into `retiring` or delete another fingerprint's bytes under the same run.
+- Unikraft Cloud: the live smoke accepts both canonical lease-ID widths (`ukc_` plus 12 or 32 hex) for identity, ownership, and cleanup, with the primary fixture widened to 32 hex and a legacy-width lifecycle test.
+
 ### Documentation — identity rollout and Hostinger hostname budget
 
 - Identifiers now document the rollout order for 32-hex IDs: current readers accept both widths, but components from releases before v0.53.2 recognize only the 12-character form, so the CLI and coordinator must not be rolled back below v0.53.2 while 32-hex leases exist.
