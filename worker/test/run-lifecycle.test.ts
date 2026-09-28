@@ -482,6 +482,30 @@ describe("terminal attempt staging", () => {
     expect((await storage.list({ prefix: attemptPrefix(live.id) })).size).toBe(1);
   });
 
+  it("never deletes a claimed attempt's bytes while a visible run references them", async () => {
+    const storage = new MemoryStorage();
+    const repository = new DurableObjectRunRepository(hostFor(storage));
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    const committed = await repository.commitTerminalRun(commitInput(run));
+    expect(committed.kind).toBe("committed");
+    const attemptKey = terminalAttemptKey(run.id, "sha256:aaaa");
+    const consumed = (await storage.get<{ state: string; logPrefix: string }>(attemptKey))!;
+    expect(consumed.state).toBe("consumed");
+
+    // Force the state the repository cannot produce — GC has claimed the
+    // attempt while the run still references its log — and require the
+    // sweep to refuse rather than delete a terminal run's evidence.
+    storage.map.set(attemptKey, { ...consumed, state: "retiring" });
+    expect(await repository.sweepTerminalAttempts(Date.now())).toBe(0);
+    expect((await storage.get<{ state: string }>(attemptKey))!.state).toBe("retiring");
+    expect((await storage.list({ prefix: consumed.logPrefix })).size).toBeGreaterThan(0);
+    expect((await storage.get(runKey(run.id))) as RunRecord).toMatchObject({
+      state: "succeeded",
+      terminalLogPrefix: consumed.logPrefix,
+    });
+  });
+
   it("removes a consumed attempt only together with its run", async () => {
     const storage = new MemoryStorage();
     const repository = new DurableObjectRunRepository(hostFor(storage));

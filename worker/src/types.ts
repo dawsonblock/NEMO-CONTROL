@@ -552,6 +552,11 @@ export interface LeaseRecord {
    * transition from the revision it loaded, so two same-state writers
    * cannot silently overwrite each other. Absent on records written
    * before the counter existed and read as 0.
+   *
+   * Scope: repository-managed transitions only. Direct whole-record
+   * writes outside the repository (the fleet's `putLease` paths) do not
+   * advance it, so it guards transitions, not every durable edit to the
+   * record.
    */
   storageRevision?: number;
 }
@@ -613,6 +618,11 @@ export interface ReadyPoolEntry {
    * loaded an older revision is refused instead of overwriting a
    * committed update. Absent on records written before the counter
    * existed and read as 0.
+   *
+   * Scope: repository-managed transitions only. Direct whole-record
+   * writes outside the repository (the fleet's `putReadyPoolEntry`
+   * paths) do not advance it, so it guards transitions, not every
+   * durable edit to the entry.
    */
   storageRevision?: number;
 }
