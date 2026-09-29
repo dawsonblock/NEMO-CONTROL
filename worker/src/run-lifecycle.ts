@@ -131,9 +131,17 @@ function phaseForRunEvent(event: RunEventRecord): string {
  * trail without rewriting committed terminal evidence, and a
  * `run.failed` event is the one event-driven state transition: the run
  * becomes terminal `failed`.
+ *
+ * The projection freezes on EITHER terminal marker. A `/finish` commit
+ * leaves a terminal fingerprint; a `run.failed` event terminalizes
+ * without one. Guarding only on the fingerprint let a late event rewrite
+ * a failed run's projection — phase, provider, lease attribution — which
+ * is both a history-integrity and an authorization defect, since lease
+ * attribution decides who may read the run. The event that terminalizes
+ * still applies, because the record is `running` when it is projected.
  */
 export function applyRunEventSummary(run: RunRecord, event: RunEventRecord): void {
-  if (run.terminalFinishSHA256) {
+  if (run.terminalFinishSHA256 || isTerminalRunState(run.state)) {
     return;
   }
   if (event.phase) {

@@ -1355,6 +1355,38 @@ describe("concurrent run writes are serialized at the repository boundary", () =
     expect(updated.storageRevision).toBe(3);
   });
 
+  it("keeps a run.failed run terminal when a late event arrives", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+
+    await repository.appendRunEvent(run.id, { type: "run.failed", phase: "failed" });
+    const failed = (await storage.get<RunRecord>(runKey(run.id)))!;
+    expect(failed.state).toBe("failed");
+    expect(failed.terminalFinishSHA256).toBeUndefined();
+
+    // The owner may still post events (the route authorizes by identity,
+    // not state), and the event must land in the audit trail — but it
+    // must not rewrite the terminal projection or add lease attribution
+    // that would change who can read the run.
+    const { event } = await repository.appendRunEvent(run.id, {
+      type: "lease.created",
+      phase: "leased",
+      leaseID: `cbx_${"b".repeat(32)}`,
+      provider: "hetzner",
+    });
+    const after = (await storage.get<RunRecord>(runKey(run.id)))!;
+
+    expect(event.seq).toBe(failed.eventCount! + 1);
+    expect(after.state).toBe("failed");
+    expect(after.phase).toBe("failed");
+    expect(after.provider).toBe(failed.provider);
+    expect(after.leaseID).toBe(failed.leaseID);
+    expect(after.leaseIDs).toBe(failed.leaseIDs);
+    expect(after.endedAt).toBe(failed.endedAt);
+  });
+
   it("keeps a concurrent telemetry append when a finish commits", async () => {
     const storage = new CrashStorage();
     const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });

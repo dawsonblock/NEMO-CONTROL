@@ -201,6 +201,34 @@ describe("run event projection", () => {
     } as RunEventRecord);
     expect(committed).toEqual(before);
   });
+
+  // A run.failed event terminalizes a run WITHOUT a terminal fingerprint,
+  // so the fingerprint guard alone did not freeze it: a late event could
+  // rewrite the failed run's projection — including its lease
+  // attribution, which decides who may read the run's history.
+  it("never rewrites a run.failed terminal either", () => {
+    const failed = runFixture();
+    applyRunEventSummary(failed, {
+      runID: failed.id,
+      seq: 2,
+      type: "run.failed",
+      createdAt: "2026-09-24T00:02:00.000Z",
+    } as RunEventRecord);
+    const before = { ...failed };
+    expect(before.state).toBe("failed");
+
+    applyRunEventSummary(failed, {
+      runID: failed.id,
+      seq: 3,
+      type: "lease.created",
+      phase: "leased",
+      leaseID: "cbx_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      provider: "hetzner",
+      createdAt: "2026-09-24T00:03:00.000Z",
+    } as RunEventRecord);
+
+    expect(failed).toEqual(before);
+  });
 });
 
 // ─── Repository: replay, conflict, persistence order ──────────────────
