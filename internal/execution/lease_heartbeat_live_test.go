@@ -40,11 +40,14 @@ func (h sleepyHandler) Execute(ctx context.Context, _ Request, desc capability.R
 // slow post-provider verification — the heartbeat must not stop at
 // provider return.
 //
-// Timing: lease = 300ms, provider = 150ms, post-provider verification
-// (preFinalizeHook) = 400ms. Total post-dispatch ≈ 550ms > 300ms lease.
-// Without heartbeat renewal past the 300ms mark, Finalize's fenced CAS
-// (lease_expires_at > clock_timestamp()) would fail and the record
-// would drop into UNKNOWN despite a clean provider success.
+// Timing: lease = 300ms, provider = 150ms. The post-provider
+// verification window is synchronized on durable state rather than a
+// fixed sleep: the hook waits until the original 300ms deadline has
+// passed AND the heartbeat has provably renewed the lease (a
+// LEASE_RENEWED effect event), so Finalize's fenced CAS
+// (lease_expires_at > clock_timestamp()) can only succeed on a lease
+// the heartbeat kept alive. Without the renewal the CAS fails and the
+// record drops into UNKNOWN despite a clean provider success.
 //
 // Requires CRABBOX_TEST_DATABASE_URL. Skipped when absent.
 func TestLiveLeaseHeartbeatSurvivesSlowFinalize(t *testing.T) {
@@ -76,10 +79,44 @@ func TestLiveLeaseHeartbeatSurvivesSlowFinalize(t *testing.T) {
 		"sleepy": sleepyHandler{delay: 150 * time.Millisecond},
 	})
 	exec := NewDispatchExecutor(multiHandler, store)
-	// Simulate slow post-provider evidence verification: 400ms spent
-	// between provider return and Finalize while the 300ms lease would
-	// otherwise expire.
-	exec.preFinalizeHook = func() { time.Sleep(400 * time.Millisecond) }
+	// Simulate slow post-provider evidence verification, synchronized on
+	// durable state instead of a fixed sleep: the heartbeat must provably
+	// renew the lease and the original deadline must have passed before
+	// Finalize runs. The fixed sleep this replaces raced a sub-second
+	// wall-clock lease against CI scheduling and failed whenever the
+	// heartbeat goroutine was delayed past the expiry.
+	exec.preFinalizeHook = func() {
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			var pastOriginalDeadline, renewed, leaseAlive bool
+			err := db.QueryRowContext(ctx, `
+				SELECT
+				  clock_timestamp() >= r.lease_started_at + make_interval(secs => $2),
+				  EXISTS (
+				    SELECT 1 FROM effect_events e
+				    WHERE e.execution_id = r.execution_id::text AND e.event_type = $3
+				  ),
+				  r.lease_expires_at > clock_timestamp()
+				FROM execution_requests r
+				WHERE r.idempotency_key = $1`,
+				key, 0.3, idempotency.EventLeaseRenewed,
+			).Scan(&pastOriginalDeadline, &renewed, &leaseAlive)
+			if err == nil {
+				if pastOriginalDeadline && !leaseAlive {
+					t.Errorf("lease expired before Finalize: the heartbeat did not keep it alive through verification")
+					return
+				}
+				if pastOriginalDeadline && renewed {
+					return
+				}
+			}
+			if time.Now().After(deadline) {
+				t.Errorf("timed out waiting for the heartbeat to renew the lease past its original deadline")
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 
 	desc := capability.ResolvedDescriptor{
 		ExecutionClass: capability.ClassMutation,
