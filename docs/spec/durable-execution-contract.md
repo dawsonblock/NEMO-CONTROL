@@ -357,6 +357,20 @@ structured response and exits 3. The service, which never learns the
 client left, still drives the invocation to its durable terminal
 outcome.
 
+The rule binds the service's own wire too. A response that cannot be
+represented as a frame AFTER a side-effectful execution is reported as
+`UNKNOWN` (the effect may have happened and only the transport failed to
+carry the result), never as a definitive `FAILED`. A `PURE`/`READ`
+execution can prove no external effect occurred, so its unframeable
+response keeps the definitive `FAILED`.
+
+Planner clients that know the authoritative class (the NeMo adapter,
+which receives it from the kernel) convert ambiguous transport failures
+— `POST_DISPATCH` and `PROTOCOL` — to `UNKNOWN` for `MUTATION`/
+`CRITICAL`. The Go CLI is deliberately class-agnostic: the execution
+class it may carry is an advisory assertion, not the registry's, so it
+treats every post-transmission failure as ambiguous.
+
 ## 6. Post-dispatch uncertainty
 
 A provider error after IN_FLIGHT must not automatically become FAILED
