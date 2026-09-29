@@ -328,11 +328,14 @@ run_gate effect-fabric-evidence TEST go test -v -race -count=1 -timeout=60s \
 # the client dispatch boundary. A mutation that outlives the production
 # client wait must come back as an ambiguous failure (the client's
 # POST_DISPATCH classification) while the service — which never learned
-# the client left — still reaches its durable terminal outcome. This is
-# a deliberate 32-second wall-clock gate: the property under test is
-# the production default wait, so the wait cannot be shortened.
+# the client left — still reaches its durable terminal outcome; and a
+# response that arrives after the service's 60-second connection
+# lifetime must still be delivered, so a longer client wait is
+# meaningful. Both properties are wall-clock properties of the
+# production defaults, so they cannot be shortened: ~100 seconds total.
 run_gate effect-fabric-post-dispatch-timeout TEST env CRABBOX_QUALIFICATION_POST_DISPATCH=1 \
-  go test -v -count=1 -timeout=180s -run TestPostDispatchTimeoutQualification ./internal/execution/
+  go test -v -count=1 -timeout=240s \
+  -run 'TestPostDispatchTimeoutQualification|TestLateResponseAfterConnectionLifetime' ./internal/execution/
 
 # effect-fabric-race: race-detector run over the execution + idempotency
 # + capability + reconcile packages. Closes concurrent-acquisition races
@@ -868,7 +871,7 @@ extract_tests_executed() {
       f=$(grep -oE '^tests_failed=[0-9]+' "$log" | tail -1 | grep -oE '[0-9]+$' || true)
       count=$((${p:-0} + ${f:-0}))
       ;;
-    go-evidence-tests|go-tart-tests|go-lume-tests|go-shared-tests|go-race-evidence|go-race-providers|go-race-cli|effect-fabric-contract|effect-fabric-reconciliation|effect-fabric-evidence|effect-fabric-race|authority-postgres|provider-github-real-api|critical-external|critical-faults)
+    go-evidence-tests|go-tart-tests|go-lume-tests|go-shared-tests|go-race-evidence|go-race-providers|go-race-cli|effect-fabric-contract|effect-fabric-reconciliation|effect-fabric-evidence|effect-fabric-race|authority-postgres|provider-github-real-api|critical-external|critical-faults|effect-fabric-post-dispatch-timeout)
       # Go test with -v prints one line per test:
       #   --- PASS: TestName (0.00s)
       #   --- FAIL: TestName (0.00s)
@@ -951,7 +954,7 @@ extract_tests_skipped() {
       count=$(grep -oE '^tests_skipped=[0-9]+' "$log" | tail -1 | grep -oE '[0-9]+$' || true)
       count=${count:-0}
       ;;
-    go-evidence-tests|go-tart-tests|go-lume-tests|go-shared-tests|go-race-evidence|go-race-providers|go-race-cli|effect-fabric-contract|effect-fabric-reconciliation|effect-fabric-evidence|effect-fabric-race|authority-postgres|provider-github-real-api|critical-external|critical-faults|cross-language-conformance)
+    go-evidence-tests|go-tart-tests|go-lume-tests|go-shared-tests|go-race-evidence|go-race-providers|go-race-cli|effect-fabric-contract|effect-fabric-reconciliation|effect-fabric-evidence|effect-fabric-race|authority-postgres|provider-github-real-api|critical-external|critical-faults|cross-language-conformance|effect-fabric-post-dispatch-timeout)
       count=$(grep -cE '^\s*--- SKIP:' "$log" 2>/dev/null || true)
       ;;
     worker-tests|nemo-tests)
@@ -1014,7 +1017,7 @@ extract_tests_failed() {
         count=$(jq '[.testResults[].assertionResults[] | select(.status == "failed")] | length' "$json_summary" 2>/dev/null || true)
       fi
       ;;
-    go-evidence-tests|go-tart-tests|go-lume-tests|go-shared-tests|go-race-evidence|go-race-providers|go-race-cli|effect-fabric-contract|effect-fabric-reconciliation|effect-fabric-evidence|effect-fabric-race|authority-postgres|provider-github-real-api|critical-external|critical-faults|cross-language-conformance)
+    go-evidence-tests|go-tart-tests|go-lume-tests|go-shared-tests|go-race-evidence|go-race-providers|go-race-cli|effect-fabric-contract|effect-fabric-reconciliation|effect-fabric-evidence|effect-fabric-race|authority-postgres|provider-github-real-api|critical-external|critical-faults|cross-language-conformance|effect-fabric-post-dispatch-timeout)
       count=$(grep -cE '^\s*--- FAIL:' "$log" 2>/dev/null || true)
       ;;
     worker-tests|nemo-tests)
