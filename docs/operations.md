@@ -971,7 +971,7 @@ Before creating or reusing a signed release tag:
 
 - Rebase release preparation on the current `main`, restore missing published history from the latest tag while preserving `Unreleased` and other new entries, and verify every published version remains represented.
 - Finalize the `Unreleased` entries maintained as work lands into a versioned, dated release section in `CHANGELOG.md`, with user-facing changes first and contributor thanks / co-author notes intact.
-- Update `VERSION` — the single version source — together with every file that carries the project version: `worker/package.json`, both root package entries in `worker/package-lock.json`, and `nemo/package.json`; the removed root plugin package must not be recreated. `node scripts/verify-version-consistency.mjs --tag vX.Y.Z` must pass before tagging — CI and both release workflows enforce it.
+- Update `VERSION` — the single version source — together with every file that carries the project version: `worker/package.json`, both root package entries in `worker/package-lock.json`, `nemo/package.json`, and both root entries in `nemo/package-lock.json`; the removed root plugin package must not be recreated. Bump the release identity in `.github/workflows/release-qualification.yml` (`RELEASE_NAME`, `RELEASE_VERSION`) in the same preparation change, so the evidence job describes the release being prepared. `node scripts/verify-version-consistency.mjs --tag vX.Y.Z` must pass before tagging — CI and both release workflows enforce it.
 - `go vet ./...`
 - `go test -race -timeout=20m ./...`
 - `scripts/test-go-modules.sh`
