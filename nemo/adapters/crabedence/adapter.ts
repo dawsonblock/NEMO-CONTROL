@@ -460,12 +460,19 @@ export class CrabedenceExecutionAdapter implements ExecutionPort {
         }),
       };
     } catch (err) {
-      // For mutations, POST_DISPATCH failure means the request was sent
-      // but the response was lost. The side effect may have occurred.
-      // Convert to UNKNOWN instead of throwing.
+      // For mutations, an ambiguous transport failure means the request
+      // was sent but no definitive response was received. The side effect
+      // may have occurred, so it becomes UNKNOWN instead of throwing.
+      //
+      // PROTOCOL is ambiguous too: the service responded, but the frame
+      // violated the ABI (invalid JSON, unknown status, oversized frame,
+      // trailing bytes, malformed evidence or execution metadata). The
+      // request was transmitted, so a MUTATION/CRITICAL may already have
+      // taken effect — the Go client classifies it the same way, and the
+      // two planners must not disagree about the same effect.
       if (
         err instanceof TransportError &&
-        err.kind === "POST_DISPATCH" &&
+        (err.kind === "POST_DISPATCH" || err.kind === "PROTOCOL") &&
         (request.executionClass === "MUTATION" ||
           request.executionClass === "CRITICAL")
       ) {
