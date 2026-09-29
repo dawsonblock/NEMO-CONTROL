@@ -324,6 +324,16 @@ run_gate effect-fabric-reconciliation TEST go test -v -count=1 -timeout=60s \
 run_gate effect-fabric-evidence TEST go test -v -race -count=1 -timeout=60s \
   ./internal/evidence/
 
+# effect-fabric-post-dispatch-timeout: the >30-second qualification for
+# the client dispatch boundary. A mutation that outlives the production
+# client wait must come back as an ambiguous failure (the client's
+# POST_DISPATCH classification) while the service — which never learned
+# the client left — still reaches its durable terminal outcome. This is
+# a deliberate 32-second wall-clock gate: the property under test is
+# the production default wait, so the wait cannot be shortened.
+run_gate effect-fabric-post-dispatch-timeout TEST env CRABBOX_QUALIFICATION_POST_DISPATCH=1 \
+  go test -v -count=1 -timeout=180s -run TestPostDispatchTimeoutQualification ./internal/execution/
+
 # effect-fabric-race: race-detector run over the execution + idempotency
 # + capability + reconcile packages. Closes concurrent-acquisition races
 # and stale-worker fencing violations.
