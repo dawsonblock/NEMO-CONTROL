@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Hardening — supply chain, dead fallbacks, and deploy visibility
+
+- CLI: the unreachable `crypto/rand` timestamp fallbacks are gone from lease, create-attempt, and run ID minting. `crypto/rand.Read` never returns an error and aborts the process on entropy failure (Go 1.24+), so the fallback only advertised a safety property that did not exist.
+- Release verification: the standalone verifier validates `qualification.json` with the pinned programmatic Ajv (`nemo/scripts/validate-schema.mjs`) instead of the `ajv-cli` binary, and `ajv-cli` is removed from NeMo's toolchain — `npm audit --prefix nemo` reports zero vulnerabilities. A mutable global `ajv` binary remains a fallback only.
+- Coordinator deploy: a run without `CLOUDFLARE_API_TOKEN` now emits a warning and a run-summary banner (`Coordinator deploy SKIPPED`) instead of a quiet notice, so a skipped deploy cannot be mistaken for a deployed one.
+
 ### Hardening — runtime identity, final GC binding, and Unikraft width
 
 - Coordinator: `GET /v1/health` now publishes the runtime identity — the `VERSION` file the deployment was built from and the exact deployed commit — and the deploy workflow passes both (`CRABBOX_BUILD_VERSION`, `CRABBOX_BUILD_COMMIT`), so an unreleased `main` deployment can no longer be identified by a version number alone.

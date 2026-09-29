@@ -508,6 +508,29 @@ test("a missing zip file fails closed", (t) => {
   assert.match(output, /requires the release zip/);
 });
 
+test("the pinned schema validator accepts valid data and fails closed", (t) => {
+  // The verifier's schema gate resolves this script from the pinned NeMo
+  // dependency (ajv), replacing the ajv-cli binary.
+  const validator = path.join(scripts, "..", "nemo", "scripts", "validate-schema.mjs");
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "cbx-validate-schema-")));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const schema = path.join(dir, "schema.json");
+  const valid = path.join(dir, "valid.json");
+  const invalid = path.join(dir, "invalid.json");
+  fs.writeFileSync(
+    schema,
+    JSON.stringify({ type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } }),
+  );
+  fs.writeFileSync(valid, JSON.stringify({ ok: true }));
+  fs.writeFileSync(invalid, JSON.stringify({ ok: "nope" }));
+
+  assert.equal(spawnSync("node", [validator, schema, valid]).status, 0);
+  const rejected = spawnSync("node", [validator, schema, invalid], { encoding: "utf8" });
+  assert.equal(rejected.status, 1);
+  assert.match(rejected.stderr, /must be boolean/);
+  assert.equal(spawnSync("node", [validator]).status, 2);
+});
+
 test("a finalized public bundle without an embedded attestation is valid", (t) => {
   // The public evidence bundle is packaged BEFORE any attestation exists,
   // so it can never carry one. An attestation is an external statement
