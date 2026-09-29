@@ -517,8 +517,13 @@ func (s *Service) writeResponse(conn net.Conn, resp Response) {
 // the ABI's declared maximum.
 const maxMessageBytes = 4 * 1024 * 1024
 
-// connectionLifetime bounds a whole client connection: one request, one
-// response, no indefinite holds.
+// connectionLifetime bounds the REQUEST side of a client connection:
+// the read that must produce one request frame, with no indefinite
+// holds. It deliberately does not bound the response: the provider
+// budget is minutes, and writeResponse sets its own write deadline, so
+// an invocation that finishes after this lifetime still delivers its
+// definitive answer rather than stranding the caller with an ambiguity
+// it did not have.
 const connectionLifetime = 60 * time.Second
 
 // writeFull writes the entire buffer. A Unix stream write may accept

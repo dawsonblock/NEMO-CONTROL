@@ -356,6 +356,48 @@ func TestClientWaitExpiryLeavesTheMutationCommitting(t *testing.T) {
 	awaitDurableCommit(t, store, key, 10*time.Second)
 }
 
+// TestLateResponseAfterConnectionLifetime pins the property that makes
+// a longer client wait meaningful: the service's connection lifetime
+// bounds the request READ, not the response write. writeResponse sets
+// its own write deadline, so an invocation that finishes after the
+// 60-second connection lifetime still delivers its definitive answer
+// instead of stranding the caller with an ambiguity it did not have.
+// Skipped unless explicitly requested: the provider deliberately
+// outlives the connection lifetime.
+func TestLateResponseAfterConnectionLifetime(t *testing.T) {
+	if os.Getenv("CRABBOX_QUALIFICATION_POST_DISPATCH") != "1" {
+		t.Skip("set CRABBOX_QUALIFICATION_POST_DISPATCH=1 to run the late-response qualification")
+	}
+	socketPath := testSocketPath(t)
+	// The provider finishes past the service's 60-second connection
+	// lifetime.
+	registry := capability.NewRegistry()
+	if err := RegisterEchoCapability(registry); err != nil {
+		t.Fatal(err)
+	}
+	service := setupServiceWithGrants(registry, slowHandler{
+		inner: NewMultiHandler(map[string]Handler{"system": NewEchoHandler()}),
+		delay: connectionLifetime + 5*time.Second,
+	}, socketPath)
+	if err := service.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	defer service.Stop()
+
+	client := NewClient(socketPath, ClientOptions{Timeout: connectionLifetime + 30*time.Second})
+	resp, err := client.Invoke(context.Background(), Request{
+		Capability: "system.echo",
+		Arguments:  json.RawMessage(`{"message":"late"}`),
+		Authority:  RequestAuthority{Principal: "alice@example.com"},
+	})
+	if err != nil {
+		t.Fatalf("a response after the connection lifetime was lost: %v", err)
+	}
+	if resp.Status != StatusSucceeded {
+		t.Fatalf("expected SUCCEEDED, got %s: %s", resp.Status, resp.Error)
+	}
+}
+
 // TestPostDispatchTimeoutQualification is the >30-second
 // qualification: it uses the production default client wait against a
 // mutation that outlives it, and proves the client returns an
