@@ -27,6 +27,7 @@ Keep core provider-neutral. Core may pass generic request/lease context and call
 - `npm run build --prefix worker`: dry-run the Worker build through Wrangler.
 - `node scripts/build-docs-site.mjs`: generate the docs site into `dist/docs-site`.
 - `internal/cli` is the slow Go package: it takes roughly 13 minutes locally (measured 799s) against the 15m budget the release gates give it. Run it with the full budget (`-timeout=15m`) rather than a short `-timeout`, which looks like a hang but is just the package's runtime — the single slowest test is the Windows bootstrap delivery test (3×10s SSH-stability probes per mode, ~40s).
+- The >30-second post-dispatch qualification is deliberately slow and env-gated: `CRABBOX_QUALIFICATION_POST_DISPATCH=1 go test -run TestPostDispatchTimeoutQualification ./internal/execution/` (~35s). It backs the release gate `effect-fabric-post-dispatch-timeout`; the ordinary execution suite covers the same property with a shortened wait (`TestClientWaitExpiryLeavesTheMutationCommitting`).
 
 ## Coding Style & Naming Conventions
 
