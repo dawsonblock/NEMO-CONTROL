@@ -13,7 +13,7 @@ and the [capability invocation ABI](../spec/capability-invocation-abi.md).
 planner (untrusted)
     │  authority: { principal, authority_ref? }
     ▼
-execution service (crabbox serve-execution)
+execution service (crabbox serve-exec)
     │  1. registry lookup → descriptor.authority_policy
     │  2. grant required?  ── no ──▶ grant-free admission
     │                      └ yes ──▶ resolver.Resolve(ref, principal)

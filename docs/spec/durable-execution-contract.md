@@ -331,6 +331,32 @@ The dispatch boundary is the transition from EXECUTING to IN_FLIGHT.
   been crossed. `IN_FLIGHT` is persisted before the provider call.
   External effects may have occurred. Not safe to blindly retry.
 
+### The client-side boundary
+
+A caller's transport failure is subject to the same boundary. Every
+planner client — the Go CLI (`internal/execution/client.go`), the NeMo
+`CrabedenceClient`, any future client — classifies a transport failure
+against the request write:
+
+- **PRE_DISPATCH**: the request frame was not fully transmitted (the
+  connection failed, the request could not be encoded, or the write was
+  incomplete). The service parses only complete frames, so the
+  invocation cannot have been dispatched. A definitive `FAILED` is
+  truthful and a retry is safe.
+- **POST_DISPATCH**: the frame was fully transmitted and no definitive
+  response was received (timeout, connection loss, server closed). The
+  outcome is `UNKNOWN`; the caller reconciles before retrying.
+- **PROTOCOL**: the service responded but the frame violated the ABI
+  (oversized length, invalid JSON, unknown status). The request was
+  transmitted, so the outcome is as ambiguous as POST_DISPATCH.
+
+A client-side wait is a wait, not a verdict: an expired wait after
+transmission is `UNKNOWN`, never `FAILED`. `crabbox exec` reports it as
+`UNKNOWN` with `EXECUTION_UNKNOWN`; `crabbox invoke` prints the
+structured response and exits 3. The service, which never learns the
+client left, still drives the invocation to its durable terminal
+outcome.
+
 ## 6. Post-dispatch uncertainty
 
 A provider error after IN_FLIGHT must not automatically become FAILED

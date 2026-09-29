@@ -2,7 +2,7 @@
  * Crabedence execution API server (Unix socket) — test/local bridge.
  *
  * @deprecated This server is for testing only. Production execution
- * uses the Go `crabbox serve-execution` service, which owns authority,
+ * uses the Go `crabbox serve-exec` service, which owns authority,
  * idempotency, dispatch, evidence, and receipts.
  *
  * This bridge does:

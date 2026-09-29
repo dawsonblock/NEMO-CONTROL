@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
-	"os"
 	"time"
 
 	"github.com/openclaw/crabbox/internal/capability"
@@ -60,13 +58,19 @@ type ExecutionMeta struct {
 // This is the stdin/stdout bridge for subprocess-based planners
 // (like the legacy TypeScript bridge.ts). It delegates entirely to
 // the persistent execution service — it never dispatches on its own.
-func (a App) execCommand(ctx context.Context, args []string) error {
+//
+// Transport failures obey the durable execution contract's dispatch
+// boundary: a failure before the request frame is fully transmitted is
+// FAILED (the invocation did not happen), while a failure after
+// transmission is UNKNOWN — the side effect may have occurred and must
+// be reconciled, never reported as a definitive failure.
+func (a App) execCommand(ctx context.Context, args []string, timeout time.Duration) error {
 	if len(args) > 0 && (args[0] == "-h" || args[0] == "--help") {
 		fmt.Fprintln(a.Stderr, "Usage: crabbox exec")
 		fmt.Fprintln(a.Stderr, "")
 		fmt.Fprintln(a.Stderr, "Reads an ExecutionRequest JSON object from stdin,")
 		fmt.Fprintln(a.Stderr, "forwards it to the persistent execution service")
-		fmt.Fprintln(a.Stderr, "(crabbox serve-execution) over the Unix socket,")
+		fmt.Fprintln(a.Stderr, "(crabbox serve-exec) over the Unix socket,")
 		fmt.Fprintln(a.Stderr, "and writes an ExecutionResponse JSON object to stdout.")
 		return nil
 	}
@@ -109,101 +113,63 @@ func (a App) execCommand(ctx context.Context, args []string) error {
 		Deadline:       req.Deadline,
 	}
 
-	// Connect to the persistent execution service.
+	// Connect to the persistent execution service and send the request
+	// through the shared client, which classifies transport failures
+	// against the dispatch boundary.
 	socketPath := a.defaultExecutionSocketPath()
-	conn, err := net.DialTimeout("unix", socketPath, 10*time.Second)
+	client := execution.NewClient(socketPath, execution.ClientOptions{Timeout: timeout})
+	resp, err := client.Invoke(ctx, execReq)
 	if err != nil {
+		if execution.AmbiguousOutcome(err) {
+			// The request was transmitted; the outcome is unknown.
+			// Reporting FAILED here would let a caller retry with a
+			// different operation or idempotency key while the first
+			// invocation may still commit.
+			return writeExecResponse(a.Stdout, ExecutionResponse{
+				Status:      execution.StatusUnknown,
+				FailureCode: string(capability.FailureExecutionUnknown),
+				Error: fmt.Sprintf(
+					"outcome unknown: %v (the request may have been dispatched to the execution service; reconcile before retrying)",
+					err,
+				),
+			})
+		}
 		return writeExecResponse(a.Stdout, ExecutionResponse{
 			Status:      "FAILED",
 			FailureCode: string(capability.FailureInternalError),
-			Error:       fmt.Sprintf("failed to connect to execution service at %s: %v (is 'crabbox serve-execution' running?)", socketPath, err),
-		})
-	}
-	defer conn.Close()
-
-	// Send request (length-prefixed JSON, same ABI as invoke).
-	payload, err := json.Marshal(execReq)
-	if err != nil {
-		return writeExecResponse(a.Stdout, ExecutionResponse{
-			Status:      "FAILED",
-			FailureCode: string(capability.FailureInternalError),
-			Error:       fmt.Sprintf("failed to marshal request: %v", err),
-		})
-	}
-
-	lenBuf := make([]byte, 4)
-	lenBuf[0] = byte(len(payload) >> 24)
-	lenBuf[1] = byte(len(payload) >> 16)
-	lenBuf[2] = byte(len(payload) >> 8)
-	lenBuf[3] = byte(len(payload))
-
-	conn.SetDeadline(time.Now().Add(30 * time.Second))
-	if _, err := conn.Write(lenBuf); err != nil {
-		return writeExecResponse(a.Stdout, ExecutionResponse{
-			Status:      "FAILED",
-			FailureCode: string(capability.FailureInternalError),
-			Error:       fmt.Sprintf("failed to send length: %v", err),
-		})
-	}
-	if _, err := conn.Write(payload); err != nil {
-		return writeExecResponse(a.Stdout, ExecutionResponse{
-			Status:      "FAILED",
-			FailureCode: string(capability.FailureInternalError),
-			Error:       fmt.Sprintf("failed to send request: %v", err),
+			Error:       err.Error(),
 		})
 	}
 
-	// Read response (length-prefixed JSON).
-	respLenBuf := make([]byte, 4)
-	if _, err := readFull(conn, respLenBuf); err != nil {
-		return writeExecResponse(a.Stdout, ExecutionResponse{
-			Status:      "FAILED",
-			FailureCode: string(capability.FailureInternalError),
-			Error:       fmt.Sprintf("failed to read response length: %v", err),
-		})
-	}
-	respLen := uint32(respLenBuf[0])<<24 | uint32(respLenBuf[1])<<16 | uint32(respLenBuf[2])<<8 | uint32(respLenBuf[3])
-	if respLen > 4*1024*1024 {
-		return writeExecResponse(a.Stdout, ExecutionResponse{
-			Status:      "FAILED",
-			FailureCode: string(capability.FailureInternalError),
-			Error:       fmt.Sprintf("response too large: %d bytes", respLen),
-		})
-	}
-
-	respBuf := make([]byte, respLen)
-	if _, err := readFull(conn, respBuf); err != nil {
-		return writeExecResponse(a.Stdout, ExecutionResponse{
-			Status:      "FAILED",
-			FailureCode: string(capability.FailureInternalError),
-			Error:       fmt.Sprintf("failed to read response: %v", err),
-		})
-	}
-
-	// Parse the response and write it to stdout.
-	var execResp ExecutionResponse
-	if err := json.Unmarshal(respBuf, &execResp); err != nil {
-		return writeExecResponse(a.Stdout, ExecutionResponse{
-			Status:      "FAILED",
-			FailureCode: string(capability.FailureInternalError),
-			Error:       fmt.Sprintf("failed to parse response: %v", err),
-		})
-	}
-
-	return writeExecResponse(a.Stdout, execResp)
+	return writeExecResponse(a.Stdout, ExecutionResponse{
+		Status:      resp.Status,
+		FailureCode: resp.FailureCode,
+		Result:      resp.Result,
+		Error:       resp.Error,
+		Evidence:    execEvidenceRef(resp.Evidence),
+		Execution:   execExecutionMeta(resp.Execution),
+	})
 }
 
-// defaultExecutionSocketPath returns the default execution service
-// socket path (same logic as serve.go's defaultSocketPath).
+func execEvidenceRef(ref *execution.EvidenceRef) *ExecutionEvidenceRef {
+	if ref == nil {
+		return nil
+	}
+	return &ExecutionEvidenceRef{Digest: ref.Digest, ReceiptVersion: ref.ReceiptVersion}
+}
+
+func execExecutionMeta(meta *execution.ExecutionMeta) *ExecutionMeta {
+	if meta == nil {
+		return nil
+	}
+	return &ExecutionMeta{Provider: meta.Provider, RunID: meta.RunID}
+}
+
+// defaultExecutionSocketPath returns the canonical execution service
+// socket path — the same resolver serve-exec and invoke default
+// to, so a default-started service and a default client agree.
 func (a App) defaultExecutionSocketPath() string {
-	if xdg := os.Getenv("XDG_RUNTIME_DIR"); xdg != "" {
-		return xdg + "/crabedence/execution.sock"
-	}
-	user := os.Getenv("USER")
-	if user == "" {
-		user = "unknown"
-	}
-	return "/tmp/crabedence-" + user + "/execution.sock"
+	return execution.DefaultSocketPath()
 }
 
 // writeExecResponse writes an ExecutionResponse as JSON to the writer.

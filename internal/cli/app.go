@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/openclaw/crabbox/internal/execution"
 )
 
 type App struct {
@@ -85,7 +87,7 @@ func (a App) directCommandHelp(ctx context.Context, args []string) (error, bool)
 	case "run":
 		return a.runCommand(ctx, helpArgs), true
 	case "exec":
-		return a.execCommand(ctx, helpArgs), true
+		return a.execCommand(ctx, helpArgs, execution.DefaultClientTimeout), true
 	case "watch":
 		return a.watch(ctx, helpArgs), true
 	case "shard":

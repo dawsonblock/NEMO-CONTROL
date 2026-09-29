@@ -82,6 +82,27 @@ export interface CrabedenceExecutionResponse {
   };
 }
 
+// ─── Canonical socket resolution ──────────────────────────────────────
+
+/**
+ * The canonical default Unix socket path for the Go execution service
+ * (`crabbox serve-exec`). Mirrors `execution.DefaultSocketPath` in
+ * internal/execution/socket.go — the two must stay in lockstep so a
+ * default-started service and a default-configured planner meet:
+ * `$XDG_RUNTIME_DIR/crabedence/execution.sock` when the runtime dir is
+ * set, else `/tmp/crabedence-$USER/execution.sock`.
+ */
+export function defaultCrabedenceSocketPath(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const xdg = env.XDG_RUNTIME_DIR;
+  if (xdg) {
+    return `${xdg}/crabedence/execution.sock`;
+  }
+  const user = env.USER || (typeof process.getuid === "function" ? `uid-${process.getuid()}` : "unknown");
+  return `/tmp/crabedence-${user}/execution.sock`;
+}
+
 // ─── Protocol constants ────────────────────────────────────────────────
 
 /** Maximum message size (4 MiB). Rejects oversized frames. */

@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/openclaw/crabbox/internal/capability"
@@ -173,5 +174,28 @@ func TestStartFailsWhenDirectoryCannotBeCreated(t *testing.T) {
 	if err := svc.Start(context.Background()); err == nil {
 		svc.Stop()
 		t.Fatal("Start must fail when the socket directory cannot be created")
+	}
+}
+
+// TestDefaultSocketPath pins the one resolver every client and the
+// service share: the per-user runtime directory when the platform
+// provides one, else a per-user directory under the system temp dir.
+func TestDefaultSocketPath(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
+	if got, want := DefaultSocketPath(), "/run/user/1000/crabedence/execution.sock"; got != want {
+		t.Fatalf("with XDG_RUNTIME_DIR set: got %q, want %q", got, want)
+	}
+
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	t.Setenv("USER", "alice")
+	if got, want := DefaultSocketPath(), "/tmp/crabedence-alice/execution.sock"; got != want {
+		t.Fatalf("with XDG_RUNTIME_DIR unset: got %q, want %q", got, want)
+	}
+
+	// An unset USER must still resolve per-user, never to a shared path.
+	t.Setenv("USER", "")
+	got := DefaultSocketPath()
+	if !strings.HasPrefix(got, "/tmp/crabedence-") || !strings.HasSuffix(got, "/execution.sock") {
+		t.Fatalf("with USER unset: got %q, want a per-user /tmp/crabedence-* path", got)
 	}
 }
