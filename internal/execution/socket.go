@@ -3,6 +3,8 @@ package execution
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strconv"
 )
 
 // Socket-path hardening. The execution service is a trust boundary:
@@ -11,6 +13,29 @@ import (
 // permissions cannot be guaranteed. Nothing at the configured path is
 // ever removed unless it is provably a stale socket owned by the
 // current user.
+
+// DefaultSocketPath returns the canonical default Unix socket path for
+// the execution service. Exactly one function owns this decision so
+// `crabbox serve-exec`, `crabbox invoke`, `crabbox exec`, and
+// planner clients cannot drift: the per-user runtime directory when
+// the platform provides one (Linux), else a per-user directory under
+// the system temp dir — a stable location across process contexts, so
+// a service started by a supervisor and a client started by a shell
+// resolve the same path. Startup secures whichever path is used.
+func DefaultSocketPath() string {
+	if xdg := os.Getenv("XDG_RUNTIME_DIR"); xdg != "" {
+		return filepath.Join(xdg, "crabedence", "execution.sock")
+	}
+	user := os.Getenv("USER")
+	if user == "" {
+		if uid := os.Getuid(); uid >= 0 {
+			user = "uid-" + strconv.Itoa(uid)
+		} else {
+			user = "unknown"
+		}
+	}
+	return filepath.Join("/tmp", "crabedence-"+user, "execution.sock")
+}
 
 // ensureSocketDir creates (if needed) and verifies the socket
 // directory: a real directory (not a symlink), owned by the current

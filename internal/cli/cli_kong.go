@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/openclaw/crabbox/internal/execution"
 )
 
 type crabboxKongCLI struct {
@@ -90,7 +92,12 @@ func (a App) runKong(ctx context.Context, args []string) (err error) {
 	parser, err := kong.New(&cli,
 		kong.Name("crabbox"),
 		kong.Description("Crabbox leases remote test boxes, syncs your dirty checkout, runs commands, and cleans up."),
-		kong.Vars{"version": currentVersion()},
+		kong.Vars{
+			"version": currentVersion(),
+			// One resolver owns the default socket path so
+			// serve-exec, invoke, and exec cannot drift.
+			"execution_socket": execution.DefaultSocketPath(),
+		},
 		kong.Writers(a.Stdout, a.Stderr),
 		kong.Exit(func(code int) {
 			panic(kongExit{code: code})
@@ -175,17 +182,18 @@ type execKongCmd struct {
 	Args []string `arg:"" optional:""`
 }
 type serveExecKongCmd struct {
-	Socket string `help:"Unix socket path" default:"/tmp/crabedence-exec.sock"`
+	Socket string `help:"Unix socket path (default: the canonical per-user execution socket)" default:"${execution_socket}"`
 }
 type invokeKongCmd struct {
-	Socket         string `help:"Unix socket path" default:"/tmp/crabedence-exec.sock"`
-	Capability     string `help:"Capability to invoke" required:""`
-	Principal      string `help:"Requesting principal" required:""`
-	AuthorityRef   string `help:"Authority reference (e.g. grant ID)"`
-	IdempotencyKey string `help:"Idempotency key (required for MUTATION/CRITICAL)"`
-	Arguments      string `help:"Arguments as JSON" default:"{}"`
-	ExecutionClass string `help:"Execution class assertion (advisory; registry is authoritative)"`
-	Deadline       string `help:"RFC3339 deadline"`
+	Socket         string        `help:"Unix socket path (default: the canonical per-user execution socket)" default:"${execution_socket}"`
+	Capability     string        `help:"Capability to invoke" required:""`
+	Principal      string        `help:"Requesting principal" required:""`
+	AuthorityRef   string        `help:"Authority reference (e.g. grant ID)"`
+	IdempotencyKey string        `help:"Idempotency key (required for MUTATION/CRITICAL)"`
+	Arguments      string        `help:"Arguments as JSON" default:"{}"`
+	ExecutionClass string        `help:"Execution class assertion (advisory; registry is authoritative)"`
+	Deadline       string        `help:"RFC3339 deadline"`
+	Timeout        time.Duration `help:"Client-side wait for a response; after transmission a timeout is UNKNOWN, never FAILED" default:"30s"`
 }
 type watchKongCmd struct {
 	Args []string `arg:"" optional:""`
@@ -680,12 +688,17 @@ func (c *doctorKongCmd) Run(ctx context.Context, app App) error  { return app.do
 func (c *warmupKongCmd) Run(ctx context.Context, app App) error  { return app.warmup(ctx, c.Args) }
 func (c *prewarmKongCmd) Run(ctx context.Context, app App) error { return app.prewarm(ctx, c.Args) }
 func (c *runKongCmd) Run(ctx context.Context, app App) error     { return app.runCommand(ctx, c.Args) }
-func (c *execKongCmd) Run(ctx context.Context, app App) error    { return app.execCommand(ctx, c.Args) }
+func (c *execKongCmd) Run(ctx context.Context, app App) error {
+	// exec is a passthrough bridge (Kong forbids flags on it); its
+	// client wait is the shared default, which matches the legacy
+	// bridge's own subprocess timeout.
+	return app.execCommand(ctx, c.Args, execution.DefaultClientTimeout)
+}
 func (c *serveExecKongCmd) Run(ctx context.Context, app App) error {
 	return app.serveExecCommand(ctx, c.Socket)
 }
 func (c *invokeKongCmd) Run(ctx context.Context, app App) error {
-	return app.invokeCommand(ctx, c.Socket, c.Capability, c.Principal, c.AuthorityRef, c.IdempotencyKey, c.Arguments, c.ExecutionClass, c.Deadline)
+	return app.invokeCommand(ctx, c.Socket, c.Capability, c.Principal, c.AuthorityRef, c.IdempotencyKey, c.Arguments, c.ExecutionClass, c.Deadline, c.Timeout)
 }
 func (c *watchKongCmd) Run(ctx context.Context, app App) error { return app.watch(ctx, c.Args) }
 func (c *shardKongCmd) Run(ctx context.Context, app App) error { return app.shard(ctx, c.Args) }

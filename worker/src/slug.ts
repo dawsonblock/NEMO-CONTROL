@@ -96,6 +96,15 @@ export function isCanonicalLeaseID(value: string): boolean {
   return /^cbx_(?:[a-f0-9]{12}|[a-f0-9]{32})$/.test(value);
 }
 
+/**
+ * Whether an optional value is a canonical lease ID — the only form a
+ * persisted lease reference (an event's leaseID, a run's current lease)
+ * may carry.
+ */
+export function validLeaseID(value: string | undefined): value is string {
+  return typeof value === "string" && isCanonicalLeaseID(value);
+}
+
 export function leaseProviderName(leaseID: string, slug: string | undefined): string {
   const normalized = normalizeLeaseSlug(slug);
   return normalized

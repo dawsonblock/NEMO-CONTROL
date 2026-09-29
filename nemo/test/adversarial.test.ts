@@ -20,6 +20,7 @@
  */
 
 import { mkdtempSync, rmSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -681,6 +682,143 @@ describe("Adversarial: Kernel admission", () => {
       const client = new CrabedenceClient(socketPath, 1000);
       const adapter = new CrabedenceExecutionAdapter(client);
 
+      await expect(
+        adapter.execute({
+          capabilityId: "test.read",
+          arguments: {},
+          authority: auth,
+          executionClass: "READ",
+        }),
+      ).rejects.toThrow(TransportError);
+    } finally {
+      await server.stop();
+      cleanupSocket(socketPath);
+    }
+  });
+
+  // PROTOCOL is as ambiguous as POST_DISPATCH: the service responded, but
+  // the frame violated the ABI — the request was transmitted, so a
+  // MUTATION/CRITICAL may already have taken effect. The Go client treats
+  // both kinds as ambiguous; the two planners must not disagree about the
+  // same effect.
+  it("PROTOCOL: MUTATION with a malformed status returns UNKNOWN", async () => {
+    const socketPath = makeTempSocket();
+    cleanupSocket(socketPath);
+    const server = new ExecutionApiServer(async () => {
+      return { status: "BANANA" } as unknown as ExecutionApiResponse;
+    }, socketPath);
+    await server.start();
+
+    try {
+      const adapter = new CrabedenceExecutionAdapter(new CrabedenceClient(socketPath, 1000));
+      const outcome = await adapter.execute({
+        capabilityId: "test.mut",
+        arguments: {},
+        authority: auth,
+        executionClass: "MUTATION",
+      });
+
+      expect(outcome.status).toBe("UNKNOWN");
+      expect(outcome.error).toContain("transport failure after dispatch");
+    } finally {
+      await server.stop();
+      cleanupSocket(socketPath);
+    }
+  });
+
+  it("PROTOCOL: MUTATION with malformed JSON returns UNKNOWN", async () => {
+    const socketPath = makeTempSocket();
+    cleanupSocket(socketPath);
+    // A frame the ABI cannot parse: valid length prefix, invalid JSON.
+    const payload = Buffer.from("not json", "utf-8");
+    const header = Buffer.alloc(4);
+    header.writeUInt32BE(payload.byteLength, 0);
+    const frame = Buffer.concat([header, payload]);
+    const server = createServer((socket) => {
+      socket.once("data", () => {
+        socket.write(frame);
+        socket.end();
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(socketPath, () => resolve()));
+
+    try {
+      const adapter = new CrabedenceExecutionAdapter(new CrabedenceClient(socketPath, 1000));
+      const outcome = await adapter.execute({
+        capabilityId: "test.mut",
+        arguments: {},
+        authority: auth,
+        executionClass: "MUTATION",
+      });
+
+      expect(outcome.status).toBe("UNKNOWN");
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      cleanupSocket(socketPath);
+    }
+  });
+
+  it("PROTOCOL: MUTATION with an oversized response returns UNKNOWN", async () => {
+    const socketPath = makeTempSocket();
+    cleanupSocket(socketPath);
+    const server = new ExecutionApiServer(async () => ({
+      status: "SUCCEEDED",
+      result: { data: "x".repeat(5 * 1024 * 1024) },
+    }), socketPath);
+    await server.start();
+
+    try {
+      const adapter = new CrabedenceExecutionAdapter(new CrabedenceClient(socketPath, 5000));
+      const outcome = await adapter.execute({
+        capabilityId: "test.mut",
+        arguments: {},
+        authority: auth,
+        executionClass: "MUTATION",
+      });
+
+      expect(outcome.status).toBe("UNKNOWN");
+    } finally {
+      await server.stop();
+      cleanupSocket(socketPath);
+    }
+  });
+
+  it("PROTOCOL: CRITICAL with malformed evidence returns UNKNOWN", async () => {
+    const socketPath = makeTempSocket();
+    cleanupSocket(socketPath);
+    const server = new ExecutionApiServer(async () => ({
+      status: "SUCCEEDED",
+      // A digest the wire ABI refuses: not a 64-character hex string.
+      evidence: { digest: "short" },
+    } as unknown as ExecutionApiResponse), socketPath);
+    await server.start();
+
+    try {
+      const adapter = new CrabedenceExecutionAdapter(new CrabedenceClient(socketPath, 1000));
+      const outcome = await adapter.execute({
+        capabilityId: "test.critical",
+        arguments: {},
+        authority: auth,
+        executionClass: "CRITICAL",
+      });
+
+      expect(outcome.status).toBe("UNKNOWN");
+    } finally {
+      await server.stop();
+      cleanupSocket(socketPath);
+    }
+  });
+
+  it("PROTOCOL: READ still throws instead of inventing UNKNOWN", async () => {
+    const socketPath = makeTempSocket();
+    cleanupSocket(socketPath);
+    const server = new ExecutionApiServer(async () => {
+      return { status: "BANANA" } as unknown as ExecutionApiResponse;
+    }, socketPath);
+    await server.start();
+
+    try {
+      const adapter = new CrabedenceExecutionAdapter(new CrabedenceClient(socketPath, 1000));
       await expect(
         adapter.execute({
           capabilityId: "test.read",

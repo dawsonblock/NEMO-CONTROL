@@ -10,6 +10,7 @@ import type {
 } from "../adapters/crabedence/index";
 import {
   CrabedenceClient,
+  defaultCrabedenceSocketPath,
   CrabedenceExecutionAdapter,
   ExecutionApiServer,
 } from "../adapters/crabedence/index";
@@ -259,5 +260,30 @@ describe("CrabedenceExecutionAdapter (Unix socket)", () => {
     });
 
     expect(resp.status).toBe("FAILED");
+  });
+});
+
+// ─── Canonical socket resolution ──────────────────────────────────────
+
+describe("defaultCrabedenceSocketPath", () => {
+  it("uses the per-user runtime dir when XDG_RUNTIME_DIR is set", () => {
+    expect(
+      defaultCrabedenceSocketPath({
+        XDG_RUNTIME_DIR: "/run/user/1000",
+        USER: "alice",
+      } as NodeJS.ProcessEnv),
+    ).toBe("/run/user/1000/crabedence/execution.sock");
+  });
+
+  it("falls back to the per-user temp path without XDG_RUNTIME_DIR", () => {
+    expect(
+      defaultCrabedenceSocketPath({ USER: "alice" } as NodeJS.ProcessEnv),
+    ).toBe("/tmp/crabedence-alice/execution.sock");
+  });
+
+  it("stays per-user when USER is unset", () => {
+    expect(
+      defaultCrabedenceSocketPath({} as NodeJS.ProcessEnv),
+    ).toMatch(/^\/tmp\/crabedence-.*\/execution\.sock$/);
   });
 });

@@ -310,7 +310,7 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 			Status:      StatusFailed,
 			FailureCode: string(capability.FailureInvalidRequest),
 			Error:       "message too large",
-		})
+		}, "")
 		return
 	}
 
@@ -330,7 +330,7 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 			Status:      StatusFailed,
 			FailureCode: string(capability.FailureInvalidRequest),
 			Error:       fmt.Sprintf("invalid request: %v", err),
-		})
+		}, "")
 		return
 	}
 
@@ -349,7 +349,7 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 				Status:      StatusDenied,
 				FailureCode: string(capability.FailureAdmissionDenied),
 				Error:       "peer authentication failed: " + err.Error(),
-			})
+			}, "")
 			return
 		}
 		req.Authority.Principal = principal
@@ -371,7 +371,7 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 			Status:      StatusDenied,
 			FailureCode: string(decision.FailureCode),
 			Error:       decision.Reason,
-		})
+		}, "")
 		return
 	}
 
@@ -390,7 +390,7 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 				FailureCode: string(capability.FailureCapabilityUnavailable),
 				Error: fmt.Sprintf("capability %s requires adapter %q, which is not available in this deployment (reason=%s: %s)",
 					req.Capability, desc.AdapterID, status, reason),
-			})
+			}, "")
 			return
 		}
 	}
@@ -405,7 +405,7 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 				Status:      StatusDenied,
 				FailureCode: string(capability.FailureAdmissionDenied),
 				Error:       fmt.Sprintf("invalid deadline: %v", err),
-			})
+			}, "")
 			return
 		}
 		if time.Now().After(deadline) {
@@ -413,7 +413,7 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 				Status:      StatusDenied,
 				FailureCode: string(capability.FailureAdmissionDenied),
 				Error:       "deadline expired",
-			})
+			}, "")
 			return
 		}
 	}
@@ -429,7 +429,7 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 				Status:      StatusDenied,
 				FailureCode: string(capability.FailureInvalidRequest),
 				Error:       fmt.Sprintf("argument schema validation failed: %v", err),
-			})
+			}, "")
 			return
 		}
 	}
@@ -448,7 +448,7 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 				Status:      StatusDenied,
 				FailureCode: string(fc),
 				Error:       reason,
-			})
+			}, "")
 			return
 		}
 		resolvedGrant = grant
@@ -471,23 +471,32 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 	// UNKNOWN (not FAILED) per the durable execution contract.
 	response := s.handler.Execute(ctx, req, decision.Descriptor)
 
-	s.writeResponse(conn, response)
+	s.writeResponse(conn, response, decision.Descriptor.ExecutionClass)
 }
 
-func (s *Service) writeResponse(conn net.Conn, resp Response) {
+// writeResponse writes one framed response. executedClass is the
+// resolved execution class of the request whose handler produced resp,
+// or "" before admission. A response that cannot be framed must never be
+// written as a truncated frame, but the substitute must not manufacture
+// a definitive failure either: after a side-effectful execution the
+// effect may already have happened and only the wire could not carry the
+// result, so a MUTATION/CRITICAL response becomes UNKNOWN. A PURE/READ
+// execution can prove no effect occurred, so FAILED stays truthful.
+func (s *Service) writeResponse(conn net.Conn, resp Response, executedClass capability.ExecutionClass) {
 	payload, err := json.Marshal(resp)
 	if err != nil {
 		log.Printf("execution service: marshal error: %v", err)
 		return
 	}
 
-	// A response that cannot be framed must never be written as a
-	// truncated frame: replace it with an error response the caller can
-	// parse.
 	if len(payload) > maxMessageBytes {
+		status, failureCode := StatusFailed, capability.FailureInternalError
+		if executedClass == capability.ClassMutation || executedClass == capability.ClassCritical {
+			status, failureCode = StatusUnknown, capability.FailureExecutionUnknown
+		}
 		payload, err = json.Marshal(Response{
-			Status:      StatusFailed,
-			FailureCode: string(capability.FailureInternalError),
+			Status:      status,
+			FailureCode: string(failureCode),
 			Error:       fmt.Sprintf("response exceeds the %d-byte frame bound", maxMessageBytes),
 		})
 		if err != nil {
@@ -517,8 +526,13 @@ func (s *Service) writeResponse(conn net.Conn, resp Response) {
 // the ABI's declared maximum.
 const maxMessageBytes = 4 * 1024 * 1024
 
-// connectionLifetime bounds a whole client connection: one request, one
-// response, no indefinite holds.
+// connectionLifetime bounds the REQUEST side of a client connection:
+// the read that must produce one request frame, with no indefinite
+// holds. It deliberately does not bound the response: the provider
+// budget is minutes, and writeResponse sets its own write deadline, so
+// an invocation that finishes after this lifetime still delivers its
+// definitive answer rather than stranding the caller with an ambiguity
+// it did not have.
 const connectionLifetime = 60 * time.Second
 
 // writeFull writes the entire buffer. A Unix stream write may accept

@@ -7,7 +7,7 @@ import (
 	"github.com/openclaw/crabbox/internal/execution"
 )
 
-// serveExecCommand implements `crabbox serve-execution`: starts the
+// serveExecCommand implements `crabbox serve-exec`: starts the
 // persistent Go execution service on a Unix socket.
 //
 // The durable store backend is selected by CRABEDENCE_STORE_BACKEND

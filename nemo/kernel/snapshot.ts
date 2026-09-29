@@ -3,7 +3,7 @@
  *
  * NEMO does not maintain a capability catalog: it loads the
  * authoritative registry's verifiable export (written by
- * `crabbox serve-execution` next to the socket) and routes on the
+ * `crabbox serve-exec` next to the socket) and routes on the
  * trusted descriptors.
  *
  * The export is an envelope that carries the registry digest AND the

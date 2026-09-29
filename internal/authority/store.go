@@ -4,7 +4,7 @@
 // Grants are stored in the authority_grants table and resolved by
 // the execution service before dispatching MUTATION/CRITICAL
 // capabilities. This replaces the NoopGrantResolver default so
-// that production serve-execution actually enforces authority.
+// that production serve-exec actually enforces authority.
 //
 // Grants are immutable: reissuing a grant_id appends a new generation
 // row rather than mutating the issued material, and the latest

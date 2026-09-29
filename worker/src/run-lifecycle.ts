@@ -16,6 +16,8 @@
 import { runWritableByPrincipal, type ActorContext } from "./authorization";
 import { sameTerminalRunBinding } from "./run-receipt";
 import type {
+  LeaseRecord,
+  LeaseTelemetry,
   RunEventRecord,
   RunEvidenceV1,
   RunRecord,
@@ -45,6 +47,37 @@ export function newRunID(): string {
 
 /** A creation was refused because the run ID already owns storage. */
 export class RunIDCollisionError extends Error {}
+
+/**
+ * An update the repository refused because the durable record is not
+ * what the caller believes it is — a different incarnation, a missing
+ * record, or a revision the caller's update cannot be applied to. The
+ * caller reloads and re-derives rather than writing a stale copy back.
+ */
+export class RunTransitionRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RunTransitionRefused";
+  }
+}
+
+/**
+ * Everything a run event carries except the fields the repository
+ * assigns from the durable record: the run ID, the sequence, and the
+ * commit time. Callers bound and sanitize the caller-supplied fields;
+ * identity and ordering come from the record itself.
+ */
+export type RunEventTemplate = Omit<RunEventRecord, "runID" | "seq" | "createdAt">;
+
+/** Build one run event from a template, with the record-assigned fields. */
+export function buildRunEvent(
+  runID: string,
+  seq: number,
+  createdAt: string,
+  template: RunEventTemplate,
+): RunEventRecord {
+  return { runID, seq, createdAt, ...template };
+}
 
 /** Terminal states are immutable; only `running` may transition. */
 export function isTerminalRunState(state: RunState): boolean {
@@ -98,9 +131,17 @@ function phaseForRunEvent(event: RunEventRecord): string {
  * trail without rewriting committed terminal evidence, and a
  * `run.failed` event is the one event-driven state transition: the run
  * becomes terminal `failed`.
+ *
+ * The projection freezes on EITHER terminal marker. A `/finish` commit
+ * leaves a terminal fingerprint; a `run.failed` event terminalizes
+ * without one. Guarding only on the fingerprint let a late event rewrite
+ * a failed run's projection — phase, provider, lease attribution — which
+ * is both a history-integrity and an authorization defect, since lease
+ * attribution decides who may read the run. The event that terminalizes
+ * still applies, because the record is `running` when it is projected.
  */
 export function applyRunEventSummary(run: RunRecord, event: RunEventRecord): void {
-  if (run.terminalFinishSHA256) {
+  if (run.terminalFinishSHA256 || isTerminalRunState(run.state)) {
     return;
   }
   if (event.phase) {
@@ -169,6 +210,72 @@ export function runStartedEvent(runID: string, seq: number, createdAt: string): 
     phase: "starting",
     createdAt,
   };
+}
+
+// ─── Run telemetry ───────────────────────────────────────────────────
+
+/** The most recent telemetry samples one run retains. */
+export const maxRunTelemetrySamples = 60;
+
+/**
+ * Keep the most recent `max` samples, one per capture time, in time
+ * order. A sample without a capture time is dropped: it cannot be
+ * ordered against the others, so retaining it would make the series
+ * ambiguous.
+ */
+export function boundedTelemetrySamples(samples: LeaseTelemetry[], max: number): LeaseTelemetry[] {
+  const byTime = new Map<string, LeaseTelemetry>();
+  for (const sample of samples) {
+    if (sample?.capturedAt) {
+      byTime.set(sample.capturedAt, sample);
+    }
+  }
+  return [...byTime.values()]
+    .toSorted((left, right) => left.capturedAt.localeCompare(right.capturedAt))
+    .slice(-max);
+}
+
+/**
+ * Merge two telemetry summaries: the incoming summary's start/end win
+ * (they are the later observation), and the sample series is the bounded
+ * union of both, so a merge never drops a sample another writer
+ * committed.
+ */
+export function mergeRunTelemetry(
+  existing: RunTelemetrySummary | undefined,
+  incoming: RunTelemetrySummary,
+): RunTelemetrySummary {
+  const telemetry: RunTelemetrySummary = {
+    ...existing,
+    ...incoming,
+  };
+  telemetry.samples = boundedTelemetrySamples(
+    [
+      ...((existing?.samples ?? []).filter(Boolean) as LeaseTelemetry[]),
+      ...((incoming.samples ?? []).filter(Boolean) as LeaseTelemetry[]),
+    ],
+    maxRunTelemetrySamples,
+  );
+  if (telemetry.samples.length === 0) {
+    delete telemetry.samples;
+  }
+  return telemetry;
+}
+
+/**
+ * Append one telemetry sample to a run's summary: the first sample also
+ * becomes the run's start reading, and the series stays bounded.
+ */
+export function appendRunTelemetrySample(
+  telemetry: RunTelemetrySummary | undefined,
+  sample: LeaseTelemetry,
+): RunTelemetrySummary {
+  const next: RunTelemetrySummary = { ...telemetry };
+  next.samples = boundedTelemetrySamples([...(next.samples ?? []), sample], maxRunTelemetrySamples);
+  if (!next.start) {
+    next.start = sample;
+  }
+  return next;
 }
 
 /** The classification of one finish attempt against the current record. */
@@ -246,7 +353,13 @@ export function buildTerminalRunUpdate(
   if (input.blockedStage) next.blockedStage = input.blockedStage;
   if (input.retryLikely) next.retryLikely = input.retryLikely;
   if (input.results) next.results = input.results;
-  if (input.telemetry) next.telemetry = input.telemetry;
+  if (input.telemetry) {
+    // Merge with the RELOADED record's summary, never replace it: a
+    // telemetry append that committed between the caller's load and this
+    // transaction must survive the terminal commit, exactly as an event
+    // append does.
+    next.telemetry = mergeRunTelemetry(current.telemetry, input.telemetry);
+  }
   if (input.receipt) next.terminalReceipt = input.receipt;
   if (input.evidence) next.evidence = input.evidence;
   next.terminalFinishSHA256 = input.fingerprint;
@@ -278,11 +391,42 @@ export type RunCommitResult =
 export interface RunRepository {
   loadRun(runID: string): Promise<RunRecord | null>;
   /**
-   * Persist the running record, then its `run.started` event. An ID that
-   * already owns storage — an existing run or an in-flight retirement
-   * tombstone — is refused with RunIDCollisionError, never overwritten.
+   * Persist the running record, its `run.started` event, and the
+   * durable reservation of its ID namespace. An ID that already owns
+   * storage — an existing run, an in-flight retirement tombstone, or a
+   * reserved namespace — is refused with RunIDCollisionError, never
+   * overwritten.
    */
   createRunningRun(run: RunRecord): Promise<RunEventRecord>;
+  /**
+   * Append one run event and apply its summary to the run, atomically.
+   * The sequence is allocated from the durable record inside the
+   * transaction, so concurrent appends cannot collide, and the summary
+   * is applied to the reloaded record, so a late event can never write
+   * a pre-terminal copy back over a committed terminal run. Returns the
+   * committed event and the record it was applied to.
+   */
+  appendRunEvent(
+    runID: string,
+    template: RunEventTemplate,
+  ): Promise<{ event: RunEventRecord; run: RunRecord }>;
+  /**
+   * Append one telemetry sample to the run's summary, atomically: the
+   * sample is merged into the reloaded record, so a concurrent append
+   * cannot be lost and a stale copy is never written back.
+   */
+  appendRunTelemetry(runID: string, sample: LeaseTelemetry): Promise<RunRecord>;
+  /**
+   * Backfill the run's lease attribution from its event log and the
+   * referenced leases, atomically, and return the run's current lease
+   * for read authorization. A run whose attribution is already present
+   * is returned unchanged WITHOUT resolving the current lease: the
+   * attribution alone settles readability, and handing back a lease
+   * would widen a decision it already made.
+   */
+  backfillRunLeaseAttribution(
+    runID: string,
+  ): Promise<{ run: RunRecord; currentLease?: LeaseRecord } | null>;
   /** Persist the terminal transition atomically, or classify the attempt. */
   commitTerminalRun(input: TerminalRunCommitInput): Promise<RunCommitResult>;
   /** Remove a terminal run and everything it owns. */
@@ -349,6 +493,33 @@ export class RunLifecycleService {
   /** Classify a finish attempt against the current record (pre-check). */
   classifyFinishAttempt(run: RunRecord, fingerprint: string): TerminalRunClassification {
     return classifyTerminalRunAttempt(run, fingerprint, run);
+  }
+
+  /**
+   * Append one run event. The event's caller-supplied fields are already
+   * bounded; identity and sequence are assigned from the durable record
+   * inside the repository transaction.
+   */
+  async appendRunEvent(
+    runID: string,
+    template: RunEventTemplate,
+  ): Promise<{ event: RunEventRecord; run: RunRecord }> {
+    return this.repository.appendRunEvent(runID, template);
+  }
+
+  /** Append one telemetry sample to the run's summary. */
+  async appendRunTelemetry(runID: string, sample: LeaseTelemetry): Promise<RunRecord> {
+    return this.repository.appendRunTelemetry(runID, sample);
+  }
+
+  /**
+   * Backfill the run's lease attribution, resolving its current lease
+   * only when the backfill actually ran (see the repository contract).
+   */
+  async ensureRunLeaseAttribution(
+    runID: string,
+  ): Promise<{ run: RunRecord; currentLease?: LeaseRecord } | null> {
+    return this.repository.backfillRunLeaseAttribution(runID);
   }
 
   /** Commit the terminal transition through the repository. */

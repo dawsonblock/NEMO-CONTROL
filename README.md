@@ -48,7 +48,7 @@ crabbox CLI     -- HTTPS -->   Cloudflare + Durable Object   -->  Hetzner / AWS 
 ANY PLANNER (Hermes, OpenAI Agents SDK, LangGraph, custom)
       │  capability invocation ABI
       ▼  (capability, arguments, principal, grant_id, idempotency_key)
-CRABEDENCE EXECUTION KERNEL  —  crabbox serve-execution (Unix socket)
+CRABEDENCE EXECUTION KERNEL  —  crabbox serve-exec (Unix socket)
       │
       ├─ capability registry        authoritative execution classes
       ├─ authority verification     immutable, digest-bound grants
@@ -240,7 +240,7 @@ Execution classes are immutable once registered — a CRITICAL capability cannot
 be downgraded to READ at runtime. MUTATION and CRITICAL operations require
 idempotency keys.
 
-The `crabbox serve-execution` command starts the persistent Go execution
+The `crabbox serve-exec` command starts the persistent Go execution
 service on a Unix socket. This is the production architecture: a long-lived
 Go process owns the capability registry, authority verification, durable
 idempotency, provider dispatch, evidence generation, and V3 receipt signing.
@@ -249,9 +249,14 @@ spawn.
 
 ```sh
 # Start the persistent execution service
-crabbox serve-execution
+crabbox serve-exec
 
-# The service listens on a Unix socket (XDG_RUNTIME_DIR/crabedence/execution.sock)
+# The service listens on the canonical per-user Unix socket:
+#   $XDG_RUNTIME_DIR/crabedence/execution.sock when XDG_RUNTIME_DIR is set,
+#   else /tmp/crabedence-$USER/execution.sock.
+# `crabbox serve-exec`, `crabbox invoke`, and `crabbox exec` all resolve
+# this default through one function, so default-started service and
+# default clients meet without flags.
 # Any planner can connect and send capability invocations
 # Durable idempotency defaults to an embedded SQLite store (WAL,
 # synchronous=FULL) at ~/.config/crabbox/crabedence.db — no database
@@ -270,15 +275,23 @@ crabbox serve-execution
 # provider capacity.
 ```
 
-The `crabbox exec` command is a stdin/stdout bridge for testing and ad-hoc
-execution. It validates requests through the same capability registry but
-cannot dispatch to providers — use `crabbox serve-execution` for real
-execution.
+The `crabbox exec` command is the stdin/stdout bridge for
+subprocess-based planners (the legacy TypeScript bridge): it forwards the
+request to the persistent execution service over the same Unix socket and
+prints the ExecutionResponse as JSON. It never dispatches on its own — use
+`crabbox serve-exec` to run the service it connects to.
 
 ```sh
-# Validate a request (returns CAPABILITY_UNIMPLEMENTED for dispatch)
-echo '{"capability":"system.echo","arguments":{},"authority":{"principal":"alice","grant_id":"g1"}}' | crabbox exec
+# Forward a request through the running execution service
+echo '{"capability":"system.echo","arguments":{},"authority":{"principal":"alice@example.com"}}' | crabbox exec
 ```
+
+Transport semantics match the durable execution contract: a failure
+before the request frame is fully transmitted is a definitive `FAILED`
+(the invocation did not happen), while a lost or late response after
+transmission is `UNKNOWN` with `EXECUTION_UNKNOWN` — the side effect may
+have occurred and must be reconciled, never retried blindly. The same
+rule applies to `crabbox invoke`, which exits 3 on `UNKNOWN`.
 
 Built-in capabilities:
 

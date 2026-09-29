@@ -371,15 +371,15 @@ import {
   INITIAL_RUN_PHASE,
   INITIAL_RUN_STATE,
   RunLifecycleService,
-  applyRunEventSummary,
+  boundedTelemetrySamples,
+  maxRunTelemetrySamples,
   newRunID,
-  terminalRunTimestamp,
+  type RunEventTemplate,
 } from "./run-lifecycle";
 import { terminalFinishSHA256, validateRunEvidence, verifyTerminalReceipt } from "./run-receipt";
 import {
   DurableObjectRunRepository,
   deleteStoragePrefix,
-  runEventKey,
   runEventPrefix,
   runKey,
   runLogChunkPrefix,
@@ -388,6 +388,7 @@ import {
   terminalRunLogChunkPrefix,
   terminalRunLogValueKey,
 } from "./run-repository";
+import { RunRetentionService, runPruneCursorKey } from "./run-retention";
 import {
   readRuntimeAdapterRelayBody,
   runtimeAdapterProxyPath,
@@ -407,11 +408,11 @@ import {
 import { buildIdentity } from "./runtime-identity";
 import {
   InvalidLeaseSlugError,
-  isCanonicalLeaseID,
   leaseSlugFromID,
   normalizeLeaseSlug,
   requestedLeaseSlug,
   slugWithCollisionSuffix,
+  validLeaseID,
 } from "./slug";
 import {
   createTailscaleAuthKey,
@@ -506,7 +507,6 @@ import { WebVNCCredentialHandoffs, type WebVNCCredentialHandoffResult } from "./
 const fleetID = "default";
 const maxStoredRunLogBytes = 8 * 1024 * 1024;
 const maxLeaseTelemetryHistory = 60;
-const maxRunTelemetrySamples = 60;
 const maxExternalRunnerSyncItems = 200;
 const webVNCPortalViewerTicketTTLSeconds = 120;
 const webVNCPortalViewerSessionTTLSeconds = 30 * 60;
@@ -541,10 +541,7 @@ const defaultAWSOrphanSweepGraceSeconds = 15 * 60;
 const defaultAzureOrphanSweepIntervalSeconds = 60 * 60;
 const defaultAzureOrphanSweepGraceSeconds = 15 * 60;
 const storageRecordScanBatchSize = 128;
-const terminalRunPruneBatchSize = 16;
 const runtimeAdapterDeleteBatchSize = 16;
-const defaultTerminalRunRetentionDays = 30;
-const runPruneCursorKey = "maintenance:run-prune-cursor";
 const providerAccessReservationTTLMS = 15 * 60 * 1000;
 const maxPendingWebVNCBytes = 1024 * 1024;
 const maxCodeWebSocketFrameChunkBytes = 15 * 1024;
@@ -1206,6 +1203,7 @@ export class FleetCoordinator {
   private readonly leaseRepository: LeaseRepository;
   private readonly readyPoolRepository: ReadyPoolRepository;
   private readonly runLifecycle: RunLifecycleService;
+  private readonly runRetention: RunRetentionService;
   private maintenanceRun: Promise<void> | undefined;
   private maintenanceFollowup: { grantVersion?: string; preserve: boolean } | undefined;
 
@@ -1220,6 +1218,13 @@ export class FleetCoordinator {
     // it resolves the actor, verifies request material, and delegates to
     // the lifecycle service through the durable-object repository.
     this.runLifecycle = new RunLifecycleService(new DurableObjectRunRepository(state));
+    // Run retention: the maintenance sweep owns its cursor, batching,
+    // and resume rules; the lifecycle owns deletion.
+    this.runRetention = new RunRetentionService({
+      storage: state.storage,
+      runs: this.runLifecycle,
+      retentionDays: this.env.CRABBOX_RUN_RETENTION_DAYS,
+    });
     // Lease lifecycle: the router never assigns a lease state — every
     // transition goes through a semantic repository operation.
     this.leaseRepository = new DurableObjectLeaseRepository(state.storage);
@@ -14727,7 +14732,7 @@ export class FleetCoordinator {
           return notFound();
         }
       }
-      const event = await this.appendRunEventRecord(run, input);
+      const event = await this.appendRunEventRecord(run.id, input);
       return json({ event }, { status: 201 });
     }
     if (method === "POST" && action === "telemetry") {
@@ -14749,9 +14754,10 @@ export class FleetCoordinator {
     if (!telemetry) {
       return json({ error: "invalid_telemetry" }, { status: 400 });
     }
-    run.telemetry = appendRunTelemetrySample(run.telemetry, telemetry);
-    await this.putRun(run);
-    return json({ run: publicRunRecord(run) });
+    // The sample is merged into the reloaded record inside the
+    // repository transaction, so a concurrent append cannot be lost.
+    const updated = await this.runLifecycle.appendRunTelemetry(runID, telemetry);
+    return json({ run: publicRunRecord(updated) });
   }
 
   private async finishRun(request: Request, runID: string): Promise<Response> {
@@ -14843,7 +14849,7 @@ export class FleetCoordinator {
       blockedStage,
       retryLikely,
       results: input.results ? boundedTestResults(input.results) : undefined,
-      telemetry: telemetry ? mergeRunTelemetry(run.telemetry, telemetry) : undefined,
+      telemetry,
       receipt,
       evidence: input.evidence,
       now,
@@ -18150,71 +18156,7 @@ export class FleetCoordinator {
   }
 
   private async pruneTerminalRuns(): Promise<void> {
-    const cutoff = Date.now() - terminalRunRetentionMs(this.env.CRABBOX_RUN_RETENTION_DAYS);
-    const storedCursor = await this.state.storage.get<string>(runPruneCursorKey);
-    const startAfter = storedCursor?.startsWith("run:") ? storedCursor : undefined;
-    const page = await this.state.storage.list<RunRecord>({
-      prefix: "run:",
-      limit: storageRecordScanBatchSize,
-      ...(startAfter ? { startAfter } : {}),
-    });
-    if (page.size === 0) {
-      if (storedCursor !== undefined) {
-        await this.state.storage.delete(runPruneCursorKey);
-      }
-    } else {
-      let deleted = 0;
-      let lastScanned: string | undefined;
-      for (const [key, run] of page) {
-        lastScanned = key;
-        const terminalAt = terminalRunTimestamp(run);
-        if (key === runKey(run.id) && terminalAt !== undefined && terminalAt <= cutoff) {
-          // oxlint-disable-next-line eslint/no-await-in-loop -- each run and its artifacts are removed before advancing the maintenance cursor.
-          await this.deleteTerminalRun(run.id, cutoff);
-          deleted += 1;
-          if (deleted >= terminalRunPruneBatchSize) {
-            break;
-          }
-        }
-      }
-      const pageEnd = [...page.keys()].at(-1);
-      if (lastScanned && (lastScanned !== pageEnd || page.size === storageRecordScanBatchSize)) {
-        await this.state.storage.put(runPruneCursorKey, lastScanned);
-      } else {
-        await this.state.storage.delete(runPruneCursorKey);
-      }
-    }
-    // Interrupted retirements and abandoned attempts live under their own
-    // prefixes, so they are swept even when the run scan found nothing.
-    await this.resumeTerminalRunGc();
-    await this.sweepTerminalAttempts();
-  }
-
-  private async deleteTerminalRun(runID: string, cutoff: number): Promise<void> {
-    await this.runLifecycle.pruneTerminalRun(runID, cutoff);
-  }
-
-  /**
-   * Finish terminal-run retirements a crash interrupted. Retention hides
-   * a run behind its tombstone atomically, so the only durable trace of
-   * an interrupted retirement is the tombstone, which names exactly what
-   * still has to be deleted.
-   */
-  private async resumeTerminalRunGc(): Promise<void> {
-    await this.runLifecycle.resumeTerminalRunGc();
-  }
-
-  /**
-   * Retire abandoned terminalization attempts alongside the run
-   * retention sweep. The repository refuses to sweep an attempt whose log
-   * a committed run references, so a live finish log can never be removed
-   * here; abandoned attempts are only removed once they age out, and a
-   * claim that survives a crash is resumed rather than skipped.
-   */
-  private async sweepTerminalAttempts(): Promise<void> {
-    await this.runLifecycle.sweepTerminalAttempts(
-      Date.now() - terminalRunRetentionMs(this.env.CRABBOX_RUN_RETENTION_DAYS),
-    );
+    await this.runRetention.pruneTerminalRuns();
   }
 
   /**
@@ -18478,43 +18420,17 @@ export class FleetCoordinator {
     return run.leaseID === leaseID || run.leaseIDs?.includes(leaseID) === true;
   }
 
-  private async ensureRunLeaseAttribution(
-    run: RunRecord,
-    knownLeases?: Map<string, LeaseRecord>,
-  ): Promise<LeaseRecord | undefined> {
-    if (run.leaseIDs !== undefined && run.leaseOwners !== undefined) {
+  private async ensureRunLeaseAttribution(run: RunRecord): Promise<LeaseRecord | undefined> {
+    // The backfill is a repository transaction: the event log and the
+    // record are read together and the attribution is applied to the
+    // durable record, so a read path can no longer write a stale copy
+    // back over a concurrent commit.
+    const attribution = await this.runLifecycle.ensureRunLeaseAttribution(run.id);
+    if (!attribution) {
       return undefined;
     }
-    const events = await this.state.storage.list<RunEventRecord>({
-      prefix: runEventPrefix(run.id),
-    });
-    const leaseIDs = new Set(
-      [...events.values()]
-        .toSorted((a, b) => a.seq - b.seq)
-        .map((event) => event.leaseID)
-        .filter((leaseID): leaseID is string => Boolean(leaseID && validLeaseID(leaseID))),
-    );
-    if (validLeaseID(run.leaseID)) {
-      leaseIDs.add(run.leaseID);
-    }
-    const ids = [...leaseIDs];
-    const leases = knownLeases
-      ? ids.map((leaseID) => knownLeases.get(leaseID))
-      : await Promise.all(ids.map((leaseID) => this.getLease(leaseID)));
-    run.leaseIDs = ids;
-    run.leaseOwners = [];
-    let currentLease: LeaseRecord | undefined;
-    for (const [index, lease] of leases.entries()) {
-      if (!lease) {
-        continue;
-      }
-      this.setRunLeaseAttribution(run, lease);
-      if (ids[index] === run.leaseID) {
-        currentLease = lease;
-      }
-    }
-    await this.putRun(run);
-    return currentLease;
+    Object.assign(run, attribution.run);
+    return attribution.currentLease;
   }
 
   private leaseVisibleToControl(
@@ -18610,10 +18526,6 @@ export class FleetCoordinator {
     return this.state.storage.get<RunRecord>(runKey(runID));
   }
 
-  private async putRun(run: RunRecord): Promise<void> {
-    await this.state.storage.put(runKey(run.id), run);
-  }
-
   private async putExternalRunner(runner: ExternalRunnerRecord): Promise<void> {
     await this.state.storage.put(
       externalRunnerKey(runner.provider, runner.id, runner.owner, runner.org),
@@ -18622,28 +18534,16 @@ export class FleetCoordinator {
   }
 
   private async appendRunEventRecord(
-    run: RunRecord,
+    runID: string,
     input: RunEventRequest,
   ): Promise<RunEventRecord> {
-    const now = new Date().toISOString();
-    const seq = (run.eventCount ?? 0) + 1;
-    const event = boundedRunEvent(run.id, seq, now, input);
-    const previousLeaseID = run.leaseID;
-    applyRunEventSummary(run, event);
-    if (
-      validLeaseID(run.leaseID) &&
-      (run.leaseID !== previousLeaseID || !run.leaseIDs?.includes(run.leaseID))
-    ) {
-      const lease = await this.getLease(run.leaseID);
-      if (lease) {
-        this.setRunLeaseAttribution(run, lease);
-      }
-    }
-    run.eventCount = seq;
-    run.lastEventAt = now;
-    await this.state.storage.put(runEventKey(run.id, seq), event);
-    await this.putRun(run);
-    await this.broadcastRunEvent(run, event);
+    // Sequence allocation, the summary update, and both writes are one
+    // repository transaction; the caller's copy is never written back.
+    const { event, run: committed } = await this.runLifecycle.appendRunEvent(
+      runID,
+      boundedRunEventTemplate(input),
+    );
+    await this.broadcastRunEvent(committed, event);
     return event;
   }
 
@@ -22254,10 +22154,6 @@ export function shouldActivateEgressSession(
   return !previous || previous.sessionID === sessionID || previous.createdAt <= createdAt;
 }
 
-function validLeaseID(value: string | undefined): value is string {
-  return typeof value === "string" && isCanonicalLeaseID(value);
-}
-
 function validCreateAttemptID(value: string | undefined): value is string {
   return typeof value === "string" && /^cat_[a-f0-9]{32}$/.test(value);
 }
@@ -22985,13 +22881,6 @@ function retainRecentRun(runs: RunRecord[], run: RunRecord, limit: number): void
   if (runs.length > limit) {
     runs.pop();
   }
-}
-
-function terminalRunRetentionMs(value: string | undefined): number {
-  const parsed = Number(value ?? "");
-  const days =
-    Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : defaultTerminalRunRetentionDays;
-  return Math.min(days, 3650) * 24 * 60 * 60 * 1000;
 }
 
 function clampLimit(value: string | null, fallback: number): number {
@@ -24072,18 +23961,10 @@ const MAX_RESULT_FAILURES = 100;
 const MAX_RESULT_STRING_BYTES = 4096;
 const MAX_EVENT_STRING_BYTES = 16 * 1024;
 
-function boundedRunEvent(
-  runID: string,
-  seq: number,
-  createdAt: string,
-  input: RunEventRequest,
-): RunEventRecord {
+function boundedRunEventTemplate(input: RunEventRequest): RunEventTemplate {
   const type = input.type && input.type.trim() ? input.type.trim() : "event";
-  const event: RunEventRecord = {
-    runID,
-    seq,
+  const event: RunEventTemplate = {
     type: truncateString(type, 128),
-    createdAt,
   };
   if (input.phase) {
     event.phase = truncateString(input.phase, 128);
@@ -24348,39 +24229,6 @@ function sanitizeRunTelemetry(
   return telemetry;
 }
 
-function mergeRunTelemetry(
-  existing: RunTelemetrySummary | undefined,
-  incoming: RunTelemetrySummary,
-): RunTelemetrySummary {
-  const telemetry: RunTelemetrySummary = {
-    ...existing,
-    ...incoming,
-  };
-  telemetry.samples = boundedTelemetrySamples(
-    [
-      ...((existing?.samples ?? []).filter(Boolean) as LeaseTelemetry[]),
-      ...((incoming.samples ?? []).filter(Boolean) as LeaseTelemetry[]),
-    ],
-    maxRunTelemetrySamples,
-  );
-  if (telemetry.samples.length === 0) {
-    delete telemetry.samples;
-  }
-  return telemetry;
-}
-
-function appendRunTelemetrySample(
-  telemetry: RunTelemetrySummary | undefined,
-  sample: LeaseTelemetry,
-): RunTelemetrySummary {
-  const next: RunTelemetrySummary = { ...telemetry };
-  next.samples = boundedTelemetrySamples([...(next.samples ?? []), sample], maxRunTelemetrySamples);
-  if (!next.start) {
-    next.start = sample;
-  }
-  return next;
-}
-
 function appendLeaseTelemetryHistory(
   history: LeaseTelemetry[] | undefined,
   telemetry: LeaseTelemetry,
@@ -24389,18 +24237,6 @@ function appendLeaseTelemetryHistory(
     [...(Array.isArray(history) ? history : []), telemetry],
     maxLeaseTelemetryHistory,
   );
-}
-
-function boundedTelemetrySamples(samples: LeaseTelemetry[], max: number): LeaseTelemetry[] {
-  const byTime = new Map<string, LeaseTelemetry>();
-  for (const sample of samples) {
-    if (sample?.capturedAt) {
-      byTime.set(sample.capturedAt, sample);
-    }
-  }
-  return [...byTime.values()]
-    .toSorted((left, right) => left.capturedAt.localeCompare(right.capturedAt))
-    .slice(-max);
 }
 
 const fixedLeaseCreateIntentVersion = 2;

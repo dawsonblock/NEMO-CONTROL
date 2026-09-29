@@ -82,6 +82,27 @@ export interface CrabedenceExecutionResponse {
   };
 }
 
+// ─── Canonical socket resolution ──────────────────────────────────────
+
+/**
+ * The canonical default Unix socket path for the Go execution service
+ * (`crabbox serve-exec`). Mirrors `execution.DefaultSocketPath` in
+ * internal/execution/socket.go — the two must stay in lockstep so a
+ * default-started service and a default-configured planner meet:
+ * `$XDG_RUNTIME_DIR/crabedence/execution.sock` when the runtime dir is
+ * set, else `/tmp/crabedence-$USER/execution.sock`.
+ */
+export function defaultCrabedenceSocketPath(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const xdg = env.XDG_RUNTIME_DIR;
+  if (xdg) {
+    return `${xdg}/crabedence/execution.sock`;
+  }
+  const user = env.USER || (typeof process.getuid === "function" ? `uid-${process.getuid()}` : "unknown");
+  return `/tmp/crabedence-${user}/execution.sock`;
+}
+
 // ─── Protocol constants ────────────────────────────────────────────────
 
 /** Maximum message size (4 MiB). Rejects oversized frames. */
@@ -439,12 +460,19 @@ export class CrabedenceExecutionAdapter implements ExecutionPort {
         }),
       };
     } catch (err) {
-      // For mutations, POST_DISPATCH failure means the request was sent
-      // but the response was lost. The side effect may have occurred.
-      // Convert to UNKNOWN instead of throwing.
+      // For mutations, an ambiguous transport failure means the request
+      // was sent but no definitive response was received. The side effect
+      // may have occurred, so it becomes UNKNOWN instead of throwing.
+      //
+      // PROTOCOL is ambiguous too: the service responded, but the frame
+      // violated the ABI (invalid JSON, unknown status, oversized frame,
+      // trailing bytes, malformed evidence or execution metadata). The
+      // request was transmitted, so a MUTATION/CRITICAL may already have
+      // taken effect — the Go client classifies it the same way, and the
+      // two planners must not disagree about the same effect.
       if (
         err instanceof TransportError &&
-        err.kind === "POST_DISPATCH" &&
+        (err.kind === "POST_DISPATCH" || err.kind === "PROTOCOL") &&
         (request.executionClass === "MUTATION" ||
           request.executionClass === "CRITICAL")
       ) {
