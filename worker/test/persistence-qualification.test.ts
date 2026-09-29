@@ -54,6 +54,22 @@ import type { LeaseRecord, ReadyPoolEntry, RunRecord } from "../src/types";
 const acme = orgKeyForLabel("acme");
 
 const terminalFingerprint = `sha256:${"a".repeat(64)}`;
+/** The attempt-ID shape the repository mints (`crypto.randomUUID()`). */
+const attemptID = "3f2a1c4e-5b6d-4f8a-9c0e-1d2b3a4c5d6e";
+
+/**
+ * A terminalization attempt fixture with a canonical attempt-ID prefix.
+ * Corruption cases override the field under test; the prefix shape stays
+ * canonical unless the case is about the shape itself.
+ */
+const corruptAttempt = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  runID: "run-1",
+  fingerprint: terminalFingerprint,
+  state: "reserved",
+  logPrefix: `runlog:run-1:finish:${"a".repeat(64)}:${attemptID}:`,
+  reservedAt: "2000-01-01T00:00:00.000Z",
+  ...overrides,
+});
 
 class CrashStorage implements RunRepositoryStorage {
   readonly map = new Map<string, unknown>();
@@ -708,15 +724,6 @@ describe("ready pool crash boundaries", () => {
 // ─── Corrupted GC records ─────────────────────────────────────────────
 
 describe("corrupted GC records fail closed", () => {
-  const corruptAttempt = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
-    runID: "run-2",
-    fingerprint: terminalFingerprint,
-    state: "reserved",
-    logPrefix: `runlog:run-2:finish:${"a".repeat(64)}:attempt:`,
-    reservedAt: "2000-01-01T00:00:00.000Z",
-    ...overrides,
-  });
-
   it("refuses a tombstone whose key does not name its run", async () => {
     const storage = new CrashStorage();
     const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
@@ -787,7 +794,10 @@ describe("corrupted GC records fail closed", () => {
     const storage = new CrashStorage();
     const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
     // The key names run-1; the record claims run-2's namespace.
-    storage.map.set(terminalAttemptKey("run-1", terminalFingerprint), corruptAttempt());
+    storage.map.set(
+      terminalAttemptKey("run-1", terminalFingerprint),
+      corruptAttempt({ runID: "run-2" }),
+    );
     const before = new Map(storage.map);
 
     await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(
@@ -819,7 +829,7 @@ describe("corrupted GC records fail closed", () => {
     const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
     storage.map.set(
       terminalAttemptKey("run-2", terminalFingerprint),
-      corruptAttempt({ state: "claimed" }),
+      corruptAttempt({ runID: "run-2", state: "claimed" }),
     );
     const before = new Map(storage.map);
 
@@ -839,7 +849,7 @@ describe("corrupted GC records fail closed", () => {
       terminalAttemptKey("run-1", terminalFingerprint),
       corruptAttempt({
         runID: "run-1",
-        logPrefix: `runlog:run-1:finish:${"b".repeat(64)}:attempt:`,
+        logPrefix: `runlog:run-1:finish:${"b".repeat(64)}:${attemptID}:`,
       }),
     );
     const before = new Map(storage.map);
@@ -865,7 +875,7 @@ describe("corrupted GC records fail closed", () => {
               key,
               {
                 ...(value as object),
-                logPrefix: `${runTerminalLogRoot(record.runID)}${"a".repeat(64)}:attempt:`,
+                logPrefix: `${runTerminalLogRoot(record.runID)}${"a".repeat(64)}:${attemptID}:`,
               } as unknown as T,
             ];
           }),
@@ -896,7 +906,7 @@ describe("corrupted GC records fail closed", () => {
     const validKey = terminalAttemptKey(run.id, terminalFingerprint);
     const validPrefix = (await storage.get<{ logPrefix: string }>(validKey))!.logPrefix;
     const refusedKey = terminalAttemptKey("run-2", terminalFingerprint);
-    storage.map.set(refusedKey, corruptAttempt({ logPrefix: "" }));
+    storage.map.set(refusedKey, corruptAttempt({ runID: "run-2", logPrefix: "" }));
 
     await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(
       RunStorageIntegrityError,
@@ -943,15 +953,6 @@ describe("corrupted GC records fail closed", () => {
 // attempt could not prove it owns.
 
 describe("corrupted terminal attempts fail closed at commit", () => {
-  const corruptAttempt = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
-    runID: "run-1",
-    fingerprint: terminalFingerprint,
-    state: "reserved",
-    logPrefix: `runlog:run-1:finish:${"a".repeat(64)}:attempt:`,
-    reservedAt: "2026-09-24T00:00:00.000Z",
-    ...overrides,
-  });
-
   async function runningRepository(): Promise<{
     storage: CrashStorage;
     repository: DurableObjectRunRepository;
@@ -972,7 +973,7 @@ describe("corrupted terminal attempts fail closed at commit", () => {
       terminalAttemptKey(run.id, terminalFingerprint),
       corruptAttempt({
         runID: "run-2",
-        logPrefix: `runlog:run-2:finish:${"a".repeat(64)}:attempt:`,
+        logPrefix: `runlog:run-2:finish:${"a".repeat(64)}:${attemptID}:`,
       }),
     );
     const before = new Map(storage.map);
@@ -1022,7 +1023,7 @@ describe("corrupted terminal attempts fail closed at commit", () => {
     // write this finish's bytes under another finish's ownership.
     storage.map.set(
       terminalAttemptKey(run.id, terminalFingerprint),
-      corruptAttempt({ logPrefix: `runlog:run-1:finish:${"b".repeat(64)}:attempt:` }),
+      corruptAttempt({ logPrefix: `runlog:run-1:finish:${"b".repeat(64)}:${attemptID}:` }),
     );
     const before = new Map(storage.map);
 
@@ -1125,7 +1126,7 @@ describe("corrupted terminal attempts fail closed at commit", () => {
             return corruptAttempt({
               state: "log_written",
               logDigest: terminalFingerprint,
-              logPrefix: `runlog:run-2:finish:${"a".repeat(64)}:attempt:`,
+              logPrefix: `runlog:run-2:finish:${"a".repeat(64)}:${attemptID}:`,
             }) as unknown as T;
           }
         }
@@ -1457,6 +1458,107 @@ describe("concurrent run writes are serialized at the repository boundary", () =
     expect(result!.run.storageRevision).toBe(attributed.storageRevision);
     expect(result!.currentLease).toBeUndefined();
     expect(await storage.get<RunRecord>(runKey(run.id))).toEqual(attributed);
+  });
+});
+
+// ─── Attempt log ownership is exact ───────────────────────────────────
+//
+// A prefix that merely starts inside the fingerprint's root is not proof
+// of ownership. The bare root names EVERY attempt for the fingerprint,
+// and a deeper path names someone else's namespace — while deletion is
+// prefix-based, so obeying either can delete a committed run's finish
+// log. These cases pin the exact-shape proof.
+
+describe("terminal attempt log ownership is exact", () => {
+  const root = `runlog:run-1:finish:${"a".repeat(64)}:`;
+
+  it("refuses every prefix that is not exactly one attempt namespace", async () => {
+    const cases: Array<[string, string]> = [
+      ["the bare fingerprint root", root],
+      ["an empty attempt id", `${root}:`],
+      ["a missing trailing colon", `${root}${attemptID}`],
+      ["a truncated attempt id", `${root}${attemptID.slice(0, -1)}`],
+      ["an extra nested segment", `${root}${attemptID}:nested:`],
+      ["a second attempt segment", `${root}${attemptID}:${attemptID}:`],
+      ["a non-canonical attempt id", `${root}attempt:`],
+    ];
+    for (const [name, logPrefix] of cases) {
+      const storage = new CrashStorage();
+      const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+      const run = runFixture();
+      // oxlint-disable-next-line eslint/no-await-in-loop -- each shape is proved against its own fresh repository before the next is considered.
+      await repository.createRunningRun(run);
+      const key = terminalAttemptKey(run.id, terminalFingerprint);
+      storage.map.set(key, corruptAttempt({ logPrefix }));
+      const before = new Map(storage.map);
+
+      // oxlint-disable-next-line eslint/no-await-in-loop -- the commit must settle on this shape before the sweep is exercised.
+      await expect(
+        repository.commitTerminalRun(commitInput(run)),
+        `${name} at commit`,
+      ).rejects.toThrow(RunStorageIntegrityError);
+      expect(storage.map, `${name} at commit`).toEqual(before);
+
+      // oxlint-disable-next-line eslint/no-await-in-loop -- the sweep must settle on this shape before the next is seeded.
+      await expect(repository.sweepTerminalAttempts(Date.now()), `${name} at GC`).rejects.toThrow(
+        RunStorageIntegrityError,
+      );
+      expect(storage.map, `${name} at GC`).toEqual(before);
+    }
+  });
+
+  it("never lets a root-prefix claim delete a committed run's finish log", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    await repository.commitTerminalRun(commitInput(run));
+    const committed = (await storage.get<RunRecord>(runKey(run.id)))!;
+    const validPrefix = committed.terminalLogPrefix!;
+    const logBefore = await readTerminalRunLog(storage, validPrefix);
+    expect(logBefore).toBe("hello\n");
+
+    // The corrupted record claims the fingerprint ROOT: every attempt for
+    // this fingerprint, including the committed run's own log. The run's
+    // prefix is `root + attemptID:`, so a full-prefix liveness check
+    // alone would call this attempt abandoned and delete the live bytes.
+    const key = terminalAttemptKey(run.id, terminalFingerprint);
+    storage.map.set(key, {
+      ...corruptAttempt({ runID: run.id, logPrefix: root }),
+      state: "reserved",
+    });
+
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
+
+    // The committed run and its finish log are untouched.
+    expect(await readTerminalRunLog(storage, validPrefix)).toBe(logBefore);
+    expect((await storage.get<RunRecord>(runKey(run.id)))!.terminalLogPrefix).toBe(validPrefix);
+  });
+
+  it("accepts a canonical one-segment prefix, which cannot widen deletion", async () => {
+    // Ownership is "exactly one attempt namespace", not "the id this
+    // repository would have minted": the record does not carry a minted
+    // id to compare against, and a one-segment prefix cannot reach
+    // another attempt's bytes. A prefix a visible run references is still
+    // protected by the sweep's liveness check.
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    const otherAttemptID = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
+    storage.map.set(
+      terminalAttemptKey(run.id, terminalFingerprint),
+      corruptAttempt({ runID: run.id, logPrefix: `${root}${otherAttemptID}:` }),
+    );
+
+    const result = await repository.commitTerminalRun(commitInput(run));
+
+    expect(result.kind).toBe("committed");
+    expect((await storage.get<RunRecord>(runKey(run.id)))!.terminalLogPrefix).toBe(
+      `${root}${otherAttemptID}:`,
+    );
   });
 });
 

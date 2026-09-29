@@ -279,11 +279,24 @@ function validateRunGcRecord(key: string, record: RunGcRecord): void {
 }
 
 /**
+ * The attempt-ID shape the repository mints: `crypto.randomUUID()`.
+ *
+ * Ownership must be EXACT. A prefix that merely starts inside the
+ * fingerprint's root is not proof of anything: the bare root names every
+ * attempt for the fingerprint, and a deeper path names someone else's
+ * namespace — yet both would pass a `startsWith` check, and deletion is
+ * prefix-based, so obeying either could delete a committed run's finish
+ * log. The suffix is therefore required to be exactly one attempt ID of
+ * the minted shape, followed by the terminal colon.
+ */
+const attemptIDPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+
+/**
  * The proof for a terminalization attempt: the key must be the one its
  * (run ID, fingerprint) pair derives, the state must be one this
- * repository writes, and the log prefix must live under the run's own
- * finish-log root — never empty, never another run's. It is applied on
- * every path that touches the attempt's storage key or log prefix:
+ * repository writes, and the log prefix must name EXACTLY one attempt
+ * namespace — `root + <attempt ID> + ":"`, nothing else. It is applied
+ * on every path that touches the attempt's storage key or log prefix:
  * claiming it for GC, writing its bytes, reading them back, and
  * consuming it. A record that cannot prove what it owns is refused.
  */
@@ -298,11 +311,14 @@ function validateTerminalAttemptRecord(key: string, attempt: TerminalAttemptReco
   if (!terminalAttemptStates.has(attempt.state)) {
     throw new RunStorageIntegrityError(`terminal attempt ${key} has an unknown state`);
   }
-  if (
-    !attempt.logPrefix.startsWith(terminalAttemptLogPrefixRoot(attempt.runID, attempt.fingerprint))
-  ) {
+  const root = terminalAttemptLogPrefixRoot(attempt.runID, attempt.fingerprint);
+  const attemptID =
+    attempt.logPrefix.startsWith(root) && attempt.logPrefix.endsWith(":")
+      ? attempt.logPrefix.slice(root.length, -1)
+      : undefined;
+  if (attemptID === undefined || !attemptIDPattern.test(attemptID)) {
     throw new RunStorageIntegrityError(
-      `terminal attempt ${key} names a log outside its fingerprint`,
+      `terminal attempt ${key} does not name exactly one attempt log`,
     );
   }
   if (!validTimestamp(attempt.reservedAt)) {
