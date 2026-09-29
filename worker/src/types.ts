@@ -1025,6 +1025,13 @@ export interface RunRecord {
   lastEventAt?: string;
   eventCount?: number;
   endedAt?: string;
+  /**
+   * Monotonic storage revision, advanced by every repository-mediated
+   * write. A writer that loaded the record at an older revision must
+   * re-derive its update from the reloaded record (or be refused),
+   * never write its stale copy back.
+   */
+  storageRevision?: number;
   terminalReceipt?: TerminalRunReceipt;
   terminalFinishSHA256?: string;
   terminalLogPrefix?: string;

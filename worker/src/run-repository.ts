@@ -8,23 +8,30 @@
  * classification is re-run inside the storage transaction so a
  * concurrent writer cannot be raced.
  */
+import { leaseKey } from "./lease-repository";
 import {
+  appendRunTelemetrySample,
+  applyRunEventSummary,
+  buildRunEvent,
   buildTerminalRunUpdate,
   classifyTerminalRunAttempt,
   RunIDCollisionError,
   runStartedEvent,
+  RunTransitionRefused,
   terminalAttemptHasLog,
   terminalAttemptIsConsumed,
   terminalAttemptIsRetiring,
   terminalLogDigest,
   terminalRunTimestamp,
   type RunCommitResult,
+  type RunEventTemplate,
   type RunRepository,
   type TerminalAttemptRecord,
   type TerminalAttemptState,
   type TerminalRunCommitInput,
 } from "./run-lifecycle";
-import type { RunEventRecord, RunRecord } from "./types";
+import { validLeaseID } from "./slug";
+import type { LeaseRecord, LeaseTelemetry, RunEventRecord, RunRecord } from "./types";
 
 // ─── Storage layout ───────────────────────────────────────────────────
 
@@ -90,6 +97,25 @@ export function terminalAttemptRunPrefix(runID: string): string {
 
 const terminalAttemptPrefix = "terminal-attempt:";
 
+/**
+ * The durable reservation of a run ID's namespace. A run ID owns every
+ * key derived from it — its record, events, finish logs, and
+ * terminalization attempts — so admission cannot be decided by looking
+ * only at the two keys that happen to be visible today. The reservation
+ * is written in the same transaction as the run and removed only after
+ * everything the run owns is gone, which makes "the ID is taken" a
+ * single-key fact instead of a scan over several prefixes.
+ */
+export function runNamespaceKey(runID: string): string {
+  return `run-namespace:${runID}`;
+}
+
+/** The durable reservation record for one run ID's namespace. */
+export interface RunNamespaceRecord {
+  runID: string;
+  reservedAt: string;
+}
+
 /** The durable cleanup tombstone for one terminal run being retired. */
 export function runGcKey(runID: string): string {
   return `run-gc:${runID}`;
@@ -100,11 +126,11 @@ const runGcPrefix = "run-gc:";
 /**
  * A durable cleanup tombstone for one terminal run. Retention writes it
  * and removes the visible run record in ONE transaction, then deletes the
- * run's subordinate data idempotently and removes the tombstone last. A
- * crash therefore leaves either a valid visible run or an invisible run
- * with a tombstone naming exactly what still has to be deleted — never a
- * visible run whose terminal log is already gone, and never leftover
- * bytes with no ledger.
+ * run's subordinate data idempotently and removes the tombstone and the
+ * namespace reservation together last. A crash therefore leaves either a
+ * valid visible run or an invisible run with a tombstone naming exactly
+ * what still has to be deleted — never a visible run whose terminal log
+ * is already gone, and never leftover bytes with no ledger.
  */
 export interface RunGcRecord {
   runID: string;
@@ -210,6 +236,26 @@ function validTimestamp(value: string | undefined): boolean {
 }
 
 /**
+ * Record that a run is attributed to a lease: the lease joins the run's
+ * leaseIDs and its ownership joins leaseOwners, both idempotently. The
+ * attribution is what read authorization compares against, so it is
+ * applied to the record the transaction just reloaded — never to a
+ * caller's copy.
+ */
+function applyLeaseAttribution(run: RunRecord, lease: LeaseRecord): void {
+  if (!run.leaseIDs?.includes(lease.id)) {
+    run.leaseIDs = [...(run.leaseIDs ?? []), lease.id];
+  }
+  if (
+    !run.leaseOwners?.some(
+      (attribution) => attribution.owner === lease.owner && attribution.org === lease.org,
+    )
+  ) {
+    run.leaseOwners = [...(run.leaseOwners ?? []), { owner: lease.owner, org: lease.org }];
+  }
+}
+
+/**
  * Prove a `run-gc:` tombstone owns exactly what it names before deleting
  * anything. GC deletes by prefix, so a corrupted record must fail closed
  * rather than redirect deletion at another run's namespace: an empty run
@@ -310,13 +356,19 @@ export class DurableObjectRunRepository implements RunRepository {
       // aborts (or retries) never leaves the caller holding a record the
       // durable state does not reflect.
       const next = structuredClone(run);
-      // A run ID owns its namespace. Refuse an ID that is already a run
-      // or an in-flight retirement tombstone instead of overwriting the
-      // existing record or being created inside a retirement whose
-      // resume would delete the new run's events, logs, and attempts.
+      // A run ID owns its namespace. Refuse an ID that is already a run,
+      // an in-flight retirement tombstone, or a reserved namespace
+      // instead of overwriting the existing record or being created
+      // inside a retirement whose resume would delete the new run's
+      // events, logs, and attempts. The reservation is the durable
+      // answer for subordinate keys (events, finish logs, attempts) that
+      // may outlive a hidden or partially retired run; the run and
+      // tombstone checks cover records written before reservations
+      // existed.
       if (
         (await txn.get<RunRecord>(runKey(next.id))) !== undefined ||
-        (await txn.get<RunGcRecord>(runGcKey(next.id))) !== undefined
+        (await txn.get<RunGcRecord>(runGcKey(next.id))) !== undefined ||
+        (await txn.get<RunNamespaceRecord>(runNamespaceKey(next.id))) !== undefined
       ) {
         throw new RunIDCollisionError(next.id);
       }
@@ -325,6 +377,11 @@ export class DurableObjectRunRepository implements RunRepository {
       const event = runStartedEvent(next.id, seq, now);
       next.eventCount = seq;
       next.lastEventAt = now;
+      next.storageRevision = 1;
+      await txn.put(runNamespaceKey(next.id), {
+        runID: next.id,
+        reservedAt: now,
+      } satisfies RunNamespaceRecord);
       await txn.put(runKey(next.id), next);
       await txn.put(runEventKey(next.id, seq), event);
       return { event, seq, now };
@@ -338,9 +395,138 @@ export class DurableObjectRunRepository implements RunRepository {
   }
 
   /**
+   * Append one run event, atomically: reload the record, allocate the
+   * next sequence from the DURABLE event count, build the event, apply
+   * its summary to the reloaded record, and commit the event and the
+   * record together. The caller's copy is never written back — a writer
+   * that loaded the run before another writer's commit re-derives from
+   * the reloaded record instead of reverting it, which is what keeps a
+   * late event from resurrecting a run whose terminal commit already
+   * landed (the summary additionally refuses to touch committed
+   * terminal evidence).
+   *
+   * Sequence allocation and the record write are one transaction, so
+   * two appends cannot mint the same sequence or lose one another's
+   * summary update — correctness no longer depends on an outer
+   * scheduler serializing these calls.
+   */
+  async appendRunEvent(
+    runID: string,
+    template: RunEventTemplate,
+  ): Promise<{ event: RunEventRecord; run: RunRecord }> {
+    return this.storage.transaction(async (txn) => {
+      const current = await txn.get<RunRecord>(runKey(runID));
+      if (!current) {
+        throw new RunTransitionRefused(`run ${runID} is missing`);
+      }
+      const next = structuredClone(current);
+      const now = new Date().toISOString();
+      const seq = (next.eventCount ?? 0) + 1;
+      const event = buildRunEvent(next.id, seq, now, template);
+      applyRunEventSummary(next, event);
+      next.eventCount = seq;
+      next.lastEventAt = now;
+      // The event may have introduced a lease the run is not yet
+      // attributed to; resolve the attribution from the lease record
+      // inside the same transaction, so the run never points at a lease
+      // whose ownership it does not carry.
+      if (validLeaseID(next.leaseID) && !next.leaseIDs?.includes(next.leaseID)) {
+        const lease = await txn.get<LeaseRecord>(leaseKey(next.leaseID));
+        if (lease) {
+          applyLeaseAttribution(next, lease);
+        }
+      }
+      next.storageRevision = (current.storageRevision ?? 0) + 1;
+      await txn.put(runEventKey(next.id, seq), event);
+      await txn.put(runKey(next.id), next);
+      return { event, run: next };
+    });
+  }
+
+  /**
+   * Append one telemetry sample, atomically: merge the sample into the
+   * reloaded record so a concurrent append is preserved rather than
+   * overwritten, and a stale caller cannot revert a newer summary.
+   */
+  async appendRunTelemetry(runID: string, sample: LeaseTelemetry): Promise<RunRecord> {
+    return this.storage.transaction(async (txn) => {
+      const current = await txn.get<RunRecord>(runKey(runID));
+      if (!current) {
+        throw new RunTransitionRefused(`run ${runID} is missing`);
+      }
+      const next = structuredClone(current);
+      next.telemetry = appendRunTelemetrySample(next.telemetry, sample);
+      next.storageRevision = (current.storageRevision ?? 0) + 1;
+      await txn.put(runKey(next.id), next);
+      return next;
+    });
+  }
+
+  /**
+   * Backfill the run's lease attribution from its own event log,
+   * atomically. The event list and the reloaded record are read in the
+   * same transaction, so the attribution written back is derived from
+   * the durable events and applied to the durable record — a concurrent
+   * commit between the caller's load and this write is preserved, not
+   * reverted. The caller never writes the record itself.
+   *
+   * Returns the run's current lease for read authorization, resolved
+   * only when the backfill actually ran: a run with complete
+   * attribution is judged by its own leaseOwners, so handing back a
+   * lease for it would widen a decision the attribution already
+   * settled.
+   */
+  async backfillRunLeaseAttribution(
+    runID: string,
+  ): Promise<{ run: RunRecord; currentLease?: LeaseRecord } | null> {
+    return this.storage.transaction(async (txn) => {
+      const current = await txn.get<RunRecord>(runKey(runID));
+      if (!current) {
+        return null;
+      }
+      if (current.leaseIDs !== undefined && current.leaseOwners !== undefined) {
+        return { run: current };
+      }
+      // The event log is the authority for which leases this run
+      // references: every valid-format lease ID an event carries is
+      // part of the run's leaseIDs, resolvable or not, so a reference
+      // is never narrowed by a lease that has since been deleted.
+      const events = await txn.list<RunEventRecord>({ prefix: runEventPrefix(runID) });
+      const leaseIDs = new Set<string>(
+        [...events.values()]
+          .toSorted((a, b) => a.seq - b.seq)
+          .map((event) => event.leaseID)
+          .filter((leaseID): leaseID is string => Boolean(leaseID && validLeaseID(leaseID))),
+      );
+      if (validLeaseID(current.leaseID)) {
+        leaseIDs.add(current.leaseID);
+      }
+      const attributions = new Map<string, { owner: string; org: string }>();
+      let currentLease: LeaseRecord | undefined;
+      for (const leaseID of leaseIDs) {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- each referenced lease is read inside the same transaction before the attribution is committed.
+        const lease = await txn.get<LeaseRecord>(leaseKey(leaseID));
+        if (!lease) continue;
+        attributions.set(`${lease.owner}\u001f${lease.org}`, {
+          owner: lease.owner,
+          org: lease.org,
+        });
+        if (leaseID === current.leaseID) {
+          currentLease = lease;
+        }
+      }
+      const next = structuredClone(current);
+      next.leaseIDs = [...leaseIDs];
+      next.leaseOwners = [...attributions.values()];
+      next.storageRevision = (current.storageRevision ?? 0) + 1;
+      await txn.put(runKey(next.id), next);
+      return currentLease === undefined ? { run: next } : { run: next, currentLease };
+    });
+  }
+
+  /**
    * The terminal commit, staged through a durable attempt so a crash at
    * any boundary is recoverable rather than merely cleaned up:
-   *
    *   transaction A  reserve the attempt and its finish-log key
    *   (outside)      write the immutable finish-log bytes
    *   transaction    record log_written with the content digest
@@ -466,6 +652,7 @@ export class DurableObjectRunRepository implements RunRepository {
         return { kind: "conflict" as const, run: current };
       }
       const { next, event } = buildTerminalRunUpdate(current, input, durable.logPrefix);
+      next.storageRevision = (current.storageRevision ?? 0) + 1;
       await txn.put(runEventKey(next.id, event.seq), event);
       await txn.put(runKey(next.id), next);
       await txn.put(attemptKey, {
@@ -676,6 +863,15 @@ export class DurableObjectRunRepository implements RunRepository {
     // crash mid-deletion can leave an orphaned attempt but never a run
     // that references a deleted attempt.
     await deleteStoragePrefix(this.storage, terminalAttemptRunPrefix(runID));
-    await this.storage.delete(key);
+    // The tombstone and the namespace reservation are the last things to
+    // go, together: everything the run owned is already deleted, so a
+    // crash before this point leaves a reservation that keeps refusing
+    // the ID (fail closed), and a crash cannot leave either key behind
+    // without the other. Only after this does the ID become admissible
+    // again — with no subordinate keys left to orphan.
+    await this.storage.transaction(async (txn) => {
+      await txn.delete(key);
+      await txn.delete(runNamespaceKey(runID));
+    });
   }
 }

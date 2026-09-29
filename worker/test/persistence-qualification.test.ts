@@ -14,6 +14,8 @@ import {
 } from "../src/ready-pool-repository";
 import {
   terminalLogDigest,
+  RunIDCollisionError,
+  RunTransitionRefused,
   type RunRepositoryStorage,
   type RunStorageView,
 } from "../src/run-lifecycle";
@@ -26,6 +28,7 @@ import {
   runGcKey,
   runKey,
   runLogKey,
+  runNamespaceKey,
   runTerminalLogRoot,
   terminalAttemptKey,
 } from "../src/run-repository";
@@ -1160,6 +1163,262 @@ describe("corrupted terminal attempts fail closed at commit", () => {
       terminalAttemptKey(run.id, terminalFingerprint),
     );
     expect(attempt!.state).toBe("consumed");
+  });
+});
+
+// ─── Namespace reservation ────────────────────────────────────────────
+
+describe("run ID namespace reservation", () => {
+  it("reserves the namespace in the same transaction as the run", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    await repository.createRunningRun(runFixture());
+    expect(storage.map.get(runNamespaceKey("run-1"))).toMatchObject({ runID: "run-1" });
+  });
+
+  it("is atomic: a crash during creation leaves neither the run nor its reservation", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    storage.crashTransaction = 1;
+    await expect(repository.createRunningRun(runFixture())).rejects.toThrow(/injected crash/);
+    expect(storage.map.get(runKey("run-1"))).toBeUndefined();
+    expect(storage.map.get(runNamespaceKey("run-1"))).toBeUndefined();
+  });
+
+  it("refuses an ID whose reservation outlived its run and tombstone", async () => {
+    // The reservation is the durable answer for subordinate keys that
+    // may have outlived a hidden or partially retired run: an ID that
+    // still holds its namespace is never re-admitted, even when neither
+    // the run record nor a tombstone is visible.
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    storage.map.set(runNamespaceKey("run-1"), {
+      runID: "run-1",
+      reservedAt: "2026-09-24T00:00:00.000Z",
+    });
+    storage.map.set(runEventKey("run-1", 1), { runID: "run-1", seq: 1 });
+
+    await expect(repository.createRunningRun(runFixture())).rejects.toThrow(RunIDCollisionError);
+    expect(storage.map.get(runKey("run-1"))).toBeUndefined();
+  });
+
+  it("releases the reservation only when retirement has deleted everything", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    await repository.commitTerminalRun(commitInput(run));
+    await repository.deleteTerminalRun(run.id, Date.now());
+
+    expect(storage.map.get(runKey(run.id))).toBeUndefined();
+    expect(storage.map.get(runGcKey(run.id))).toBeUndefined();
+    expect(storage.map.get(runNamespaceKey(run.id))).toBeUndefined();
+    // With the namespace free, the ID is admissible again — and the
+    // recreated run starts with a clean event log.
+    const recreated = runFixture();
+    await repository.createRunningRun(recreated);
+    expect((await storage.list({ prefix: `runevent:${run.id}:` })).size).toBe(1);
+  });
+
+  it("keeps refusing the ID when retirement is interrupted before the release", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    // An interrupted retirement: the subordinate data is already gone,
+    // the tombstone and the reservation are still durable.
+    storage.map.set(runGcKey("run-1"), {
+      runID: "run-1",
+      claimedAt: "2026-09-24T00:00:00.000Z",
+    });
+    storage.map.set(runNamespaceKey("run-1"), {
+      runID: "run-1",
+      reservedAt: "2026-09-24T00:00:00.000Z",
+    });
+    storage.crashTransaction = 1;
+
+    await expect(repository.resumeTerminalRunGc()).rejects.toThrow(/injected crash/);
+
+    // Fail closed: the reservation survived with the tombstone, so the
+    // ID is still refused.
+    expect(storage.map.get(runGcKey("run-1"))).toBeDefined();
+    expect(storage.map.get(runNamespaceKey("run-1"))).toBeDefined();
+    await expect(repository.createRunningRun(runFixture())).rejects.toThrow(RunIDCollisionError);
+
+    // A later resume finishes the release.
+    storage.crashTransaction = undefined;
+    expect(await repository.resumeTerminalRunGc()).toBe(1);
+    expect(storage.map.get(runGcKey("run-1"))).toBeUndefined();
+    expect(storage.map.get(runNamespaceKey("run-1"))).toBeUndefined();
+  });
+});
+
+// ─── Concurrent run writes ────────────────────────────────────────────
+//
+// Run events, telemetry, and lease attribution are repository
+// transactions: each reloads the durable record, derives its update
+// from that record, and commits atomically. Correctness therefore does
+// not depend on an outer scheduler serializing the callers — a stale
+// caller has no way to write its copy back.
+
+describe("concurrent run writes are serialized at the repository boundary", () => {
+  const canonicalLeaseID = `cbx_${"a".repeat(32)}`;
+
+  it("allocates a distinct sequence for every append", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    await repository.createRunningRun(runFixture());
+
+    const first = await repository.appendRunEvent("run-1", { type: "stdout", message: "one" });
+    const second = await repository.appendRunEvent("run-1", { type: "stdout", message: "two" });
+
+    expect([first.event.seq, second.event.seq]).toEqual([2, 3]);
+    expect((await storage.get<RunRecord>(runKey("run-1")))!.eventCount).toBe(3);
+    // Both events are durable under their own sequence.
+    expect((await storage.list({ prefix: "runevent:run-1:" })).size).toBe(3);
+  });
+
+  it("applies the event summary to the durable record, not a caller copy", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    await repository.createRunningRun(runFixture());
+
+    const { run } = await repository.appendRunEvent("run-1", {
+      type: "command.started",
+      phase: "command",
+    });
+
+    expect(run.phase).toBe("command");
+    const durable = await storage.get<RunRecord>(runKey("run-1"));
+    expect(durable!.phase).toBe("command");
+    expect(durable!.storageRevision).toBe(2);
+  });
+
+  it("refuses an append to a missing run instead of inventing one", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    await expect(repository.appendRunEvent("run-1", { type: "stdout" })).rejects.toThrow(
+      RunTransitionRefused,
+    );
+    await expect(
+      repository.appendRunTelemetry("run-1", { capturedAt: "2026-09-24T00:00:00.000Z" }),
+    ).rejects.toThrow(RunTransitionRefused);
+    expect(storage.map.size).toBe(0);
+  });
+
+  it("keeps a terminal run terminal when a late event arrives", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    await repository.commitTerminalRun(commitInput(run));
+    const terminal = (await storage.get<RunRecord>(runKey(run.id)))!;
+    expect(terminal.state).toBe("succeeded");
+
+    // A late event lands in the audit trail without rewriting committed
+    // terminal evidence.
+    const { event } = await repository.appendRunEvent(run.id, {
+      type: "stdout",
+      message: "late",
+      phase: "command",
+    });
+    const after = (await storage.get<RunRecord>(runKey(run.id)))!;
+
+    expect(event.seq).toBe(terminal.eventCount! + 1);
+    expect(after.state).toBe(terminal.state);
+    expect(after.phase).toBe(terminal.phase);
+    expect(after.terminalFinishSHA256).toBe(terminal.terminalFinishSHA256);
+    expect(after.terminalLogPrefix).toBe(terminal.terminalLogPrefix);
+    expect(after.storageRevision).toBe((terminal.storageRevision ?? 0) + 1);
+  });
+
+  it("merges telemetry into the reloaded record", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    await repository.createRunningRun(runFixture());
+
+    await repository.appendRunTelemetry("run-1", {
+      capturedAt: "2026-09-24T00:00:01.000Z",
+      cpuCount: 2,
+    });
+    const updated = await repository.appendRunTelemetry("run-1", {
+      capturedAt: "2026-09-24T00:00:02.000Z",
+      cpuCount: 4,
+    });
+
+    expect(updated.telemetry?.samples?.map((sample) => sample.capturedAt)).toEqual([
+      "2026-09-24T00:00:01.000Z",
+      "2026-09-24T00:00:02.000Z",
+    ]);
+    expect(updated.telemetry?.start?.capturedAt).toBe("2026-09-24T00:00:01.000Z");
+    // Creation plus both telemetry appends.
+    expect(updated.storageRevision).toBe(3);
+  });
+
+  it("backfills lease attribution from the durable event log", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    delete (run as { leaseIDs?: string[] }).leaseIDs;
+    delete (run as { leaseOwners?: unknown[] }).leaseOwners;
+    await repository.createRunningRun(run);
+    storage.map.set(leaseKey(canonicalLeaseID), {
+      id: canonicalLeaseID,
+      owner: "bob@example.com",
+      org: acme,
+    });
+    storage.map.set(runEventKey(run.id, 2), {
+      runID: run.id,
+      seq: 2,
+      type: "lease.created",
+      leaseID: canonicalLeaseID,
+      createdAt: "2026-09-24T00:00:30.000Z",
+    });
+
+    const result = await repository.backfillRunLeaseAttribution(run.id);
+
+    expect(result!.run.leaseIDs).toEqual([canonicalLeaseID]);
+    expect(result!.run.leaseOwners).toEqual([{ owner: "bob@example.com", org: acme }]);
+    expect(result!.currentLease).toBeUndefined();
+    // The attribution is durable, not just returned.
+    const durable = (await storage.get<RunRecord>(runKey(run.id)))!;
+    expect(durable.leaseIDs).toEqual([canonicalLeaseID]);
+    expect(durable.storageRevision).toBe(2);
+  });
+
+  it("preserves a terminal commit when attribution is backfilled afterwards", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    delete (run as { leaseIDs?: string[] }).leaseIDs;
+    delete (run as { leaseOwners?: unknown[] }).leaseOwners;
+    await repository.createRunningRun(run);
+    await repository.commitTerminalRun(commitInput(run));
+    const terminal = (await storage.get<RunRecord>(runKey(run.id)))!;
+
+    // The backfill runs on the reloaded record: the terminal fields the
+    // commit wrote are still there afterwards.
+    const result = await repository.backfillRunLeaseAttribution(run.id);
+    const after = result!.run;
+    expect(after.state).toBe("succeeded");
+    expect(after.terminalFinishSHA256).toBe(terminal.terminalFinishSHA256);
+    expect(after.terminalLogPrefix).toBe(terminal.terminalLogPrefix);
+    expect(after.terminalReceipt).toEqual(terminal.terminalReceipt);
+  });
+
+  it("returns the already-attributed run without rewriting it", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    const attributed = structuredClone((await storage.get<RunRecord>(runKey(run.id)))!);
+    attributed.leaseIDs = [canonicalLeaseID];
+    attributed.leaseOwners = [{ owner: "bob@example.com", org: acme }];
+    storage.map.set(runKey(run.id), attributed);
+
+    const result = await repository.backfillRunLeaseAttribution(run.id);
+
+    expect(result!.run.storageRevision).toBe(attributed.storageRevision);
+    expect(result!.currentLease).toBeUndefined();
+    expect(await storage.get<RunRecord>(runKey(run.id))).toEqual(attributed);
   });
 });
 

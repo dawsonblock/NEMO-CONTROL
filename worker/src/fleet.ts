@@ -371,15 +371,16 @@ import {
   INITIAL_RUN_PHASE,
   INITIAL_RUN_STATE,
   RunLifecycleService,
-  applyRunEventSummary,
+  boundedTelemetrySamples,
+  maxRunTelemetrySamples,
   newRunID,
   terminalRunTimestamp,
+  type RunEventTemplate,
 } from "./run-lifecycle";
 import { terminalFinishSHA256, validateRunEvidence, verifyTerminalReceipt } from "./run-receipt";
 import {
   DurableObjectRunRepository,
   deleteStoragePrefix,
-  runEventKey,
   runEventPrefix,
   runKey,
   runLogChunkPrefix,
@@ -407,11 +408,11 @@ import {
 import { buildIdentity } from "./runtime-identity";
 import {
   InvalidLeaseSlugError,
-  isCanonicalLeaseID,
   leaseSlugFromID,
   normalizeLeaseSlug,
   requestedLeaseSlug,
   slugWithCollisionSuffix,
+  validLeaseID,
 } from "./slug";
 import {
   createTailscaleAuthKey,
@@ -506,7 +507,6 @@ import { WebVNCCredentialHandoffs, type WebVNCCredentialHandoffResult } from "./
 const fleetID = "default";
 const maxStoredRunLogBytes = 8 * 1024 * 1024;
 const maxLeaseTelemetryHistory = 60;
-const maxRunTelemetrySamples = 60;
 const maxExternalRunnerSyncItems = 200;
 const webVNCPortalViewerTicketTTLSeconds = 120;
 const webVNCPortalViewerSessionTTLSeconds = 30 * 60;
@@ -14727,7 +14727,7 @@ export class FleetCoordinator {
           return notFound();
         }
       }
-      const event = await this.appendRunEventRecord(run, input);
+      const event = await this.appendRunEventRecord(run.id, input);
       return json({ event }, { status: 201 });
     }
     if (method === "POST" && action === "telemetry") {
@@ -14749,9 +14749,10 @@ export class FleetCoordinator {
     if (!telemetry) {
       return json({ error: "invalid_telemetry" }, { status: 400 });
     }
-    run.telemetry = appendRunTelemetrySample(run.telemetry, telemetry);
-    await this.putRun(run);
-    return json({ run: publicRunRecord(run) });
+    // The sample is merged into the reloaded record inside the
+    // repository transaction, so a concurrent append cannot be lost.
+    const updated = await this.runLifecycle.appendRunTelemetry(runID, telemetry);
+    return json({ run: publicRunRecord(updated) });
   }
 
   private async finishRun(request: Request, runID: string): Promise<Response> {
@@ -18478,43 +18479,17 @@ export class FleetCoordinator {
     return run.leaseID === leaseID || run.leaseIDs?.includes(leaseID) === true;
   }
 
-  private async ensureRunLeaseAttribution(
-    run: RunRecord,
-    knownLeases?: Map<string, LeaseRecord>,
-  ): Promise<LeaseRecord | undefined> {
-    if (run.leaseIDs !== undefined && run.leaseOwners !== undefined) {
+  private async ensureRunLeaseAttribution(run: RunRecord): Promise<LeaseRecord | undefined> {
+    // The backfill is a repository transaction: the event log and the
+    // record are read together and the attribution is applied to the
+    // durable record, so a read path can no longer write a stale copy
+    // back over a concurrent commit.
+    const attribution = await this.runLifecycle.ensureRunLeaseAttribution(run.id);
+    if (!attribution) {
       return undefined;
     }
-    const events = await this.state.storage.list<RunEventRecord>({
-      prefix: runEventPrefix(run.id),
-    });
-    const leaseIDs = new Set(
-      [...events.values()]
-        .toSorted((a, b) => a.seq - b.seq)
-        .map((event) => event.leaseID)
-        .filter((leaseID): leaseID is string => Boolean(leaseID && validLeaseID(leaseID))),
-    );
-    if (validLeaseID(run.leaseID)) {
-      leaseIDs.add(run.leaseID);
-    }
-    const ids = [...leaseIDs];
-    const leases = knownLeases
-      ? ids.map((leaseID) => knownLeases.get(leaseID))
-      : await Promise.all(ids.map((leaseID) => this.getLease(leaseID)));
-    run.leaseIDs = ids;
-    run.leaseOwners = [];
-    let currentLease: LeaseRecord | undefined;
-    for (const [index, lease] of leases.entries()) {
-      if (!lease) {
-        continue;
-      }
-      this.setRunLeaseAttribution(run, lease);
-      if (ids[index] === run.leaseID) {
-        currentLease = lease;
-      }
-    }
-    await this.putRun(run);
-    return currentLease;
+    Object.assign(run, attribution.run);
+    return attribution.currentLease;
   }
 
   private leaseVisibleToControl(
@@ -18610,10 +18585,6 @@ export class FleetCoordinator {
     return this.state.storage.get<RunRecord>(runKey(runID));
   }
 
-  private async putRun(run: RunRecord): Promise<void> {
-    await this.state.storage.put(runKey(run.id), run);
-  }
-
   private async putExternalRunner(runner: ExternalRunnerRecord): Promise<void> {
     await this.state.storage.put(
       externalRunnerKey(runner.provider, runner.id, runner.owner, runner.org),
@@ -18622,28 +18593,16 @@ export class FleetCoordinator {
   }
 
   private async appendRunEventRecord(
-    run: RunRecord,
+    runID: string,
     input: RunEventRequest,
   ): Promise<RunEventRecord> {
-    const now = new Date().toISOString();
-    const seq = (run.eventCount ?? 0) + 1;
-    const event = boundedRunEvent(run.id, seq, now, input);
-    const previousLeaseID = run.leaseID;
-    applyRunEventSummary(run, event);
-    if (
-      validLeaseID(run.leaseID) &&
-      (run.leaseID !== previousLeaseID || !run.leaseIDs?.includes(run.leaseID))
-    ) {
-      const lease = await this.getLease(run.leaseID);
-      if (lease) {
-        this.setRunLeaseAttribution(run, lease);
-      }
-    }
-    run.eventCount = seq;
-    run.lastEventAt = now;
-    await this.state.storage.put(runEventKey(run.id, seq), event);
-    await this.putRun(run);
-    await this.broadcastRunEvent(run, event);
+    // Sequence allocation, the summary update, and both writes are one
+    // repository transaction; the caller's copy is never written back.
+    const { event, run: committed } = await this.runLifecycle.appendRunEvent(
+      runID,
+      boundedRunEventTemplate(input),
+    );
+    await this.broadcastRunEvent(committed, event);
     return event;
   }
 
@@ -22254,10 +22213,6 @@ export function shouldActivateEgressSession(
   return !previous || previous.sessionID === sessionID || previous.createdAt <= createdAt;
 }
 
-function validLeaseID(value: string | undefined): value is string {
-  return typeof value === "string" && isCanonicalLeaseID(value);
-}
-
 function validCreateAttemptID(value: string | undefined): value is string {
   return typeof value === "string" && /^cat_[a-f0-9]{32}$/.test(value);
 }
@@ -24072,18 +24027,10 @@ const MAX_RESULT_FAILURES = 100;
 const MAX_RESULT_STRING_BYTES = 4096;
 const MAX_EVENT_STRING_BYTES = 16 * 1024;
 
-function boundedRunEvent(
-  runID: string,
-  seq: number,
-  createdAt: string,
-  input: RunEventRequest,
-): RunEventRecord {
+function boundedRunEventTemplate(input: RunEventRequest): RunEventTemplate {
   const type = input.type && input.type.trim() ? input.type.trim() : "event";
-  const event: RunEventRecord = {
-    runID,
-    seq,
+  const event: RunEventTemplate = {
     type: truncateString(type, 128),
-    createdAt,
   };
   if (input.phase) {
     event.phase = truncateString(input.phase, 128);
@@ -24369,18 +24316,6 @@ function mergeRunTelemetry(
   return telemetry;
 }
 
-function appendRunTelemetrySample(
-  telemetry: RunTelemetrySummary | undefined,
-  sample: LeaseTelemetry,
-): RunTelemetrySummary {
-  const next: RunTelemetrySummary = { ...telemetry };
-  next.samples = boundedTelemetrySamples([...(next.samples ?? []), sample], maxRunTelemetrySamples);
-  if (!next.start) {
-    next.start = sample;
-  }
-  return next;
-}
-
 function appendLeaseTelemetryHistory(
   history: LeaseTelemetry[] | undefined,
   telemetry: LeaseTelemetry,
@@ -24389,18 +24324,6 @@ function appendLeaseTelemetryHistory(
     [...(Array.isArray(history) ? history : []), telemetry],
     maxLeaseTelemetryHistory,
   );
-}
-
-function boundedTelemetrySamples(samples: LeaseTelemetry[], max: number): LeaseTelemetry[] {
-  const byTime = new Map<string, LeaseTelemetry>();
-  for (const sample of samples) {
-    if (sample?.capturedAt) {
-      byTime.set(sample.capturedAt, sample);
-    }
-  }
-  return [...byTime.values()]
-    .toSorted((left, right) => left.capturedAt.localeCompare(right.capturedAt))
-    .slice(-max);
 }
 
 const fixedLeaseCreateIntentVersion = 2;
