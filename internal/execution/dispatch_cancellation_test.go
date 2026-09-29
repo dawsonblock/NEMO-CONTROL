@@ -120,30 +120,55 @@ func TestObservationFailureRecoverySurvivesCallerCancel(t *testing.T) {
 // persisted, a caller disconnect must not stop lease renewal while
 // mandatory post-dispatch persistence is still running.
 //
-// Timing: lease = 300ms, provider = 100ms, cancel at provider return,
-// slow finalization (preFinalizeHook) = 400ms. The record commits at
-// ~500ms — past the original 300ms lease expiry. With the heartbeat
-// derived from the caller ctx, renewal stops at ~100ms, the lease
-// expires at 300ms, and Finalize's fenced CAS fails → UNKNOWN.
-// With a durability-owned heartbeat, the lease renews through
-// finalization → COMMITTED.
+// Timing: lease = 300ms (renewal interval = 200ms), provider = 100ms,
+// cancel at provider return. The post-provider verification window is
+// synchronized on durable state rather than a fixed sleep: the hook
+// waits until the ORIGINAL lease deadline has passed and the lease is
+// still valid — which is only possible if the heartbeat renewed it,
+// since renewal is what extends an expiry that has already elapsed.
+// Without a durability-owned heartbeat, renewal stops at the cancel,
+// the lease expires, and Finalize's fenced CAS fails → UNKNOWN.
 func TestHeartbeatSurvivesCallerCancelThroughFinalize(t *testing.T) {
+	const leaseDuration = 300 * time.Millisecond
 	store := openExecutorSQLiteStore(t, idempotency.LeaseConfig{
-		DefaultDuration: 300 * time.Millisecond,
+		DefaultDuration: leaseDuration,
 		MaxDuration:     10 * time.Second,
 		RenewalWindow:   100 * time.Millisecond,
 	})
 
 	exec := NewDispatchExecutor(succeedHandler{delay: 100 * time.Millisecond}, store)
-	// Slow evidence verification / receipt construction after the
-	// provider returns — the lease must remain valid through it.
-	exec.preFinalizeHook = func() { time.Sleep(400 * time.Millisecond) }
+
+	key := fmt.Sprintf("hb-cancel-%d", time.Now().UnixNano())
+	// Simulate slow post-provider evidence verification, synchronized on
+	// durable state instead of a fixed sleep: the fixed 400ms sleep this
+	// replaces raced the 200ms renewal interval against CI scheduling —
+	// whenever the renewal landed after Finalize, the fenced CAS failed
+	// and the test failed despite a clean provider success.
+	exec.preFinalizeHook = func() {
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			rec, err := store.LookupByKey(context.Background(), "alice@example.com", "test.mut", key)
+			if err == nil && rec.LeaseStartedAt != nil && rec.LeaseExpiresAt != nil {
+				if time.Now().After(rec.LeaseStartedAt.Add(leaseDuration)) {
+					if !rec.LeaseExpiresAt.After(time.Now()) {
+						t.Errorf("lease expired before Finalize: the heartbeat did not keep it alive through verification")
+						return
+					}
+					return
+				}
+			}
+			if time.Now().After(deadline) {
+				t.Errorf("timed out waiting for the lease to be renewed past its original deadline")
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	exec.postDispatchHook = cancel
 
-	key := fmt.Sprintf("hb-cancel-%d", time.Now().UnixNano())
 	resp := exec.ExecuteWithIdempotency(ctx, Request{
 		Capability:     "test.mut",
 		Arguments:      json.RawMessage(`{"x":1}`),
