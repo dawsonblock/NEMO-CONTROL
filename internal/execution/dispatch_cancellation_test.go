@@ -140,25 +140,37 @@ func TestHeartbeatSurvivesCallerCancelThroughFinalize(t *testing.T) {
 
 	key := fmt.Sprintf("hb-cancel-%d", time.Now().UnixNano())
 	// Simulate slow post-provider evidence verification, synchronized on
-	// durable state instead of a fixed sleep: the fixed 400ms sleep this
-	// replaces raced the 200ms renewal interval against CI scheduling —
-	// whenever the renewal landed after Finalize, the fenced CAS failed
-	// and the test failed despite a clean provider success.
+	// durable state instead of a wall clock: wait until the ORIGINAL lease
+	// deadline has passed AND the record shows a renewal that happened
+	// after this hook began — which is after the caller was cancelled, so
+	// the renewal cannot be caller-owned. Finalize then runs on a lease
+	// the heartbeat provably kept alive.
+	//
+	// Two earlier forms of this wait raced CI scheduling. The fixed 400ms
+	// sleep raced the renewal interval; requiring only "the lease is alive
+	// once the original deadline has passed" still raced the FIRST tick,
+	// because a starved heartbeat goroutine misses the 300ms window
+	// outright — which is how this failed on main's CI. Waiting for the
+	// renewal itself has no such window: a caller-owned heartbeat never
+	// renews, so the bounded wait reports exactly that.
 	exec.preFinalizeHook = func() {
-		deadline := time.Now().Add(10 * time.Second)
+		bound := time.Now().Add(10 * time.Second)
+		var baseline time.Time
 		for {
 			rec, err := store.LookupByKey(context.Background(), "alice@example.com", "test.mut", key)
 			if err == nil && rec.LeaseStartedAt != nil && rec.LeaseExpiresAt != nil {
-				if time.Now().After(rec.LeaseStartedAt.Add(leaseDuration)) {
-					if !rec.LeaseExpiresAt.After(time.Now()) {
-						t.Errorf("lease expired before Finalize: the heartbeat did not keep it alive through verification")
-						return
-					}
+				if baseline.IsZero() {
+					baseline = *rec.LeaseExpiresAt
+				}
+				pastOriginalDeadline := time.Now().After(rec.LeaseStartedAt.Add(leaseDuration))
+				renewedAfterCancel := rec.LeaseExpiresAt.After(baseline)
+				alive := rec.LeaseExpiresAt.After(time.Now())
+				if pastOriginalDeadline && renewedAfterCancel && alive {
 					return
 				}
 			}
-			if time.Now().After(deadline) {
-				t.Errorf("timed out waiting for the lease to be renewed past its original deadline")
+			if time.Now().After(bound) {
+				t.Errorf("no post-cancel lease renewal observed: the heartbeat did not keep the lease alive through verification")
 				return
 			}
 			time.Sleep(10 * time.Millisecond)

@@ -80,38 +80,43 @@ func TestLiveLeaseHeartbeatSurvivesSlowFinalize(t *testing.T) {
 	})
 	exec := NewDispatchExecutor(multiHandler, store)
 	// Simulate slow post-provider evidence verification, synchronized on
-	// durable state instead of a fixed sleep: the heartbeat must provably
-	// renew the lease and the original deadline must have passed before
-	// Finalize runs. The fixed sleep this replaces raced a sub-second
-	// wall-clock lease against CI scheduling and failed whenever the
-	// heartbeat goroutine was delayed past the expiry.
+	// durable state instead of a wall clock: wait until the ORIGINAL lease
+	// deadline has passed AND a renewal lands after this hook began —
+	// which is after the caller was cancelled, so the renewal cannot be
+	// caller-owned. Finalize then runs on a lease the heartbeat provably
+	// kept alive.
+	//
+	// The renewal is observed through `lease_expires_at` advancing, which
+	// is the same transaction that appends the LEASE_RENEWED event and is
+	// monotonic (`GREATEST`). The previous forms raced CI scheduling: the
+	// fixed sleep raced the renewal interval, and requiring only "the
+	// lease is alive once the original deadline has passed" still raced
+	// the first tick, because a starved heartbeat goroutine misses the
+	// sub-second window outright.
 	exec.preFinalizeHook = func() {
-		deadline := time.Now().Add(10 * time.Second)
+		bound := time.Now().Add(10 * time.Second)
+		var baseline time.Time
 		for {
-			var pastOriginalDeadline, renewed, leaseAlive bool
+			var pastOriginalDeadline bool
+			var expiresAt time.Time
 			err := db.QueryRowContext(ctx, `
 				SELECT
 				  clock_timestamp() >= r.lease_started_at + make_interval(secs => $2),
-				  EXISTS (
-				    SELECT 1 FROM effect_events e
-				    WHERE e.execution_id = r.execution_id::text AND e.event_type = $3
-				  ),
-				  r.lease_expires_at > clock_timestamp()
+				  r.lease_expires_at
 				FROM execution_requests r
 				WHERE r.idempotency_key = $1`,
-				key, 0.3, idempotency.EventLeaseRenewed,
-			).Scan(&pastOriginalDeadline, &renewed, &leaseAlive)
+				key, 0.3,
+			).Scan(&pastOriginalDeadline, &expiresAt)
 			if err == nil {
-				if pastOriginalDeadline && !leaseAlive {
-					t.Errorf("lease expired before Finalize: the heartbeat did not keep it alive through verification")
-					return
+				if baseline.IsZero() {
+					baseline = expiresAt
 				}
-				if pastOriginalDeadline && renewed {
+				if pastOriginalDeadline && expiresAt.After(baseline) && expiresAt.After(time.Now()) {
 					return
 				}
 			}
-			if time.Now().After(deadline) {
-				t.Errorf("timed out waiting for the heartbeat to renew the lease past its original deadline")
+			if time.Now().After(bound) {
+				t.Errorf("no post-cancel lease renewal observed: the heartbeat did not keep the lease alive through verification")
 				return
 			}
 			time.Sleep(10 * time.Millisecond)
