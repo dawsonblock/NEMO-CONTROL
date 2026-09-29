@@ -19,7 +19,7 @@ import {
 } from "../src/run-lifecycle";
 import {
   DurableObjectRunRepository,
-  RunGcRefused,
+  RunStorageIntegrityError,
   deleteStoragePrefix,
   readTerminalRunLog,
   runEventKey,
@@ -724,7 +724,7 @@ describe("corrupted GC records fail closed", () => {
     storage.map.set(runEventKey("run-2", 1), { runID: "run-2", seq: 1 });
     const before = new Map(storage.map);
 
-    await expect(repository.resumeTerminalRunGc()).rejects.toThrow(RunGcRefused);
+    await expect(repository.resumeTerminalRunGc()).rejects.toThrow(RunStorageIntegrityError);
 
     // The record cannot prove what it owns, so nothing was deleted.
     expect(storage.map).toEqual(before);
@@ -739,7 +739,7 @@ describe("corrupted GC records fail closed", () => {
     storage.map.set(runLogKey("run-1"), "aggregate log");
     const before = new Map(storage.map);
 
-    await expect(repository.resumeTerminalRunGc()).rejects.toThrow(RunGcRefused);
+    await expect(repository.resumeTerminalRunGc()).rejects.toThrow(RunStorageIntegrityError);
 
     expect(storage.map).toEqual(before);
   });
@@ -755,7 +755,7 @@ describe("corrupted GC records fail closed", () => {
     storage.map.set("runlog:run-2:finish:foreign:attempt:value", "another run's evidence");
     const before = new Map(storage.map);
 
-    await expect(repository.resumeTerminalRunGc()).rejects.toThrow(RunGcRefused);
+    await expect(repository.resumeTerminalRunGc()).rejects.toThrow(RunStorageIntegrityError);
 
     expect(storage.map).toEqual(before);
   });
@@ -772,7 +772,9 @@ describe("corrupted GC records fail closed", () => {
     storage.map.set("runlog:run-1:chunk:000000", "unrelated bytes");
     const before = new Map(storage.map);
 
-    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
 
     expect(storage.map).toEqual(before);
   });
@@ -784,7 +786,9 @@ describe("corrupted GC records fail closed", () => {
     storage.map.set(terminalAttemptKey("run-1", terminalFingerprint), corruptAttempt());
     const before = new Map(storage.map);
 
-    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
 
     expect(storage.map).toEqual(before);
   });
@@ -799,7 +803,9 @@ describe("corrupted GC records fail closed", () => {
     storage.map.set("runlog:run-2:finish:foreign:attempt:value", "another run's evidence");
     const before = new Map(storage.map);
 
-    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
 
     expect(storage.map).toEqual(before);
   });
@@ -813,7 +819,9 @@ describe("corrupted GC records fail closed", () => {
     );
     const before = new Map(storage.map);
 
-    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
 
     expect(storage.map).toEqual(before);
   });
@@ -832,7 +840,9 @@ describe("corrupted GC records fail closed", () => {
     );
     const before = new Map(storage.map);
 
-    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
 
     expect(storage.map).toEqual(before);
   });
@@ -863,7 +873,9 @@ describe("corrupted GC records fail closed", () => {
     const key = terminalAttemptKey("run-1", terminalFingerprint);
     storage.map.set(key, corruptAttempt({ runID: "run-1", logPrefix: "" }));
 
-    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
 
     // The corrupt record was never claimed: it stays reserved, not retiring.
     expect((await storage.get<{ state: string }>(key))!.state).toBe("reserved");
@@ -882,7 +894,9 @@ describe("corrupted GC records fail closed", () => {
     const refusedKey = terminalAttemptKey("run-2", terminalFingerprint);
     storage.map.set(refusedKey, corruptAttempt({ logPrefix: "" }));
 
-    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(RunGcRefused);
+    await expect(repository.sweepTerminalAttempts(Date.now())).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
 
     // The abandoned attempt and its bytes were retired; the refused
     // record was left exactly as it was.
@@ -910,8 +924,242 @@ describe("corrupted GC records fail closed", () => {
   it("refuses to delete an empty prefix even outside a record", async () => {
     const storage = new CrashStorage();
     storage.map.set(runKey("run-1"), runFixture());
-    await expect(deleteStoragePrefix(storage, "")).rejects.toThrow(RunGcRefused);
+    await expect(deleteStoragePrefix(storage, "")).rejects.toThrow(RunStorageIntegrityError);
     expect(storage.map.size).toBe(1);
+  });
+});
+
+// ─── Corrupted terminal attempts at commit ────────────────────────────
+//
+// The commit path writes, reads, and consumes an attempt's log prefix,
+// so it obeys the same integrity model as GC: a persisted record that
+// cannot prove what it owns is refused before any of those operations.
+// A corrupted attempt must never redirect finish bytes into another
+// run's namespace, and a terminal run must never reference a log the
+// attempt could not prove it owns.
+
+describe("corrupted terminal attempts fail closed at commit", () => {
+  const corruptAttempt = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+    runID: "run-1",
+    fingerprint: terminalFingerprint,
+    state: "reserved",
+    logPrefix: `runlog:run-1:finish:${"a".repeat(64)}:attempt:`,
+    reservedAt: "2026-09-24T00:00:00.000Z",
+    ...overrides,
+  });
+
+  async function runningRepository(): Promise<{
+    storage: CrashStorage;
+    repository: DurableObjectRunRepository;
+    run: RunRecord;
+  }> {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    return { storage, repository, run };
+  }
+
+  it("refuses a stored attempt whose key does not match its identity", async () => {
+    const { storage, repository, run } = await runningRepository();
+    // The key names run-1; the record claims run-2's namespace, so
+    // obeying it would write run-1's finish bytes into run-2's log.
+    storage.map.set(
+      terminalAttemptKey(run.id, terminalFingerprint),
+      corruptAttempt({
+        runID: "run-2",
+        logPrefix: `runlog:run-2:finish:${"a".repeat(64)}:attempt:`,
+      }),
+    );
+    const before = new Map(storage.map);
+
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses an attempt with an empty run ID before writing anything", async () => {
+    const { storage, repository, run } = await runningRepository();
+    storage.map.set(
+      terminalAttemptKey(run.id, terminalFingerprint),
+      corruptAttempt({ runID: "", logPrefix: "runlog::finish::attempt:" }),
+    );
+    const before = new Map(storage.map);
+
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses an attempt with an empty log prefix before writing anything", async () => {
+    const { storage, repository, run } = await runningRepository();
+    // An empty prefix lists the whole storage namespace; writing or
+    // deleting through it would touch every key in it.
+    storage.map.set(
+      terminalAttemptKey(run.id, terminalFingerprint),
+      corruptAttempt({ logPrefix: "" }),
+    );
+    const before = new Map(storage.map);
+
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses an attempt whose log lives under a different fingerprint", async () => {
+    const { storage, repository, run } = await runningRepository();
+    // Same run root, different fingerprint segment: obeying this would
+    // write this finish's bytes under another finish's ownership.
+    storage.map.set(
+      terminalAttemptKey(run.id, terminalFingerprint),
+      corruptAttempt({ logPrefix: `runlog:run-1:finish:${"b".repeat(64)}:attempt:` }),
+    );
+    const before = new Map(storage.map);
+
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses an attempt in an unknown state", async () => {
+    const { storage, repository, run } = await runningRepository();
+    storage.map.set(
+      terminalAttemptKey(run.id, terminalFingerprint),
+      corruptAttempt({ state: "claimed" }),
+    );
+    const before = new Map(storage.map);
+
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses an attempt with a malformed digest", async () => {
+    const { storage, repository, run } = await runningRepository();
+    storage.map.set(
+      terminalAttemptKey(run.id, terminalFingerprint),
+      corruptAttempt({ state: "log_written", logDigest: "not-a-digest" }),
+    );
+    const before = new Map(storage.map);
+
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("refuses an attempt with an invalid reservation time", async () => {
+    const { storage, repository, run } = await runningRepository();
+    storage.map.set(
+      terminalAttemptKey(run.id, terminalFingerprint),
+      corruptAttempt({ reservedAt: "sometime last week" }),
+    );
+    const before = new Map(storage.map);
+
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
+
+    expect(storage.map).toEqual(before);
+  });
+
+  it("revalidates the reloaded attempt before recording the digest", async () => {
+    // The pre-write reservation sees a structurally valid copy while
+    // the durable record is corrupt, so only the in-transaction
+    // revalidation can catch the swap before the digest is recorded
+    // against the corrupt record's prefix.
+    class FirstReadValidStorage extends CrashStorage {
+      private servedValid = false;
+      override async get<T>(key: string): Promise<T | undefined> {
+        if (key.startsWith("terminal-attempt:") && !this.servedValid) {
+          this.servedValid = true;
+          return corruptAttempt() as unknown as T;
+        }
+        return super.get<T>(key);
+      }
+    }
+    const storage = new FirstReadValidStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    const key = terminalAttemptKey(run.id, terminalFingerprint);
+    storage.map.set(key, corruptAttempt({ logPrefix: "" }));
+
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
+
+    // The corrupt record was never advanced: it stays reserved, so GC
+    // still owns whatever bytes the attempt could not prove.
+    expect((await storage.get<{ state: string }>(key))!.state).toBe("reserved");
+    // The run was never made terminal.
+    expect((await storage.get<RunRecord>(runKey(run.id)))!.state).toBe("running");
+  });
+
+  it("refuses a record that turns corrupt before the consume transaction", async () => {
+    // Transaction A and the digest transaction see the valid record;
+    // the record is swapped for one that names another run's log before
+    // transaction B, which must refuse rather than commit a terminal
+    // run that references a prefix the attempt cannot prove it owns.
+    class CorruptAtConsumeStorage extends CrashStorage {
+      private attemptReads = 0;
+      override async get<T>(key: string): Promise<T | undefined> {
+        if (key.startsWith("terminal-attempt:")) {
+          this.attemptReads += 1;
+          if (this.attemptReads >= 3) {
+            return corruptAttempt({
+              state: "log_written",
+              logDigest: terminalFingerprint,
+              logPrefix: `runlog:run-2:finish:${"a".repeat(64)}:attempt:`,
+            }) as unknown as T;
+          }
+        }
+        return super.get<T>(key);
+      }
+    }
+    const storage = new CorruptAtConsumeStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    const key = terminalAttemptKey(run.id, terminalFingerprint);
+    storage.map.set(key, corruptAttempt());
+
+    await expect(repository.commitTerminalRun(commitInput(run))).rejects.toThrow(
+      RunStorageIntegrityError,
+    );
+
+    // No terminal commit, no consume, no terminal event. The durable
+    // record legitimately reached log_written (its bytes and digest
+    // were recorded), but the corrupt copy was never consumed and the
+    // run never became terminal. Read the durable record directly:
+    // every later read through this storage serves the corrupt copy.
+    const durable = storage.map.get(key) as { state: string };
+    expect(durable.state).toBe("log_written");
+    expect((storage.map.get(runKey(run.id)) as RunRecord).state).toBe("running");
+    expect((await storage.list({ prefix: `runevent:${run.id}:` })).size).toBe(1);
+  });
+
+  it("still commits a valid attempt after the integrity checks", async () => {
+    const { storage, repository, run } = await runningRepository();
+    const result = await repository.commitTerminalRun(commitInput(run));
+    expect(result.kind).toBe("committed");
+    const committed = await storage.get<RunRecord>(runKey(run.id));
+    expect(committed!.terminalLogPrefix).toBeDefined();
+    const attempt = await storage.get<{ state: string }>(
+      terminalAttemptKey(run.id, terminalFingerprint),
+    );
+    expect(attempt!.state).toBe("consumed");
   });
 });
 

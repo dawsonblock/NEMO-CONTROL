@@ -160,7 +160,7 @@ export async function deleteStoragePrefix(storage: RunStorageView, prefix: strin
   if (prefix === "") {
     // An empty prefix lists the entire storage namespace; no caller may
     // delete without naming what it owns.
-    throw new RunGcRefused("refusing to delete an empty storage prefix");
+    throw new RunStorageIntegrityError("refusing to delete an empty storage prefix");
   }
   for (;;) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- deletion advances by removing each bounded first page.
@@ -184,10 +184,18 @@ function splitRunLogByBytes(log: string): string[] {
   return chunks;
 }
 
-// ─── GC record validation ─────────────────────────────────────────────
+// ─── Persisted-record validation ──────────────────────────────────────
+//
+// Every persisted record the repository obeys — a GC tombstone, a
+// terminalization attempt — must first prove what it owns. The same
+// proof applies on every path that touches the record's storage key or
+// log prefix: deletion (GC), writing finish bytes, reading them back,
+// and consuming the attempt. Corruption is refused, never obeyed, so a
+// record that cannot prove its identity can neither redirect a write
+// nor redirect a deletion.
 
-/** A persisted GC record that cannot prove what it owns; deletion refused. */
-export class RunGcRefused extends Error {}
+/** A persisted record that cannot prove what it owns; the operation is refused. */
+export class RunStorageIntegrityError extends Error {}
 
 const sha256Pattern = /^sha256:[0-9a-f]{64}$/u;
 const terminalAttemptStates: ReadonlySet<TerminalAttemptState> = new Set([
@@ -211,24 +219,27 @@ function validTimestamp(value: string | undefined): boolean {
  */
 function validateRunGcRecord(key: string, record: RunGcRecord): void {
   if (record.runID === "" || key !== runGcKey(record.runID)) {
-    throw new RunGcRefused(`run-gc record ${key} does not match its run ID`);
+    throw new RunStorageIntegrityError(`run-gc record ${key} does not match its run ID`);
   }
   if (
     record.terminalLogPrefix !== undefined &&
     !record.terminalLogPrefix.startsWith(runTerminalLogRoot(record.runID))
   ) {
-    throw new RunGcRefused(`run-gc record ${key} names a log outside its run`);
+    throw new RunStorageIntegrityError(`run-gc record ${key} names a log outside its run`);
   }
   if (!validTimestamp(record.claimedAt)) {
-    throw new RunGcRefused(`run-gc record ${key} has no valid claim time`);
+    throw new RunStorageIntegrityError(`run-gc record ${key} has no valid claim time`);
   }
 }
 
 /**
- * The same proof for a terminalization attempt: the key must be the one
- * its (run ID, fingerprint) pair derives, the state must be one this
+ * The proof for a terminalization attempt: the key must be the one its
+ * (run ID, fingerprint) pair derives, the state must be one this
  * repository writes, and the log prefix must live under the run's own
- * finish-log root — never empty, never another run's.
+ * finish-log root — never empty, never another run's. It is applied on
+ * every path that touches the attempt's storage key or log prefix:
+ * claiming it for GC, writing its bytes, reading them back, and
+ * consuming it. A record that cannot prove what it owns is refused.
  */
 function validateTerminalAttemptRecord(key: string, attempt: TerminalAttemptRecord): void {
   if (
@@ -236,27 +247,29 @@ function validateTerminalAttemptRecord(key: string, attempt: TerminalAttemptReco
     !sha256Pattern.test(attempt.fingerprint) ||
     key !== terminalAttemptKey(attempt.runID, attempt.fingerprint)
   ) {
-    throw new RunGcRefused(`terminal attempt ${key} does not match its identity`);
+    throw new RunStorageIntegrityError(`terminal attempt ${key} does not match its identity`);
   }
   if (!terminalAttemptStates.has(attempt.state)) {
-    throw new RunGcRefused(`terminal attempt ${key} has an unknown state`);
+    throw new RunStorageIntegrityError(`terminal attempt ${key} has an unknown state`);
   }
   if (
     !attempt.logPrefix.startsWith(terminalAttemptLogPrefixRoot(attempt.runID, attempt.fingerprint))
   ) {
-    throw new RunGcRefused(`terminal attempt ${key} names a log outside its fingerprint`);
+    throw new RunStorageIntegrityError(
+      `terminal attempt ${key} names a log outside its fingerprint`,
+    );
   }
   if (!validTimestamp(attempt.reservedAt)) {
-    throw new RunGcRefused(`terminal attempt ${key} has no valid reservation time`);
+    throw new RunStorageIntegrityError(`terminal attempt ${key} has no valid reservation time`);
   }
   if (attempt.logDigest !== undefined && !sha256Pattern.test(attempt.logDigest)) {
-    throw new RunGcRefused(`terminal attempt ${key} has an invalid log digest`);
+    throw new RunStorageIntegrityError(`terminal attempt ${key} has an invalid log digest`);
   }
   if (attempt.logWrittenAt !== undefined && !validTimestamp(attempt.logWrittenAt)) {
-    throw new RunGcRefused(`terminal attempt ${key} has no valid log-write time`);
+    throw new RunStorageIntegrityError(`terminal attempt ${key} has no valid log-write time`);
   }
   if (attempt.consumedAt !== undefined && !validTimestamp(attempt.consumedAt)) {
-    throw new RunGcRefused(`terminal attempt ${key} has no valid consumption time`);
+    throw new RunStorageIntegrityError(`terminal attempt ${key} has no valid consumption time`);
   }
 }
 
@@ -340,6 +353,11 @@ export class DurableObjectRunRepository implements RunRepository {
    * and an uncommitted attempt never makes the run appear terminal.
    * Repeating a finish converges on the same attempt (same fingerprint,
    * same log key) instead of creating a second one.
+   *
+   * Integrity: every loaded attempt must prove it owns its storage key
+   * and its log prefix before this path writes, reads, or consumes it —
+   * a corrupted record is refused rather than obeyed, so it can never
+   * redirect finish bytes into another run's namespace.
    */
   async commitTerminalRun(input: TerminalRunCommitInput): Promise<RunCommitResult> {
     const attemptKey = terminalAttemptKey(input.runID, input.fingerprint);
@@ -353,6 +371,11 @@ export class DurableObjectRunRepository implements RunRepository {
       if (classification === "conflict") return { kind: "conflict" as const, run: current };
       const existing = await txn.get<TerminalAttemptRecord>(attemptKey);
       if (existing) {
+        // A persisted attempt must prove it owns the key it was loaded
+        // from and the log prefix this path is about to write to. The
+        // commit path obeys the same integrity model as GC: corruption
+        // is refused, never carried into a write, a read, or a commit.
+        validateTerminalAttemptRecord(attemptKey, existing);
         if (terminalAttemptIsConsumed(existing) || terminalAttemptIsRetiring(existing)) {
           // Consumed: the run already used this attempt and moved on.
           // Retiring: garbage collection owns it, and a new attempt must
@@ -379,12 +402,21 @@ export class DurableObjectRunRepository implements RunRepository {
     // ── Immutable bytes, then the digest ──────────────────────────────
     const logDigest = await terminalLogDigest(input.log.text);
     if (!terminalAttemptHasLog(attempt) || attempt.logDigest !== logDigest) {
+      // Re-prove ownership immediately before the bytes are written: the
+      // prefix came from a validated record, but this write is outside
+      // any transaction, so the check cannot be deferred to the
+      // log-write transaction that follows it.
+      validateTerminalAttemptRecord(attemptKey, attempt);
       await writeTerminalRunLog(this.storage, attempt.logPrefix, input.log.text);
       const recorded = await this.storage.transaction(async (txn) => {
         const current = await txn.get<TerminalAttemptRecord>(attemptKey);
         if (!current || terminalAttemptIsConsumed(current) || terminalAttemptIsRetiring(current)) {
           return undefined;
         }
+        // The reloaded record must prove the same ownership before the
+        // digest is recorded against its prefix, or corruption could be
+        // laundered into `log_written`.
+        validateTerminalAttemptRecord(attemptKey, current);
         const next: TerminalAttemptRecord = {
           ...current,
           state: "log_written",
@@ -423,6 +455,10 @@ export class DurableObjectRunRepository implements RunRepository {
         // than commit a record that would reference unverified bytes.
         return { kind: "conflict" as const, run: current };
       }
+      // The record about to be consumed and referenced by the terminal
+      // run must prove it owns its key and its log prefix — the run's
+      // finish log reference is only as trustworthy as this proof.
+      validateTerminalAttemptRecord(attemptKey, durable);
       // The bytes must exist and hash to the attempt's digest. This is the
       // invariant: no terminal record may reference an unverified log.
       const bytes = await readTerminalRunLog(txn, durable.logPrefix);
