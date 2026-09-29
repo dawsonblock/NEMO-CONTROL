@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Qualification — deterministic lease-heartbeat live test
+
+- The `internal/execution` live lease-heartbeat test now synchronizes on durable state instead of a fixed 400ms sleep: it waits until the original 300ms deadline has passed and the heartbeat has provably renewed the lease (a `LEASE_RENEWED` effect event) before Finalize runs. That removes the sub-second wall-clock race that failed the qualification evidence gate once under CI load.
+
 ## 0.53.2 - 2026-09-29
 
 ### Hardening — supply chain, dead fallbacks, and deploy visibility
