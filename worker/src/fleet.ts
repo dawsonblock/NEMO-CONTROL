@@ -374,7 +374,6 @@ import {
   boundedTelemetrySamples,
   maxRunTelemetrySamples,
   newRunID,
-  terminalRunTimestamp,
   type RunEventTemplate,
 } from "./run-lifecycle";
 import { terminalFinishSHA256, validateRunEvidence, verifyTerminalReceipt } from "./run-receipt";
@@ -389,6 +388,7 @@ import {
   terminalRunLogChunkPrefix,
   terminalRunLogValueKey,
 } from "./run-repository";
+import { RunRetentionService, runPruneCursorKey } from "./run-retention";
 import {
   readRuntimeAdapterRelayBody,
   runtimeAdapterProxyPath,
@@ -541,10 +541,7 @@ const defaultAWSOrphanSweepGraceSeconds = 15 * 60;
 const defaultAzureOrphanSweepIntervalSeconds = 60 * 60;
 const defaultAzureOrphanSweepGraceSeconds = 15 * 60;
 const storageRecordScanBatchSize = 128;
-const terminalRunPruneBatchSize = 16;
 const runtimeAdapterDeleteBatchSize = 16;
-const defaultTerminalRunRetentionDays = 30;
-const runPruneCursorKey = "maintenance:run-prune-cursor";
 const providerAccessReservationTTLMS = 15 * 60 * 1000;
 const maxPendingWebVNCBytes = 1024 * 1024;
 const maxCodeWebSocketFrameChunkBytes = 15 * 1024;
@@ -1206,6 +1203,7 @@ export class FleetCoordinator {
   private readonly leaseRepository: LeaseRepository;
   private readonly readyPoolRepository: ReadyPoolRepository;
   private readonly runLifecycle: RunLifecycleService;
+  private readonly runRetention: RunRetentionService;
   private maintenanceRun: Promise<void> | undefined;
   private maintenanceFollowup: { grantVersion?: string; preserve: boolean } | undefined;
 
@@ -1220,6 +1218,13 @@ export class FleetCoordinator {
     // it resolves the actor, verifies request material, and delegates to
     // the lifecycle service through the durable-object repository.
     this.runLifecycle = new RunLifecycleService(new DurableObjectRunRepository(state));
+    // Run retention: the maintenance sweep owns its cursor, batching,
+    // and resume rules; the lifecycle owns deletion.
+    this.runRetention = new RunRetentionService({
+      storage: state.storage,
+      runs: this.runLifecycle,
+      retentionDays: this.env.CRABBOX_RUN_RETENTION_DAYS,
+    });
     // Lease lifecycle: the router never assigns a lease state — every
     // transition goes through a semantic repository operation.
     this.leaseRepository = new DurableObjectLeaseRepository(state.storage);
@@ -18151,71 +18156,7 @@ export class FleetCoordinator {
   }
 
   private async pruneTerminalRuns(): Promise<void> {
-    const cutoff = Date.now() - terminalRunRetentionMs(this.env.CRABBOX_RUN_RETENTION_DAYS);
-    const storedCursor = await this.state.storage.get<string>(runPruneCursorKey);
-    const startAfter = storedCursor?.startsWith("run:") ? storedCursor : undefined;
-    const page = await this.state.storage.list<RunRecord>({
-      prefix: "run:",
-      limit: storageRecordScanBatchSize,
-      ...(startAfter ? { startAfter } : {}),
-    });
-    if (page.size === 0) {
-      if (storedCursor !== undefined) {
-        await this.state.storage.delete(runPruneCursorKey);
-      }
-    } else {
-      let deleted = 0;
-      let lastScanned: string | undefined;
-      for (const [key, run] of page) {
-        lastScanned = key;
-        const terminalAt = terminalRunTimestamp(run);
-        if (key === runKey(run.id) && terminalAt !== undefined && terminalAt <= cutoff) {
-          // oxlint-disable-next-line eslint/no-await-in-loop -- each run and its artifacts are removed before advancing the maintenance cursor.
-          await this.deleteTerminalRun(run.id, cutoff);
-          deleted += 1;
-          if (deleted >= terminalRunPruneBatchSize) {
-            break;
-          }
-        }
-      }
-      const pageEnd = [...page.keys()].at(-1);
-      if (lastScanned && (lastScanned !== pageEnd || page.size === storageRecordScanBatchSize)) {
-        await this.state.storage.put(runPruneCursorKey, lastScanned);
-      } else {
-        await this.state.storage.delete(runPruneCursorKey);
-      }
-    }
-    // Interrupted retirements and abandoned attempts live under their own
-    // prefixes, so they are swept even when the run scan found nothing.
-    await this.resumeTerminalRunGc();
-    await this.sweepTerminalAttempts();
-  }
-
-  private async deleteTerminalRun(runID: string, cutoff: number): Promise<void> {
-    await this.runLifecycle.pruneTerminalRun(runID, cutoff);
-  }
-
-  /**
-   * Finish terminal-run retirements a crash interrupted. Retention hides
-   * a run behind its tombstone atomically, so the only durable trace of
-   * an interrupted retirement is the tombstone, which names exactly what
-   * still has to be deleted.
-   */
-  private async resumeTerminalRunGc(): Promise<void> {
-    await this.runLifecycle.resumeTerminalRunGc();
-  }
-
-  /**
-   * Retire abandoned terminalization attempts alongside the run
-   * retention sweep. The repository refuses to sweep an attempt whose log
-   * a committed run references, so a live finish log can never be removed
-   * here; abandoned attempts are only removed once they age out, and a
-   * claim that survives a crash is resumed rather than skipped.
-   */
-  private async sweepTerminalAttempts(): Promise<void> {
-    await this.runLifecycle.sweepTerminalAttempts(
-      Date.now() - terminalRunRetentionMs(this.env.CRABBOX_RUN_RETENTION_DAYS),
-    );
+    await this.runRetention.pruneTerminalRuns();
   }
 
   /**
@@ -22940,13 +22881,6 @@ function retainRecentRun(runs: RunRecord[], run: RunRecord, limit: number): void
   if (runs.length > limit) {
     runs.pop();
   }
-}
-
-function terminalRunRetentionMs(value: string | undefined): number {
-  const parsed = Number(value ?? "");
-  const days =
-    Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : defaultTerminalRunRetentionDays;
-  return Math.min(days, 3650) * 24 * 60 * 60 * 1000;
 }
 
 function clampLimit(value: string | null, fallback: number): number {
