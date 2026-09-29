@@ -647,32 +647,41 @@ if [ -f "$EVIDENCE_DIR/qualification.json" ]; then
   # Resolve the JSON Schema validator from the PINNED repository
   # dependency first: the archive ships nemo/package-lock.json, so
   # `npm ci --prefix nemo` (or an equivalent install) provides an
-  # exactly-pinned validator. A mutable global `ajv` is only a
-  # fallback, and no validator at all is a qualification failure.
-  AJV_BIN=""
+  # exactly-pinned programmatic Ajv with no ajv-cli transitive
+  # toolchain. A mutable global `ajv` binary is only a fallback, and no
+  # validator at all is a qualification failure.
+  VALIDATOR_SCRIPT=""
   for candidate in \
-    "$REPO_ROOT/nemo/node_modules/.bin/ajv" \
-    "$(dirname "$EVIDENCE_DIR")/nemo/node_modules/.bin/ajv"; do
-    if [ -x "$candidate" ]; then
-      AJV_BIN="$candidate"
+    "$REPO_ROOT/nemo/scripts/validate-schema.mjs" \
+    "$(dirname "$EVIDENCE_DIR")/nemo/scripts/validate-schema.mjs"; do
+    if [ -f "$candidate" ]; then
+      VALIDATOR_SCRIPT="$candidate"
       break
     fi
   done
-  if [ -z "$AJV_BIN" ] && command -v ajv >/dev/null 2>&1; then
+  AJV_BIN=""
+  if [ -z "$VALIDATOR_SCRIPT" ] && command -v ajv >/dev/null 2>&1; then
     AJV_BIN="$(command -v ajv)"
   fi
-  if [ -z "$AJV_BIN" ]; then
+  if [ -z "$VALIDATOR_SCRIPT" ] && [ -z "$AJV_BIN" ]; then
     check "Qualification schema (validator missing)" "FAIL"
     echo "  ERROR: no JSON Schema validator found. Install the pinned dependency with:" >&2
     echo "         npm ci --prefix nemo" >&2
     exit 1
   fi
-  if "$AJV_BIN" validate -s "$SCHEMA_FILE" -d "$EVIDENCE_DIR/qualification.json" >/dev/null 2>&1; then
+  validate_qualification_schema() {
+    if [ -n "$VALIDATOR_SCRIPT" ]; then
+      node "$VALIDATOR_SCRIPT" "$SCHEMA_FILE" "$EVIDENCE_DIR/qualification.json"
+    else
+      "$AJV_BIN" validate -s "$SCHEMA_FILE" -d "$EVIDENCE_DIR/qualification.json"
+    fi
+  }
+  if validate_qualification_schema >/dev/null 2>&1; then
     check "Qualification schema valid" "PASS"
   else
     check "Qualification schema valid" "FAIL"
     echo "  ERROR: qualification.json does not validate against schema" >&2
-    "$AJV_BIN" validate -s "$SCHEMA_FILE" -d "$EVIDENCE_DIR/qualification.json" >&2 || true
+    validate_qualification_schema >&2 || true
     exit 1
   fi
 

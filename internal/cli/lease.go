@@ -10,24 +10,21 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 func newLeaseID() string {
 	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		digits := strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", "")
-		return "cbx_" + (digits + "00000000000000000000000000000000")[:32]
-	}
+	// crypto/rand.Read never returns an error and always fills the buffer
+	// (Go 1.24+); an entropy failure aborts the process. A timestamp
+	// fallback would advertise a safety property that does not exist.
+	_, _ = rand.Read(b[:])
 	return "cbx_" + hex.EncodeToString(b[:])
 }
 
 func newCreateAttemptID() string {
 	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		digits := strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", "")
-		return "cat_" + (digits + "00000000000000000000000000000000")[:32]
-	}
+	// See newLeaseID: there is deliberately no non-random fallback.
+	_, _ = rand.Read(b[:])
 	return "cat_" + hex.EncodeToString(b[:])
 }
 
@@ -37,10 +34,8 @@ func NewLeaseID() string {
 
 func newRunID() string {
 	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		digits := strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", "")
-		return "run_" + (digits + "00000000000000000000000000000000")[:32]
-	}
+	// See newLeaseID: there is deliberately no non-random fallback.
+	_, _ = rand.Read(b[:])
 	return "run_" + hex.EncodeToString(b[:])
 }
 
