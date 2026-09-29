@@ -14849,7 +14849,7 @@ export class FleetCoordinator {
       blockedStage,
       retryLikely,
       results: input.results ? boundedTestResults(input.results) : undefined,
-      telemetry: telemetry ? mergeRunTelemetry(run.telemetry, telemetry) : undefined,
+      telemetry,
       receipt,
       evidence: input.evidence,
       now,
@@ -24225,27 +24225,6 @@ function sanitizeRunTelemetry(
   }
   if (samples.length > 0) {
     telemetry.samples = boundedTelemetrySamples(samples, maxRunTelemetrySamples);
-  }
-  return telemetry;
-}
-
-function mergeRunTelemetry(
-  existing: RunTelemetrySummary | undefined,
-  incoming: RunTelemetrySummary,
-): RunTelemetrySummary {
-  const telemetry: RunTelemetrySummary = {
-    ...existing,
-    ...incoming,
-  };
-  telemetry.samples = boundedTelemetrySamples(
-    [
-      ...((existing?.samples ?? []).filter(Boolean) as LeaseTelemetry[]),
-      ...((incoming.samples ?? []).filter(Boolean) as LeaseTelemetry[]),
-    ],
-    maxRunTelemetrySamples,
-  );
-  if (telemetry.samples.length === 0) {
-    delete telemetry.samples;
   }
   return telemetry;
 }

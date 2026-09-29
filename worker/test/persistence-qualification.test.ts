@@ -14,6 +14,7 @@ import {
 } from "../src/ready-pool-repository";
 import {
   terminalLogDigest,
+  mergeRunTelemetry,
   RunIDCollisionError,
   RunTransitionRefused,
   type RunRepositoryStorage,
@@ -1351,6 +1352,43 @@ describe("concurrent run writes are serialized at the repository boundary", () =
     expect(updated.telemetry?.start?.capturedAt).toBe("2026-09-24T00:00:01.000Z");
     // Creation plus both telemetry appends.
     expect(updated.storageRevision).toBe(3);
+  });
+
+  it("keeps a concurrent telemetry append when a finish commits", async () => {
+    const storage = new CrashStorage();
+    const repository = new DurableObjectRunRepository({ storage, runExclusive: (fn) => fn() });
+    const run = runFixture();
+    await repository.createRunningRun(run);
+    await repository.appendRunTelemetry(run.id, {
+      capturedAt: "2026-09-24T00:00:01.000Z",
+      cpuCount: 2,
+    });
+    // The finish route builds its telemetry from the record it loaded; a
+    // concurrent append lands after that snapshot and before the commit.
+    const snapshot = structuredClone((await storage.get<RunRecord>(runKey(run.id)))!);
+    await repository.appendRunTelemetry(run.id, {
+      capturedAt: "2026-09-24T00:00:02.000Z",
+      cpuCount: 4,
+    });
+
+    const result = await repository.commitTerminalRun(
+      commitInput(run, {
+        telemetry: mergeRunTelemetry(snapshot.telemetry, {
+          end: { capturedAt: "2026-09-24T00:01:00.000Z" },
+        }),
+      }),
+    );
+
+    expect(result.kind).toBe("committed");
+    // The committed record carries the stale summary's samples, the
+    // concurrent append, and the finish's end reading — the terminal
+    // commit merges with the reloaded record instead of replacing it.
+    const committed = (await storage.get<RunRecord>(runKey(run.id)))!;
+    expect(committed.telemetry?.samples?.map((sample) => sample.capturedAt)).toEqual([
+      "2026-09-24T00:00:01.000Z",
+      "2026-09-24T00:00:02.000Z",
+    ]);
+    expect(committed.telemetry?.end?.capturedAt).toBe("2026-09-24T00:01:00.000Z");
   });
 
   it("backfills lease attribution from the durable event log", async () => {

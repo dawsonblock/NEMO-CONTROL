@@ -228,6 +228,33 @@ export function boundedTelemetrySamples(samples: LeaseTelemetry[], max: number):
 }
 
 /**
+ * Merge two telemetry summaries: the incoming summary's start/end win
+ * (they are the later observation), and the sample series is the bounded
+ * union of both, so a merge never drops a sample another writer
+ * committed.
+ */
+export function mergeRunTelemetry(
+  existing: RunTelemetrySummary | undefined,
+  incoming: RunTelemetrySummary,
+): RunTelemetrySummary {
+  const telemetry: RunTelemetrySummary = {
+    ...existing,
+    ...incoming,
+  };
+  telemetry.samples = boundedTelemetrySamples(
+    [
+      ...((existing?.samples ?? []).filter(Boolean) as LeaseTelemetry[]),
+      ...((incoming.samples ?? []).filter(Boolean) as LeaseTelemetry[]),
+    ],
+    maxRunTelemetrySamples,
+  );
+  if (telemetry.samples.length === 0) {
+    delete telemetry.samples;
+  }
+  return telemetry;
+}
+
+/**
  * Append one telemetry sample to a run's summary: the first sample also
  * becomes the run's start reading, and the series stays bounded.
  */
@@ -318,7 +345,13 @@ export function buildTerminalRunUpdate(
   if (input.blockedStage) next.blockedStage = input.blockedStage;
   if (input.retryLikely) next.retryLikely = input.retryLikely;
   if (input.results) next.results = input.results;
-  if (input.telemetry) next.telemetry = input.telemetry;
+  if (input.telemetry) {
+    // Merge with the RELOADED record's summary, never replace it: a
+    // telemetry append that committed between the caller's load and this
+    // transaction must survive the terminal commit, exactly as an event
+    // append does.
+    next.telemetry = mergeRunTelemetry(current.telemetry, input.telemetry);
+  }
   if (input.receipt) next.terminalReceipt = input.receipt;
   if (input.evidence) next.evidence = input.evidence;
   next.terminalFinishSHA256 = input.fingerprint;
@@ -379,7 +412,9 @@ export interface RunRepository {
    * Backfill the run's lease attribution from its event log and the
    * referenced leases, atomically, and return the run's current lease
    * for read authorization. A run whose attribution is already present
-   * is returned unchanged (the current lease is still resolved).
+   * is returned unchanged WITHOUT resolving the current lease: the
+   * attribution alone settles readability, and handing back a lease
+   * would widen a decision it already made.
    */
   backfillRunLeaseAttribution(
     runID: string,
@@ -469,7 +504,10 @@ export class RunLifecycleService {
     return this.repository.appendRunTelemetry(runID, sample);
   }
 
-  /** Backfill the run's lease attribution and resolve its current lease. */
+  /**
+   * Backfill the run's lease attribution, resolving its current lease
+   * only when the backfill actually ran (see the repository contract).
+   */
   async ensureRunLeaseAttribution(
     runID: string,
   ): Promise<{ run: RunRecord; currentLease?: LeaseRecord } | null> {
