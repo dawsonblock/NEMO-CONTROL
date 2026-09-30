@@ -40,14 +40,20 @@ func (h sleepyHandler) Execute(ctx context.Context, _ Request, desc capability.R
 // slow post-provider verification — the heartbeat must not stop at
 // provider return.
 //
-// Timing: lease = 300ms, provider = 150ms. The post-provider
-// verification window is synchronized on durable state rather than a
-// fixed sleep: the hook waits until the original 300ms deadline has
-// passed AND the heartbeat has provably renewed the lease (a
-// LEASE_RENEWED effect event), so Finalize's fenced CAS
-// (lease_expires_at > clock_timestamp()) can only succeed on a lease
-// the heartbeat kept alive. Without the renewal the CAS fails and the
-// record drops into UNKNOWN despite a clean provider success.
+// Timing: lease = 1s (renewal interval = 500ms), provider = 150ms. The
+// renewal window is the only scheduling slack a heartbeat tick has: the
+// store refuses to renew an expired lease, so a tick that lands after
+// the deadline kills the heartbeat permanently — a starved goroutine
+// missing a sub-second window is what made the shorter lease flaky on
+// CI. A 500ms window gives a loaded runner five times that slack.
+//
+// The post-provider verification window waits until the ORIGINAL lease
+// deadline has passed AND a renewal has landed since the hook began —
+// observed through a recording store rather than sampled expiry, so a
+// renewal can never be missed between poll phases. Finalize's fenced
+// CAS (lease_expires_at > clock_timestamp()) can then only succeed on
+// a lease the heartbeat kept alive. Without the renewal the CAS fails
+// and the record drops into UNKNOWN despite a clean provider success.
 //
 // Requires CRABBOX_TEST_DATABASE_URL. Skipped when absent.
 func TestLiveLeaseHeartbeatSurvivesSlowFinalize(t *testing.T) {
@@ -62,9 +68,9 @@ func TestLiveLeaseHeartbeatSurvivesSlowFinalize(t *testing.T) {
 	defer db.Close()
 
 	store, err := idempotency.NewStoreWithConfig(db, idempotency.LeaseConfig{
-		DefaultDuration: 300 * time.Millisecond,
+		DefaultDuration: time.Second,
 		MaxDuration:     10 * time.Second,
-		RenewalWindow:   50 * time.Millisecond,
+		RenewalWindow:   500 * time.Millisecond,
 	})
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
@@ -78,24 +84,20 @@ func TestLiveLeaseHeartbeatSurvivesSlowFinalize(t *testing.T) {
 	multiHandler := NewMultiHandler(map[string]Handler{
 		"sleepy": sleepyHandler{delay: 150 * time.Millisecond},
 	})
-	exec := NewDispatchExecutor(multiHandler, store)
+	wrapped := &renewalObservingStore{EffectStore: store}
+	exec := NewDispatchExecutor(multiHandler, wrapped)
 	// Simulate slow post-provider evidence verification, synchronized on
-	// durable state instead of a wall clock: wait until the ORIGINAL lease
-	// deadline has passed AND a renewal lands after this hook began —
-	// which is after the caller was cancelled, so the renewal cannot be
-	// caller-owned. Finalize then runs on a lease the heartbeat provably
-	// kept alive.
-	//
-	// The renewal is observed through `lease_expires_at` advancing, which
-	// is the same transaction that appends the LEASE_RENEWED event and is
-	// monotonic (`GREATEST`). The previous forms raced CI scheduling: the
-	// fixed sleep raced the renewal interval, and requiring only "the
-	// lease is alive once the original deadline has passed" still raced
-	// the first tick, because a starved heartbeat goroutine misses the
-	// sub-second window outright.
+	// durable state and the recording store instead of a wall clock: wait
+	// until the ORIGINAL lease deadline has passed AND a renewal has
+	// landed since this hook began — a renewal after provider return
+	// proves the heartbeat did not stop at dispatch. Finalize then runs
+	// on a lease the heartbeat provably kept alive. The bound stays
+	// below the terminalization stage budget (5s) so a genuine failure
+	// reports the heartbeat problem instead of dying as a context
+	// deadline inside Finalize.
 	exec.preFinalizeHook = func() {
-		bound := time.Now().Add(10 * time.Second)
-		var baseline time.Time
+		bound := time.Now().Add(4 * time.Second)
+		renewalsAtHookStart := wrapped.succeeded.Load()
 		for {
 			var pastOriginalDeadline bool
 			var expiresAt time.Time
@@ -105,18 +107,16 @@ func TestLiveLeaseHeartbeatSurvivesSlowFinalize(t *testing.T) {
 				  r.lease_expires_at
 				FROM execution_requests r
 				WHERE r.idempotency_key = $1`,
-				key, 0.3,
+				key, 1.0,
 			).Scan(&pastOriginalDeadline, &expiresAt)
-			if err == nil {
-				if baseline.IsZero() {
-					baseline = expiresAt
-				}
-				if pastOriginalDeadline && expiresAt.After(baseline) && expiresAt.After(time.Now()) {
-					return
-				}
+			if err == nil && pastOriginalDeadline &&
+				wrapped.succeeded.Load() > renewalsAtHookStart && expiresAt.After(time.Now()) {
+				return
 			}
 			if time.Now().After(bound) {
-				t.Errorf("no post-cancel lease renewal observed: the heartbeat did not keep the lease alive through verification")
+				t.Errorf("no post-dispatch lease renewal landed (renewals attempted=%d succeeded=%d, baseline %d): "+
+					"the heartbeat did not keep the lease alive through verification",
+					wrapped.attempted.Load(), wrapped.succeeded.Load(), renewalsAtHookStart)
 				return
 			}
 			time.Sleep(10 * time.Millisecond)
@@ -138,7 +138,7 @@ func TestLiveLeaseHeartbeatSurvivesSlowFinalize(t *testing.T) {
 	}, desc)
 
 	if resp.Status != StatusSucceeded {
-		t.Fatalf("expected SUCCEEDED after 550ms post-dispatch window on a 300ms lease, got %s: %s", resp.Status, resp.Error)
+		t.Fatalf("expected SUCCEEDED past the original lease deadline on a renewed lease, got %s: %s", resp.Status, resp.Error)
 	}
 
 	rec, err := store.LookupByKey(ctx, "alice@example.com", "test.sleepy", key)
