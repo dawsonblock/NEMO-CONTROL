@@ -51,6 +51,22 @@ credential-isolation and dependency-graph checks are in place and verified. The
 transfer plan records what remains, with each item's state and the reason it
 holds that state.
 
+The distinction that matters below is between proving architectural
+prerequisites and proving the assembled system. "Partial" entries are the
+latter.
+
+| Workstream | State |
+| --- | --- |
+| Source integrity (provenance, declared identity, CI gate) | Closed |
+| Binary declaration and build (manifest-declared binaries compiled in CI) | Closed |
+| Authority dependency guards (plugin path cannot reach the authority) | Closed — static invariant; runtime containment still requires composition testing |
+| `DIRECT` policy | Closed — deliberately refused in the first release |
+| Distribution assembler and component binding | Closed |
+| Distribution release adoption (GoReleaser emits the assembled distribution) | Open |
+| Plugin-host composition | Partial — safety prerequisites done, actual composition open |
+| Installed-artifact qualification | Open |
+| Windows integration | Deferred (scoped out; see the platform decision) |
+
 ## Distribution
 
 `crabedence-V1-fix-integration-integrity/scripts/build-nemo-distribution.sh`
