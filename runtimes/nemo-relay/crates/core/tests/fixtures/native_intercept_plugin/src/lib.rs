@@ -204,6 +204,23 @@ impl NativePlugin for InterceptPlugin {
                 }
             })?;
         }
+        // What the child was handed: the *names* of its environment variables,
+        // never the values — a dump is only a witness, and a witness that
+        // carries secrets is a leak. A composition asserts the isolation policy
+        // held by reading which names exist, not by trusting the spawn code
+        // that set them.
+        if let Some(dump) = config.get("env_dump").and_then(|value| value.as_str()) {
+            use std::io::Write;
+            if let Ok(mut file) = std::fs::File::create(dump) {
+                let mut names: Vec<String> = std::env::vars_os()
+                    .filter_map(|(name, _)| name.into_string().ok())
+                    .collect();
+                names.sort();
+                for name in names {
+                    let _ = writeln!(file, "{name}");
+                }
+            }
+        }
         ctx.register_llm_request_intercept(
             "fixture_intercept_llm_rewrite",
             0,
@@ -228,34 +245,77 @@ impl NativePlugin for InterceptPlugin {
                 }
             },
         )?;
-        // The class that wraps the call rather than answering one. It marks the
-        // arguments it passes downstream and the result that comes back, so both
-        // halves of a continuation are visible from the caller: the request
-        // marker proves the rewritten arguments reached the downstream call, and
-        // the result marker proves the downstream answer came back to the plugin.
+        // The class that wraps the call rather than answering one. It is
+        // always registered — the wrap itself is the proof the middleware ran:
+        // nothing downstream executes except through the continuation it holds.
+        // What "arg_marks" gates is the marker it writes into the *arguments*
+        // (a strict-schema capability cannot carry extra keys), never the one
+        // it writes into the result the call returned.
+        let arg_marks = config
+            .get("arg_marks")
+            .and_then(Json::as_bool)
+            .unwrap_or(true);
+        // Failure shapes a composition needs to prove the boundary is honest:
+        // a host that dies inside its own intercept ("die_on_invoke") and one
+        // that holds the call past its deadline ("sleep_ms"). Both are the
+        // plugin's own behavior, so both ask for themselves by configuration
+        // rather than running by default.
+        let die_on_invoke = config
+            .get("die_on_invoke")
+            .and_then(Json::as_bool)
+            .unwrap_or(false);
+        let sleep_ms = config.get("sleep_ms").and_then(Json::as_u64);
+        // The behaviour switches below are read from the call's arguments AND
+        // from the component's configuration: a strict-schema capability
+        // cannot carry the arg keys, so a composition that needs them on such
+        // a call passes them as config instead.
+        let concurrent_configured = config
+            .get("use_concurrent_next")
+            .and_then(Json::as_bool)
+            .unwrap_or(false);
+        let fail_after_configured = config
+            .get("fail_after_next")
+            .and_then(Json::as_bool)
+            .unwrap_or(false);
+        let replace_configured = config
+            .get("skip_next")
+            .and_then(Json::as_bool)
+            .unwrap_or(false);
         ctx.register_tool_execution_intercept("fixture_intercept_execution", 0, {
-            |_name, args, next| {
+            move |_name, args, next| {
                 Box::pin(async move {
+                    if die_on_invoke {
+                        // The host dying inside its own middleware: the whole
+                        // child process goes, which is what a crash looks like
+                        // to the composition on the other side of the channel.
+                        std::process::abort();
+                    }
+                    if let Some(ms) = sleep_ms {
+                        tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+                    }
                     let mut args = args;
-                    if let Json::Object(object) = &mut args {
+                    if arg_marks && let Json::Object(object) = &mut args {
                         object.insert(EXECUTION_REQUEST_MARKER.into(), json!(true));
                     }
                     // Three shapes the boundary has to carry, chosen by the
                     // caller rather than by the fixture: an intercept that
                     // replaces the call, one that runs it twice, and one that
                     // runs it and then fails.
-                    let replace = args
-                        .get("skip_next")
-                        .and_then(Json::as_bool)
-                        .unwrap_or(false);
-                    let concurrent = args
-                        .get("use_concurrent_next")
-                        .and_then(Json::as_bool)
-                        .unwrap_or(false);
-                    let fail_after = args
-                        .get("fail_after_next")
-                        .and_then(Json::as_bool)
-                        .unwrap_or(false);
+                    let replace = replace_configured
+                        || args
+                            .get("skip_next")
+                            .and_then(Json::as_bool)
+                            .unwrap_or(false);
+                    let concurrent = concurrent_configured
+                        || args
+                            .get("use_concurrent_next")
+                            .and_then(Json::as_bool)
+                            .unwrap_or(false);
+                    let fail_after = fail_after_configured
+                        || args
+                            .get("fail_after_next")
+                            .and_then(Json::as_bool)
+                            .unwrap_or(false);
                     let mut result = if replace {
                         // No continuation at all: the plugin decided the result
                         // itself, and nothing downstream is entered.
@@ -278,17 +338,19 @@ impl NativePlugin for InterceptPlugin {
                     // A mark the intercept asks the *call's* owner to emit, rather
                     // than one it emits itself: the call lives in the kernel, so
                     // the request has to travel back with the outcome.
-                    Ok(ToolExecutionInterceptOutcome::from(result).with_pending_mark(
-                        PendingMarkSpec::builder()
-                            .name(EXECUTION_PENDING_MARK)
-                            .category(EventCategory::custom())
-                            .category_profile(CategoryProfile {
-                                subtype: Some("fixture.intercept.tool_execution".into()),
-                                ..CategoryProfile::default()
-                            })
-                            .data(json!({ "source": "fixture_intercept_execution" }))
-                            .build(),
-                    ))
+                    Ok(
+                        ToolExecutionInterceptOutcome::from(result).with_pending_mark(
+                            PendingMarkSpec::builder()
+                                .name(EXECUTION_PENDING_MARK)
+                                .category(EventCategory::custom())
+                                .category_profile(CategoryProfile {
+                                    subtype: Some("fixture.intercept.tool_execution".into()),
+                                    ..CategoryProfile::default()
+                                })
+                                .data(json!({ "source": "fixture_intercept_execution" }))
+                                .build(),
+                        ),
+                    )
                 })
             }
         })?;
@@ -336,22 +398,24 @@ impl NativePlugin for InterceptPlugin {
             .unwrap_or(false)
         {
             ctx.register_llm_sanitize_request_guardrail(
-            "fixture_llm_sanitize_request",
-            0,
-            |mut request, context| async move {
-                let resolved = match context.resolve_codec() {
-                    Some(codec) => match codec.decode(&request) {
-                        Ok(annotated) => annotated.model.unwrap_or_else(|| "decoded".to_string()),
-                        Err(error) => format!("codec failed: {error}"),
-                    },
-                    None => "no codec".to_string(),
-                };
-                if let Json::Object(content) = &mut request.content {
-                    content.insert(LLM_SANITIZE_REQUEST_MARKER.into(), json!(true));
-                    content.insert(LLM_SANITIZE_CODEC_MARKER.into(), json!(resolved));
-                }
-                Ok(Some(request))
-            },
+                "fixture_llm_sanitize_request",
+                0,
+                |mut request, context| async move {
+                    let resolved = match context.resolve_codec() {
+                        Some(codec) => match codec.decode(&request) {
+                            Ok(annotated) => {
+                                annotated.model.unwrap_or_else(|| "decoded".to_string())
+                            }
+                            Err(error) => format!("codec failed: {error}"),
+                        },
+                        None => "no codec".to_string(),
+                    };
+                    if let Json::Object(content) = &mut request.content {
+                        content.insert(LLM_SANITIZE_REQUEST_MARKER.into(), json!(true));
+                        content.insert(LLM_SANITIZE_CODEC_MARKER.into(), json!(resolved));
+                    }
+                    Ok(Some(request))
+                },
             )?;
             ctx.register_llm_sanitize_response_guardrail(
                 "fixture_llm_sanitize_response",
@@ -382,19 +446,33 @@ impl NativePlugin for InterceptPlugin {
         {
             register_event_sanitizer_failures(ctx, sanitizer_log(config))?;
         }
-        ctx.register_tool_request_intercept(
-            "fixture_intercept_rewrite",
-            0,
-            false,
-            |_name, mut args| {
-                Box::pin(async move {
-                    if let Json::Object(object) = &mut args {
-                        object.insert(REWRITE_MARKER.into(), json!(true));
-                    }
-                    Ok(args)
-                })
-            },
-        )
+        // The request-side marker is how a test sees the rewrite cross the
+        // boundary — and it is gated, because the mark is what makes it
+        // visible: a strict-schema capability cannot carry extra keys, so a
+        // composition that needs the call's args kept clean (a committed
+        // mutation through the managed chain) activates the component with
+        // "arg_marks": false. The default is on, so every existing caller
+        // keeps its marks.
+        if config
+            .get("arg_marks")
+            .and_then(Json::as_bool)
+            .unwrap_or(true)
+        {
+            ctx.register_tool_request_intercept(
+                "fixture_intercept_rewrite",
+                0,
+                false,
+                |_name, mut args| {
+                    Box::pin(async move {
+                        if let Json::Object(object) = &mut args {
+                            object.insert(REWRITE_MARKER.into(), json!(true));
+                        }
+                        Ok(args)
+                    })
+                },
+            )?;
+        }
+        Ok(())
     }
 }
 

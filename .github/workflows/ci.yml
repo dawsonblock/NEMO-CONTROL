@@ -209,9 +209,11 @@ jobs:
 
       # The distribution must assemble and its component manifest must bind
       # every component it carries: the CLI, the runtime, the plugin host, the
-      # capability schema, the registry envelope, and the transfer manifest.
-      # Debug binaries keep the job fast; the assembly and the binding are the
-      # same either way.
+      # capability schema, the registry envelope, and the transfer manifest —
+      # in a per-target root named nemo-control_<version>_<os>_<arch>, verified
+      # exhaustively (an undeclared file is a failure, and the .sha256 sidecar
+      # must say what the manifest digests to). Debug binaries keep the job
+      # fast; the assembly and the binding are the same either way.
       - name: Assemble the distribution and verify its component manifest
         env:
           NEMO_DIST_PROFILE: debug
@@ -227,7 +229,22 @@ jobs:
       - name: Prove the plugin-host composition
         run: scripts/test-nemo-plugin-host.sh
 
-      # The reference side. These suites — the conformance corpus, the
+      # The joined chain against a live service — the integration RC's core
+      # gate. Each script builds what it needs (the cargo and Go builds above
+      # make that cheap), starts a real `crabbox serve-exec` on its own socket
+      # and store, and exercises the runtime binary end to end: the managed
+      # PURE call through the plugin child's middleware into the
+      # function-hook backend, the synthetic MUTATION committed through
+      # Crabedence with a receipt, replay and identity-conflict, the
+      # fail-closed plugin composition cases, the CRITICAL evidence path,
+      # expired authority, and restart idempotency. These are merge gates, not
+      # skipped environment probes — each is self-contained on SQLite.
+      - name: Prove the joined chain against a live service
+        run: |
+          scripts/test-nemo-runtime-e2e.sh
+          scripts/test-nemo-critical-path.sh
+          scripts/test-nemo-expired-authority.sh
+          scripts/test-nemo-restart-idempotency.sh
       # adversarial cases, framing, snapshot verification, and the schema
       # binding — are what the Rust path is compared against, so they have to
       # actually run.
