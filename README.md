@@ -51,6 +51,28 @@ credential-isolation and dependency-graph checks are in place and verified. The
 transfer plan records what remains, with each item's state and the reason it
 holds that state.
 
+## Running the suites
+
+The NEMO-side and integration suites run from here without ceremony — Rust
+(`cargo test` under `crabedence-V1-fix-integration-integrity/runtimes/nemo-relay`),
+TypeScript (`npm test --prefix nemo`), and the docs gate
+(`scripts/check-docs.sh`).
+
+The Crabedence Go suite is different, and the reason is worth knowing before it
+bites. That CLI derives its **repository root** from
+`git rev-parse --show-toplevel`. In this layout that resolves to *this*
+directory rather than the subtree, so lease-claim identity, Actions hydration,
+and checkpoint source-claim checks compare against the wrong root and fail —
+with messages that name the mismatch, e.g. `lease … is claimed by repo
+…/crabedence-V1-fix-integration-integrity; use --reclaim to claim it for
+…/NEMO-CONTROL`. Nothing is broken in the code; the suite is being run from a
+repository it was not written for.
+
+Run it from a checkout where `crabedence-V1-fix-integration-integrity/` **is**
+the repository root — its own clone. That is what its CI does, and it is why CI
+is unaffected. The same resolution is why a test run can leave a `.crabbox/`
+run record here, which is gitignored.
+
 ## Licensing
 
 The two trees carry different licenses: NEMO is Apache-2.0 and Crabedence is
