@@ -51,6 +51,19 @@ credential-isolation and dependency-graph checks are in place and verified. The
 transfer plan records what remains, with each item's state and the reason it
 holds that state.
 
+## Distribution
+
+`crabedence-V1-fix-integration-integrity/scripts/build-nemo-distribution.sh`
+assembles the binary distribution: `bin/` (crabbox, the NEMO effect runtime,
+the plugin host), `share/` (the capability schema and the registry envelope the
+runtime serves), and `manifests/` (the transfer manifest plus a component
+manifest that binds every component by SHA-256, with its own digest alongside).
+CI assembles it and verifies the binding on every change.
+
+The Crabedence release pipeline does not consume it yet — its archives still
+carry the CLI alone — and that gap is recorded in the transfer plan rather than
+implied away by the heading above.
+
 ## Running the suites
 
 The NEMO-side and integration suites run from here without ceremony — Rust
