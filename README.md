@@ -1,108 +1,231 @@
+<div align="center">
+
 # NEMO-CONTROL
 
-Two runtimes, one distribution: a reasoning/runtime layer (**NEMO**) and the
-authority/effect kernel that decides whether consequential work is authorized
-(**Crabedence**). This repository holds both while they are consolidated into a
-single platform with a deliberately small trust boundary.
+**A reasoning runtime and an authority kernel, consolidated behind one narrow, testable trust boundary.**
 
-## What is here
+[![NEMO](https://img.shields.io/badge/NEMO-0.9.1--rc.4-blueviolet)](NEMO-feat-native-plugin-isolation/RELEASING.md)
+[![Crabedence](https://img.shields.io/badge/Crabedence-0.53.2-blue)](crabedence-V1-fix-integration-integrity/VERSION)
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](crabedence-V1-fix-integration-integrity/go.mod)
+[![Rust](https://img.shields.io/badge/Rust-1.96.1-dea584?logo=rust&logoColor=white)](NEMO-feat-native-plugin-isolation/rust-toolchain.toml)
+[![Node.js](https://img.shields.io/badge/Node.js-24.x-339933?logo=node.js&logoColor=white)](NEMO-feat-native-plugin-isolation)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](NEMO-feat-native-plugin-isolation)
+[![License](https://img.shields.io/badge/license-Apache%202.0%20%C2%B7%20MIT-lightgrey)](#licensing)
 
-| Directory | What it is | Version |
-| --- | --- | --- |
-| [`NEMO-feat-native-plugin-isolation/`](NEMO-feat-native-plugin-isolation) | **NEMO** — a multi-language agent runtime: scope stacks, middleware and interceptors, plugin lifecycle, an isolated native plugin host, LLM wrapping and routing, and Python / Node.js / Go bindings. A derived development fork of [NVIDIA NeMo Relay](https://github.com/NVIDIA/NeMo-Relay) (Apache-2.0). It is **not** an official NVIDIA release — see its [`FORK_PROVENANCE.md`](NEMO-feat-native-plugin-isolation/FORK_PROVENANCE.md). | 0.9.1-rc.4 |
-| [`crabedence-V1-fix-integration-integrity/`](crabedence-V1-fix-integration-integrity) | **Crabedence** (Crabbox) — the trusted execution kernel: capability registry, authority, admission, durable idempotency, the Effect Fabric, evidence and receipts, and UNKNOWN reconciliation. A Go CLI plus an optional Cloudflare Worker or Node.js coordinator (MIT). It carries the vendored NEMO runtime under [`runtimes/nemo-relay/`](crabedence-V1-fix-integration-integrity/runtimes/nemo-relay) and the Rust bridge and effect router under `bridges/`. | 0.53.2 |
+[Components](#components) ·
+[The boundary](#the-boundary) ·
+[Capability surface](#capability-surface) ·
+[Status](#status) ·
+[Distribution](#distribution) ·
+[Development](#development) ·
+[Documentation](#documentation)
+
+</div>
+
+---
+
+Two runtimes, one distribution. **NEMO** is the reasoning/runtime layer —
+scopes, middleware, plugins, routing, observability. **Crabedence** is the
+authority and effect kernel that decides whether consequential work is
+authorized, and how it is committed. This repository holds both while they are
+consolidated into a single platform with a deliberately small trust boundary.
+
+The design premise: an agent runtime should be free to plan, and should be
+powerless to authorize. Everything that can produce an external effect crosses
+one contract — the capability invocation ABI — into a kernel that resolves
+class, authority, route, and evidence independently of whatever asked.
+
+## Components
+
+| Directory | What it is | Version | License |
+| --- | --- | --- | --- |
+| [`NEMO-feat-native-plugin-isolation/`](NEMO-feat-native-plugin-isolation) | **NEMO** — a multi-language managed execution runtime: immutable capability registration, scope stacks, middleware/interceptors, plugin lifecycle, an isolated native plugin host, LLM wrapping and routing, typed events, and Rust / Python / Node.js / Go bindings. A derived development fork of [NVIDIA NeMo Relay](https://github.com/NVIDIA/NeMo-Relay) — **not** an official NVIDIA release; see [`FORK_PROVENANCE.md`](NEMO-feat-native-plugin-isolation/FORK_PROVENANCE.md). | `0.9.1-rc.4` | Apache-2.0 |
+| [`crabedence-V1-fix-integration-integrity/`](crabedence-V1-fix-integration-integrity) | **Crabedence** (Crabbox) — the trusted execution kernel and remote-execution control plane: capability registry, grant-scoped authority, admission, durable idempotency, the Effect Fabric, signed evidence, UNKNOWN reconciliation, plus a Go CLI, ~47 remote-execution providers, and an optional Cloudflare Worker or Node.js/PostgreSQL coordinator. Carries the vendored NEMO runtime under [`runtimes/nemo-relay/`](crabedence-V1-fix-integration-integrity/runtimes/nemo-relay) and the Rust bridge/effect router under `bridges/`. | `0.53.2` | MIT |
 
 ## The boundary
 
-The two are **not** merged, and the split is deliberate:
+The two are **not** merged, and the split is the point:
 
 ```text
 NEMO decides how to run, reason, and route.
-Crabedence decides whether consequential work is authorized and how it is committed.
+Crabedence decides whether consequential work is authorized and how it commits.
 ```
 
-One narrow contract crosses between them — the capability invocation ABI. The
-request on that wire carries a capability, its arguments, authority material, an
-idempotency key, and a deadline. It never carries execution route, provider
-selection, assurance profile, approval requirements, retry policy, or receipt
-requirements: those are resolved by Crabedence's registry, and a planner that
-supplies them is refused rather than obeyed.
+```text
+┌──────────────────────────────┐         ┌──────────────────────────────┐
+│            NEMO              │         │          CRABEDENCE          │
+│                              │         │                              │
+│  planner · scopes · plugins  │         │  capability registry         │
+│  middleware · intercepts     │         │  authority verification      │
+│  LLM routing · telemetry     │         │  admission + schema checks   │
+│                              │  ABI    │  Effect Fabric (durable      │
+│  capability invocation ──────┼────────▶│    idempotent execution)     │
+│  (capability, args,          │  only   │  evidence + signed receipts  │
+│   principal, grant_id,       │         │  UNKNOWN reconciliation      │
+│   idempotency_key, deadline) │         │  provider dispatch           │
+└──────────────────────────────┘         └──────────────────────────────┘
+```
 
-The invariant that follows:
+One narrow contract crosses between them. The request on that wire carries a
+capability, its arguments, authority material, an idempotency key, and a
+deadline. It **never** carries execution route, provider selection, assurance
+profile, approval requirements, retry policy, or receipt requirements — those
+are resolved by Crabedence's registry, and a planner that supplies them is
+refused rather than obeyed.
 
-> No NEMO component can independently produce a MUTATION or CRITICAL external
-> effect.
+> **The invariant:** no NEMO component can independently produce a `MUTATION`
+> or `CRITICAL` external effect. Asserted by tests in CI, not only documented.
 
-It is asserted by tests in CI, not only documented.
+## Capability surface
 
-## Where to read
+Crabedence's built-in registry currently pins eleven capabilities across the
+route lattice — `LOCAL` (pure), `DIRECT` (bounded reads), and `CRABEDENCE`
+(durable mutations):
 
-- [`docs/plan/nemo-runtime-transfer.md`](crabedence-V1-fix-integration-integrity/docs/plan/nemo-runtime-transfer.md) — the transfer plan, the findings recorded while executing it, and the state of each release blocker.
-- [`docs/adr/ADR-003-nemo-runtime-transfer-boundary.md`](crabedence-V1-fix-integration-integrity/docs/adr/ADR-003-nemo-runtime-transfer-boundary.md) — the trust-boundary decision and the ownership matrix.
-- [`docs/spec/capability-invocation-abi.md`](crabedence-V1-fix-integration-integrity/docs/spec/capability-invocation-abi.md) — the frozen wire contract, with its strict parsing rules.
-- [`crabedence-V1-fix-integration-integrity/README.md`](crabedence-V1-fix-integration-integrity/README.md) — the Crabedence project README: the Effect Fabric, the execution kernel, providers, and operations.
-- [`NEMO-feat-native-plugin-isolation/README.md`](NEMO-feat-native-plugin-isolation/README.md) — the NEMO project README.
+| Route | Capabilities |
+| --- | --- |
+| **LOCAL** | `system.echo` |
+| **DIRECT** | `system.info` · `github.issue.get` · `github.issue.list` |
+| **CRABEDENCE** | `test.counter.increment` · `github.issue.create` · `github.issue.comment` · `github.issue.close` · `github.issue.update` · `github.pr.create` · `github.pr.merge` |
+| **CRITICAL** | `qualification.critical.commit` — release-gate commits, registered only when `CRABEDENCE_QUAL_PROVIDER_URL` wires the qualification provider |
+
+All GitHub mutations are grant-required (`github.issue` / `github.pr`
+authority policies) with `repo` resource constraints — `github.pr.create`
+adds a `base`-branch constraint. Mutations that can embed a marker recover by
+scanning for it; mutations that can't (state PATCHes, merges) recover by
+desired-state observation: the locator persists SHA-256 digests of the
+canonical fields and the resolver commits only when every digest matches the
+observed object. Interleaved edits and non-application are indistinguishable,
+so ambiguity resolves `UNKNOWN` — never a fabricated `COMMITTED`, never a
+blind retry.
+
+<details>
+<summary><strong>Execution classes and the Effect Fabric contract</strong></summary>
+
+- **PURE** — no external effect; executes locally.
+- **READ** — observational; bounded results over the DIRECT route.
+- **MUTATION** — exactly-once external effect; requires an idempotency key and
+  durable storage.
+- **CRITICAL** — release-gate class; terminal states require Ed25519-signed
+  evidence (`COMPLETED` on success, `NO_EFFECT` on failure).
+
+The frozen state machine (`PREPARED → EXECUTING → IN_FLIGHT →
+COMMITTED | FAILED | UNKNOWN`) is implemented identically by the SQLite and
+PostgreSQL stores and pinned by
+[ADR-002](crabedence-V1-fix-integration-integrity/docs/adr/ADR-002-durable-effect-r13-contract-freeze.md):
+`IN_FLIGHT` means the effect *may* have occurred; `UNKNOWN` can never
+auto-redispatch and is resolved only by independent evidence; terminal states
+cannot regress; and every mutation is fenced by lease token, generation,
+state CAS, and cluster epoch.
+
+</details>
 
 ## Status
 
 Consolidation in progress. The vendored NEMO runtime, the Rust bridge, the
 effect router, the shared invocation and outcome conformance corpora, and the
-credential-isolation and dependency-graph checks are in place and verified. The
-transfer plan records what remains, with each item's state and the reason it
-holds that state.
-
-The distinction that matters below is between proving architectural
-prerequisites and proving the assembled system. "Partial" entries are the
-latter.
+credential-isolation and dependency-graph checks are in place and verified.
+"Partial" entries below are where architectural prerequisites are proven but
+the assembled system is not yet.
 
 | Workstream | State |
 | --- | --- |
-| Source integrity (provenance, declared identity, CI gate) | Closed |
-| Binary declaration and build (manifest-declared binaries compiled in CI) | Closed |
-| Authority dependency guards (plugin path cannot reach the authority) | Closed — static invariant; runtime containment still requires composition testing |
-| `DIRECT` policy | Closed — deliberately refused in the first release |
-| Distribution assembler and component binding | Closed |
-| Distribution release adoption (GoReleaser emits the assembled distribution) | Open |
-| Plugin-host composition | Partial — safety prerequisites done, actual composition open |
-| Installed-artifact qualification | Open |
-| Windows integration | Deferred (scoped out; see the platform decision) |
+| Source integrity (provenance, declared identity, CI gate) | ✅ Closed |
+| Binary declaration and build (manifest-declared binaries compiled in CI) | ✅ Closed |
+| Authority dependency guards (plugin path cannot reach the authority) | ✅ Closed — static invariant; runtime containment still requires composition testing |
+| `DIRECT` policy | ✅ Closed — deliberately refused in the first release |
+| Distribution assembler and component binding | ✅ Closed |
+| Distribution release adoption (GoReleaser emits the assembled distribution) | 🔲 Open |
+| Plugin-host composition | ◐ Partial — safety prerequisites done, actual composition open |
+| Installed-artifact qualification | 🔲 Open |
+| Windows integration | ⏸ Deferred (scoped out; see the platform decision) |
 
 ## Distribution
 
 `crabedence-V1-fix-integration-integrity/scripts/build-nemo-distribution.sh`
-assembles the binary distribution: `bin/` (crabbox, the NEMO effect runtime,
-the plugin host), `share/` (the capability schema and the registry envelope the
-runtime serves), and `manifests/` (the transfer manifest plus a component
-manifest that binds every component by SHA-256, with its own digest alongside).
-CI assembles it and verifies the binding on every change.
+assembles the binary distribution:
 
-The Crabedence release pipeline does not consume it yet — its archives still
-carry the CLI alone — and that gap is recorded in the transfer plan rather than
-implied away by the heading above.
+```text
+dist/
+├── bin/        crabbox · nemo-effect-runtime · nemo-plugin-host
+├── share/      capability schema + the registry envelope the runtime serves
+└── manifests/  transfer manifest + component manifest binding every
+                component by SHA-256 (with its own digest alongside)
+```
 
-## Running the suites
+CI assembles the distribution and verifies the binding on every change. The
+Crabedence release pipeline does not consume it yet — its archives still
+carry the CLI alone — and that gap is recorded in the transfer plan rather
+than implied away.
 
-The NEMO-side and integration suites run from here without ceremony — Rust
-(`cargo test` under `crabedence-V1-fix-integration-integrity/runtimes/nemo-relay`),
-TypeScript (`npm test --prefix nemo`), and the docs gate
-(`scripts/check-docs.sh`).
+## Development
 
-The Crabedence Go suite is different, and the reason is worth knowing before it
-bites. That CLI derives its **repository root** from
-`git rev-parse --show-toplevel`. In this layout that resolves to *this*
-directory rather than the subtree, so lease-claim identity, Actions hydration,
-and checkpoint source-claim checks compare against the wrong root and fail —
-with messages that name the mismatch, e.g. `lease … is claimed by repo
-…/crabedence-V1-fix-integration-integrity; use --reclaim to claim it for
-…/NEMO-CONTROL`. Nothing is broken in the code; the suite is being run from a
-repository it was not written for.
+### Layout
 
-Run it from a checkout where `crabedence-V1-fix-integration-integrity/` **is**
-the repository root — its own clone. That is what its CI does, and it is why CI
-is unaffected. The same resolution is why a test run can leave a `.crabbox/`
-run record here, which is gitignored.
+```text
+NEMO-CONTROL/
+├── NEMO-feat-native-plugin-isolation/   # NEMO runtime (Rust core + bindings)
+│   ├── crates/                          # core, adaptive, authority, executor,
+│   │                                    #   isolation, ledger, plugin-host, …
+│   ├── python/ · go/ · crates/node/     # language bindings
+│   └── FORK_PROVENANCE.md               # upstream lineage and divergence
+└── crabedence-V1-fix-integration-integrity/   # Crabedence / Crabbox
+    ├── cmd/crabbox                      # CLI entrypoint
+    ├── internal/                        # execution, authority, capability,
+    │                                    #   idempotency, providers, cli
+    ├── runtimes/nemo-relay/             # vendored NEMO + Rust bridges
+    ├── worker/                          # Cloudflare Worker coordinator
+    ├── nemo/                            # TypeScript ABI adapter + client
+    └── docs/                            # specs, ADRs, provider guides
+```
+
+### Running the suites
+
+The NEMO-side and integration suites run from this root directly:
+
+```sh
+# Rust runtime + bridges
+cargo test --manifest-path crabedence-V1-fix-integration-integrity/runtimes/nemo-relay/Cargo.toml
+
+# TypeScript ABI adapter
+npm test --prefix crabedence-V1-fix-integration-integrity/nemo
+
+# Docs gate
+crabedence-V1-fix-integration-integrity/scripts/check-docs.sh
+```
+
+> **Note — the Crabedence Go suite is different.** The `crabbox` CLI derives
+> its repository root from `git rev-parse --show-toplevel`. In this layout
+> that resolves to `NEMO-CONTROL/` rather than the subtree, so lease-claim
+> identity, Actions hydration, and checkpoint source-claim checks compare
+> against the wrong root and fail with messages that name the mismatch.
+> Nothing is broken — the suite is being run from a repository it was not
+> written for. Run it from a checkout where
+> `crabedence-V1-fix-integration-integrity/` **is** the repository root (its
+> own clone). That is what its CI does. A test run here can leave a
+> `.crabbox/` run record, which is gitignored.
+
+From a standalone Crabedence checkout:
+
+```sh
+go build -trimpath -o bin/crabbox ./cmd/crabbox
+go test -race -timeout=20m ./...
+```
+
+## Documentation
+
+| Document | Contents |
+| --- | --- |
+| [`docs/plan/nemo-runtime-transfer.md`](crabedence-V1-fix-integration-integrity/docs/plan/nemo-runtime-transfer.md) | The transfer plan, findings recorded while executing it, and the state of each release blocker |
+| [`docs/adr/ADR-003-nemo-runtime-transfer-boundary.md`](crabedence-V1-fix-integration-integrity/docs/adr/ADR-003-nemo-runtime-transfer-boundary.md) | The trust-boundary decision and the ownership matrix |
+| [`docs/spec/capability-invocation-abi.md`](crabedence-V1-fix-integration-integrity/docs/spec/capability-invocation-abi.md) | The frozen wire contract, with its strict parsing rules |
+| [`docs/spec/durable-execution-contract.md`](crabedence-V1-fix-integration-integrity/docs/spec/durable-execution-contract.md) | The Effect Fabric's durable execution contract |
+| [`docs/architecture/`](crabedence-V1-fix-integration-integrity/docs/architecture) | Execution kernel, authority model, capability registry semantics, reconciliation and recovery |
+| [`crabedence-V1-fix-integration-integrity/README.md`](crabedence-V1-fix-integration-integrity/README.md) | The Crabedence project README: Effect Fabric, kernel, providers, operations |
+| [`NEMO-feat-native-plugin-isolation/README.md`](NEMO-feat-native-plugin-isolation/README.md) | The NEMO project README: runtime model, bindings, security posture |
 
 ## Licensing
 
-The two trees carry different licenses: NEMO is Apache-2.0 and Crabedence is
-MIT. Each directory's `LICENSE` is authoritative for that subtree.
+The two trees carry different licenses: **NEMO is Apache-2.0** and
+**Crabedence is MIT**. Each directory's `LICENSE` file is authoritative for
+that subtree.
