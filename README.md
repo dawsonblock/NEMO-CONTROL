@@ -144,7 +144,7 @@ the assembled system is not yet.
 | `DIRECT` policy | ✅ Closed — implemented: `system.info`, `github.issue.get`, and `github.issue.list` dispatch over the socket on the registry-selected `DIRECT` route with bounded reads and no durable receipt (proven by `scripts/test-nemo-runtime-e2e.sh`); the wire cannot request a route |
 | Distribution assembler and component binding | ✅ Closed |
 | Distribution release adoption (tag-time per-target assembly, qualification, signed `SHA256SUMS`) | ✅ Closed — `.github/workflows/nemo-distribution.yml`; tag builds fail closed when `NEMO_RELEASE_SSH_SIGNING_KEY` is absent |
-| NEMO artifact publication through the proof-gated release contract | 🔲 Open — the qualified tarballs are not yet folded into the `publish-release.sh` provenance manifest |
+| NEMO artifact publication through the proof-gated release contract | ✅ Closed — the family publishes under its own signed `nemo-vX.Y.Z` tag via `scripts/publish-nemo-release.sh`: signed-tag, ruleset, distribution-run, signed-`SHA256SUMS`, and per-archive attestation binding all verified before the family release publishes (see "NEMO Distribution Family" in `docs/RELEASING.md`); the kernel `publish-release.sh` provenance contract stays scoped to `crabbox_*` |
 | Plugin-host composition | ✅ Closed — real host child, mediated managed chain, fail-closed cases proven in CI; `restricted-macos` and `restricted-linux` confinement policies ship (Linux positive confinement is a non-skippable lane) |
 | Installed-artifact qualification | ✅ Closed — `scripts/test-nemo-installed-distribution.sh` qualifies each packed archive on its native runner and emits a bound attestation |
 | Windows integration | ⏸ Deferred (scoped out; see the platform decision) |
@@ -166,11 +166,16 @@ CI assembles the distribution and verifies the binding on every change, and
 `.github/workflows/nemo-distribution.yml` builds, signs, and qualifies the
 four per-target roots at tag time — a tag build fails closed when
 `NEMO_RELEASE_SSH_SIGNING_KEY` is absent, while manual development runs may
-still produce unsigned artifacts. Publication remains the open step: the
-qualified `nemo-control_*` tarballs are not yet bound into the proof-gated
-`publish-release.sh` provenance contract, so the archive family a `v*` tag
-produces is built and qualified but not yet a published release subject.
-That gap is recorded in the transfer plan rather than implied away.
+still produce unsigned artifacts. Publication is the separate bound-family
+operation: the qualified `nemo-control_*` tarballs ship under their own
+signed `nemo-vX.Y.Z` tag with a `release/records/nemo-vX.Y.Z.json`
+authorization, published by `scripts/publish-nemo-release.sh` — it
+re-verifies the signed family tag, the `nemo-v*` tag ruleset, the
+distribution run, the signed checksum manifest, and every
+attestation-to-archive binding before creating and publishing the family
+release. The kernel `publish-release.sh` provenance contract deliberately
+stays scoped to `crabbox_*`: two families, two proof chains, no shared
+asset list.
 
 ## Development
 
