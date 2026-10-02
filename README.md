@@ -39,8 +39,16 @@ class, authority, route, and evidence independently of whatever asked.
 
 | Directory | What it is | Version | License |
 | --- | --- | --- | --- |
-| [`NEMO-feat-native-plugin-isolation/`](NEMO-feat-native-plugin-isolation) | **NEMO** — a multi-language managed execution runtime: immutable capability registration, scope stacks, middleware/interceptors, plugin lifecycle, an isolated native plugin host, LLM wrapping and routing, typed events, and Rust / Python / Node.js / Go bindings. A derived development fork of [NVIDIA NeMo Relay](https://github.com/NVIDIA/NeMo-Relay) — **not** an official NVIDIA release; see [`FORK_PROVENANCE.md`](NEMO-feat-native-plugin-isolation/FORK_PROVENANCE.md). | `0.9.1-rc.4` | Apache-2.0 |
-| [`crabedence-V1-fix-integration-integrity/`](crabedence-V1-fix-integration-integrity) | **Crabedence** (Crabbox) — the trusted execution kernel and remote-execution control plane: capability registry, grant-scoped authority, admission, durable idempotency, the Effect Fabric, signed evidence, UNKNOWN reconciliation, plus a Go CLI, ~47 remote-execution providers, and an optional Cloudflare Worker or Node.js/PostgreSQL coordinator. Carries the vendored NEMO runtime under [`runtimes/nemo-relay/`](crabedence-V1-fix-integration-integrity/runtimes/nemo-relay) and the Rust bridge/effect router under `bridges/`. | `0.53.2` | MIT |
+| [`NEMO-feat-native-plugin-isolation/`](NEMO-feat-native-plugin-isolation) | **NEMO** — a multi-language managed execution runtime: immutable capability registration, scope stacks, middleware/interceptors, plugin lifecycle, an isolated native plugin host, LLM wrapping and routing, typed events, and Rust / Python / Node.js / Go bindings. A derived development fork of [NVIDIA NeMo Relay](https://github.com/NVIDIA/NeMo-Relay) — **not** an official NVIDIA release; see [`FORK_PROVENANCE.md`](NEMO-feat-native-plugin-isolation/FORK_PROVENANCE.md). **Frozen reference, not a development target** — see below. | `0.9.1-rc.4` | Apache-2.0 |
+| [`crabedence-V1-fix-integration-integrity/`](crabedence-V1-fix-integration-integrity) | **Crabedence** (Crabbox) — the trusted execution kernel and remote-execution control plane: capability registry, grant-scoped authority, admission, durable idempotency, the Effect Fabric, signed evidence, UNKNOWN reconciliation, plus a Go CLI, ~47 remote-execution providers, and an optional Cloudflare Worker or Node.js/PostgreSQL coordinator. Carries the **canonical NEMO source** under [`runtimes/nemo-relay/`](crabedence-V1-fix-integration-integrity/runtimes/nemo-relay) and the Rust bridge/effect router under `bridges/`. | `0.53.2` | MIT |
+
+> **One NEMO source.** The NEMO code that builds, ships, and is qualified lives
+> in `crabedence-V1-fix-integration-integrity/runtimes/nemo-relay/` — every fix
+> and feature goes there. The outer `NEMO-feat-native-plugin-isolation/` tree
+> is a frozen copy kept for provenance: it is the baseline the transfer
+> manifest's delta (24 modifications, 4 added paths) is computed against, and
+> nothing in the distribution compiles from it. A change made only to the
+> outer tree does not exist as far as the product is concerned.
 
 ## The boundary
 
@@ -132,12 +140,13 @@ the assembled system is not yet.
 | --- | --- |
 | Source integrity (provenance, declared identity, CI gate) | ✅ Closed |
 | Binary declaration and build (manifest-declared binaries compiled in CI) | ✅ Closed |
-| Authority dependency guards (plugin path cannot reach the authority) | ✅ Closed — static invariant; runtime containment still requires composition testing |
-| `DIRECT` policy | ✅ Closed — deliberately refused in the first release |
+| Authority dependency guards (plugin path cannot reach the authority) | ✅ Closed |
+| `DIRECT` policy | ✅ Closed — implemented: `system.info`, `github.issue.get`, and `github.issue.list` dispatch over the socket on the registry-selected `DIRECT` route with bounded reads and no durable receipt (proven by `scripts/test-nemo-runtime-e2e.sh`); the wire cannot request a route |
 | Distribution assembler and component binding | ✅ Closed |
-| Distribution release adoption (GoReleaser emits the assembled distribution) | 🔲 Open |
-| Plugin-host composition | ◐ Partial — safety prerequisites done, actual composition open |
-| Installed-artifact qualification | 🔲 Open |
+| Distribution release adoption (tag-time per-target assembly, qualification, signed `SHA256SUMS`) | ✅ Closed — `.github/workflows/nemo-distribution.yml`; tag builds fail closed when `NEMO_RELEASE_SSH_SIGNING_KEY` is absent |
+| NEMO artifact publication through the proof-gated release contract | 🔲 Open — the qualified tarballs are not yet folded into the `publish-release.sh` provenance manifest |
+| Plugin-host composition | ✅ Closed — real host child, mediated managed chain, fail-closed cases proven in CI; `restricted-macos` and `restricted-linux` confinement policies ship (Linux positive confinement is a non-skippable lane) |
+| Installed-artifact qualification | ✅ Closed — `scripts/test-nemo-installed-distribution.sh` qualifies each packed archive on its native runner and emits a bound attestation |
 | Windows integration | ⏸ Deferred (scoped out; see the platform decision) |
 
 ## Distribution
@@ -153,10 +162,15 @@ dist/
                 component by SHA-256 (with its own digest alongside)
 ```
 
-CI assembles the distribution and verifies the binding on every change. The
-Crabedence release pipeline does not consume it yet — its archives still
-carry the CLI alone — and that gap is recorded in the transfer plan rather
-than implied away.
+CI assembles the distribution and verifies the binding on every change, and
+`.github/workflows/nemo-distribution.yml` builds, signs, and qualifies the
+four per-target roots at tag time — a tag build fails closed when
+`NEMO_RELEASE_SSH_SIGNING_KEY` is absent, while manual development runs may
+still produce unsigned artifacts. Publication remains the open step: the
+qualified `nemo-control_*` tarballs are not yet bound into the proof-gated
+`publish-release.sh` provenance contract, so the archive family a `v*` tag
+produces is built and qualified but not yet a published release subject.
+That gap is recorded in the transfer plan rather than implied away.
 
 ## Development
 
@@ -164,7 +178,7 @@ than implied away.
 
 ```text
 NEMO-CONTROL/
-├── NEMO-feat-native-plugin-isolation/   # NEMO runtime (Rust core + bindings)
+├── NEMO-feat-native-plugin-isolation/   # frozen NEMO reference (provenance only)
 │   ├── crates/                          # core, adaptive, authority, executor,
 │   │                                    #   isolation, ledger, plugin-host, …
 │   ├── python/ · go/ · crates/node/     # language bindings
@@ -173,7 +187,7 @@ NEMO-CONTROL/
     ├── cmd/crabbox                      # CLI entrypoint
     ├── internal/                        # execution, authority, capability,
     │                                    #   idempotency, providers, cli
-    ├── runtimes/nemo-relay/             # vendored NEMO + Rust bridges
+    ├── runtimes/nemo-relay/             # canonical NEMO source + Rust bridges
     ├── worker/                          # Cloudflare Worker coordinator
     ├── nemo/                            # TypeScript ABI adapter + client
     └── docs/                            # specs, ADRs, provider guides

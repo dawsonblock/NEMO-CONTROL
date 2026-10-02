@@ -23,6 +23,12 @@ SPDX-License-Identifier: Apache-2.0
 
 </div>
 
+> **Frozen reference — do not develop here.** In the NEMO-CONTROL
+> distribution this tree is the provenance baseline only: the canonical NEMO
+> source — the one that builds, ships, and is qualified — is
+> `crabedence-V1-fix-integration-integrity/runtimes/nemo-relay/`. Changes
+> belong there; an edit made only to this tree reaches nothing.
+
 > **Development status.** `0.9.1-rc.4` is a hardening development line. The
 > checked-in qualification record is provenance-bound but reports
 > `INCONCLUSIVE` with `DEV` promotion. It is not a production certificate.
