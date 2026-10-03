@@ -22,24 +22,37 @@ source commit → capability registry digest → shipped runtime digest
 
 | Identity | Value at last verification | How it is produced |
 | --- | --- | --- |
+| Provenance format | 2 | `provenance_format_version` in the transfer manifest; `runtimes/nemo-provenance-policy.json` defines the canonical stream |
 | Capability registry SHA-256 | `3c32a9d2f51f9c1d0068dfaad04f2499ce7baade91ccafa42fa233c1700db3e9` | `crabbox` capability snapshot; bound into the runtime-identity file at serve time |
-| Shipped runtime SHA-256 | `1bcf5f9dac40646db3e6a3e997637d8d3d683cb178c5fe7717f42da1e057055c` (1466 files) | `cmd/nemo-runtime-digest`; declared in `runtimes/nemo-transfer-manifest.json` |
-| Source runtime SHA-256 | `5c9f32e82c317eba918936a4e90d9b35cd18e4ee6dcd935397fea3fdb49f9526` (1438 files) | Same digest definition over `NEMO-feat-native-plugin-isolation/` |
-| Declared delta | 66 modified / 29 added / 1 removed | `local_modifications`, `added_paths`, `removed_paths` in the manifest; must equal the computed delta exactly |
+| Shipped runtime SHA-256 | `060719d750238e7de19527aca256262e4568dea09d311dfde08855dfdf97cba9` (1465 files, 10 symlinks) | `cmd/nemo-runtime-digest` format-2 canonical stream; declared in `runtimes/nemo-transfer-manifest.json` |
+| Source runtime SHA-256 | `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957` (1438 files, 10 symlinks) | Same format-2 stream over `NEMO-feat-native-plugin-isolation/` |
+| Declared delta | 78 modified / 9 declared added entries covering 28 files / 1 removed / 0 symlink deltas / 0 retyped / 0 mode changes | `delta` object in the manifest; must equal the computed delta class-for-class |
+| Provenance policy SHA-256 | `0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1` | Bound into the manifest as `policy.path` + `policy.sha256`; the enumeration rules cannot drift silently |
 | Crabedence version | 0.53.2 | `VERSION` |
 | NEMO runtime version | 0.9.1-rc.4 | `runtimes/nemo-relay/Cargo.toml` `[workspace.package]` |
 | Runtime configuration identity | computed at serve time | `{release, registry_sha256, effect_store, enabled_adapters}` — see `internal/execution/runtime_identity.go` |
 
-The digest definition (all verifiers agree byte-for-byte): SHA-256 over
-the sorted records `sha256(file-content) + two spaces + ./path + \n`
-of every regular file below the tree, with `target/`, `.git/`,
-`node_modules/`, `.venv/`, `.uv-cache/`, `__pycache__/` pruned.
-Symlinks are not part of the file digest; they are covered by the
-delta walk and by the component manifest's exhaustive check.
+The format-2 digest definition (Go and Python verifiers agree
+byte-for-byte): SHA-256 over the canonical record stream of every
+provenance object under the tree, in byte-wise `./`-prefixed path
+order:
+
+```text
+FILE<TAB>./path<TAB>sha256(content)<TAB>x|-      # regular file + exec bit
+SYMLINK<TAB>./path<TAB>readlink-target            # symlinks are bound, not skipped
+```
+
+The enumeration rules — excluded directory names/suffixes, excluded
+file names/suffixes, and `generated_paths` (deterministic build outputs
+such as the `plugin_worker_pb2*.py` bindings) — live in
+`runtimes/nemo-provenance-policy.json`, bound into the manifest by
+SHA-256. Anything in the tree that is neither excluded nor a declared
+delta object fails verification; generated files can be present on disk
+without perturbing identity and can never be declared as source.
 
 ## Verifying the transfer
 
-Three equivalent verifiers, in decreasing dependency order:
+Two verifiers, in decreasing dependency order:
 
 ```sh
 # Go tool — the CI gate (scripts/check-nemo-transfer-manifest.sh)
@@ -47,25 +60,32 @@ go run ./cmd/nemo-runtime-digest -manifest runtimes/nemo-transfer-manifest.json
 
 # Python — consumer-side, stdlib only, same definition and semantics
 python3 scripts/verify-nemo-transfer.py
-
-# Shell — the bare digest only, no inventory checks
-cd runtimes/nemo-relay && find . -type f -not -path './target/*' -print0 \
-  | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256
 ```
 
-The full verify checks, in order: computed identity (digest, file
-count, version, exclusion set), inventory (declared workspace members
-are members; declared paths exist), declared binaries (source exists
-inside the tree, the package declares it, features exist), the
-generated blocks in `runtimes/nemo-relay/TRANSFER-PROVENANCE.md`, and —
+Both take a strict mode for transfer-provenance qualification —
+`-require-source` / `--require-source` — under which a missing frozen
+reference is a hard failure rather than a reported note. Official
+release admission runs the strict mode. The manifest can demand the
+same with `source.required: true`.
+
+The full verify checks, in order: the bound policy hash; computed
+identity (format-2 digest, file count, symlink count, version);
+inventory (declared workspace members are members; declared paths exist
+and none name a generated artifact); declared binaries (source exists
+inside the tree, the package declares it, features exist); the
+generated blocks in `runtimes/nemo-relay/TRANSFER-PROVENANCE.md`; and —
 when `NEMO-feat-native-plugin-isolation/` is present — the source
-identity and the complete declared delta.
+identity and the complete typed delta: modified/added/removed files,
+added/removed/retargeted symlinks, retyped paths, and mode changes.
 
 Regenerate the declaration after a deliberate tree change:
 
 ```sh
 go run ./cmd/nemo-runtime-digest -manifest runtimes/nemo-transfer-manifest.json -update
 ```
+
+Running the regeneration twice produces a zero-diff second run; running
+verification twice produces identical results and no modified files.
 
 ## Baseline findings and resolution
 
@@ -83,14 +103,44 @@ computed 1484 / `955a2614…`. Root cause was twofold:
 
 Resolution in phase 7: the artifacts were removed (they are regenerable
 local state), and the manifest was regenerated so the declaration again
-equals the actual delta. The gate now passes with the real transfer
-delta — 66 modifications, 29 added paths (10 declarations), 1 removal
+equals the actual delta. The gate then passed with the real transfer
+delta — 66 modifications, 29 added paths, 1 removal
 (`crates/core/src/kernel.rs`, moved to `crates/effect-runtime/`).
+
+The release-integrity repair cycle subsequently superseded the format-1
+identity: the v1 digest was regular-files-only, counted two generated
+protobuf bindings as source additions, and left symlinks outside the
+identity entirely. Format 2 binds files, symlinks, and executable bits
+under a policy hash; the pb2 bindings are generated artifacts that can
+no longer perturb canonical identity or ride into the delta. The
+format-1 shipped digest `1bcf5f9d…` (1466 files) is retired in favor
+of `060719d7…` (1465 files, 10 symlinks).
+
+
+## Status vocabulary
+
+Words that name release state mean exactly one thing here. Nothing else a
+check, log, or report prints is a status claim.
+
+- **IMPLEMENTED** — code exists. Says nothing about whether it ran.
+- **TESTED** — the relevant test passed in the environment it ran in.
+- **QUALIFIED** — every required qualification gate passed for the exact
+  artifact the gates ran on. A gate that did not run is `NOT_RUN`, never
+  PASS.
+- **SIGNED** — the exact qualified artifact carries a valid release
+  signature (Developer ID Application for macOS artifacts, the allowed
+  signers list otherwise).
+- **PUBLISHED** — the exact qualified, signed artifact was published; the
+  bytes a consumer fetches are the bytes the evidence describes.
+
+`ready`, `verified`, and `done` are deliberately not status words: a tree
+that is IMPLEMENTED and TESTED is not QUALIFIED, and a QUALIFIED artifact
+is neither SIGNED nor PUBLISHED.
 
 ## Qualification evidence (phase 8)
 
-The following gates were executed against this tree; results bind the
-shipped digest above (`1bcf5f9d…`):
+The following gates were executed against this tree; results bound the
+format-1 shipped digest (`1bcf5f9d…`) current at that capture:
 
 | Gate | Result |
 | --- | --- |

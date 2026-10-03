@@ -46,7 +46,9 @@ class, authority, route, and evidence independently of whatever asked.
 > in `crabedence-V1-fix-integration-integrity/runtimes/nemo-relay/` — every fix
 > and feature goes there. The outer `NEMO-feat-native-plugin-isolation/` tree
 > is a frozen copy kept for provenance: it is the baseline the transfer
-> manifest's delta (24 modifications, 4 added paths) is computed against, and
+> manifest's typed delta (78 modified / 28 added / 1 removed files; see
+> `runtimes/nemo-transfer-manifest.json` and `PROVENANCE.md`) is computed
+> against, and
 > nothing in the distribution compiles from it. A change made only to the
 > outer tree does not exist as far as the product is concerned.
 
