@@ -24,9 +24,9 @@ source commit → capability registry digest → shipped runtime digest
 | --- | --- | --- |
 | Provenance format | 2 | `provenance_format_version` in the transfer manifest; `runtimes/nemo-provenance-policy.json` defines the canonical stream |
 | Capability registry SHA-256 | `3c32a9d2f51f9c1d0068dfaad04f2499ce7baade91ccafa42fa233c1700db3e9` | `crabbox` capability snapshot; bound into the runtime-identity file at serve time |
-| Shipped runtime SHA-256 | `060719d750238e7de19527aca256262e4568dea09d311dfde08855dfdf97cba9` (1465 files, 10 symlinks) | `cmd/nemo-runtime-digest` format-2 canonical stream; declared in `runtimes/nemo-transfer-manifest.json` |
+| Shipped runtime SHA-256 | `e1279ef20acc448ac52a6ac2332c81f71e278b2bf71579160ffc953d0f9567a0` (1466 files, 10 symlinks) | `cmd/nemo-runtime-digest` format-2 canonical stream; declared in `runtimes/nemo-transfer-manifest.json` |
 | Source runtime SHA-256 | `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957` (1438 files, 10 symlinks) | Same format-2 stream over `NEMO-feat-native-plugin-isolation/` |
-| Declared delta | 78 modified / 9 declared added entries covering 28 files / 1 removed / 0 symlink deltas / 0 retyped / 0 mode changes | `delta` object in the manifest; must equal the computed delta class-for-class |
+| Declared delta | 78 modified / 9 declared added entries covering 29 files / 1 removed / 0 symlink deltas / 0 retyped / 0 mode changes | `delta` object in the manifest; must equal the computed delta class-for-class |
 | Provenance policy SHA-256 | `0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1` | Bound into the manifest as `policy.path` + `policy.sha256`; the enumeration rules cannot drift silently |
 | Crabedence version | 0.53.2 | `VERSION` |
 | NEMO runtime version | 0.9.1-rc.4 | `runtimes/nemo-relay/Cargo.toml` `[workspace.package]` |
@@ -113,8 +113,11 @@ protobuf bindings as source additions, and left symlinks outside the
 identity entirely. Format 2 binds files, symlinks, and executable bits
 under a policy hash; the pb2 bindings are generated artifacts that can
 no longer perturb canonical identity or ride into the delta. The
-format-1 shipped digest `1bcf5f9d…` (1466 files) is retired in favor
-of `060719d7…` (1465 files, 10 symlinks).
+format-1 shipped digest `1bcf5f9d…` (1466 files) is retired; the current
+format-2 identity is `e1279ef2…` (1466 files, 10 symlinks) — the digest moves
+when the vendored runtime's declared content changes (a documentation split
+added `security/PLUGIN-ISOLATION-HISTORY.md`), and every such move is a
+manifest regeneration recorded here rather than a silent change.
 
 
 ## Status vocabulary
