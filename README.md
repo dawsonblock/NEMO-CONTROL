@@ -46,7 +46,7 @@ class, authority, route, and evidence independently of whatever asked.
 > in `crabedence-V1-fix-integration-integrity/runtimes/nemo-relay/` — every fix
 > and feature goes there. The outer `NEMO-feat-native-plugin-isolation/` tree
 > is a frozen copy kept for provenance: it is the baseline the transfer
-> manifest's typed delta (78 modified / 28 added / 1 removed files; see
+> manifest's typed delta (78 modified / 29 added / 1 removed files; see
 > `runtimes/nemo-transfer-manifest.json` and `PROVENANCE.md`) is computed
 > against, and
 > nothing in the distribution compiles from it. A change made only to the
@@ -114,8 +114,10 @@ blind retry.
 
 - **PURE** — no external effect; executes locally.
 - **READ** — observational; bounded results over the DIRECT route.
-- **MUTATION** — exactly-once external effect; requires an idempotency key and
-  durable storage.
+- **MUTATION** — durable external effect with at-most-once dispatch:
+  requires an idempotency key and durable storage; an ambiguous
+  post-dispatch failure resolves `UNKNOWN` and reconciles by independent
+  evidence, never a blind retry.
 - **CRITICAL** — release-gate class; terminal states require Ed25519-signed
   evidence (`COMPLETED` on success, `NO_EFFECT` on failure).
 

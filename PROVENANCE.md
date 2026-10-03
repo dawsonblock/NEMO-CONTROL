@@ -26,7 +26,7 @@ source commit → capability registry digest → shipped runtime digest
 | Capability registry SHA-256 | `3c32a9d2f51f9c1d0068dfaad04f2499ce7baade91ccafa42fa233c1700db3e9` | `crabbox` capability snapshot; bound into the runtime-identity file at serve time |
 | Shipped runtime SHA-256 | `e1279ef20acc448ac52a6ac2332c81f71e278b2bf71579160ffc953d0f9567a0` (1466 files, 10 symlinks) | `cmd/nemo-runtime-digest` format-2 canonical stream; declared in `runtimes/nemo-transfer-manifest.json` |
 | Source runtime SHA-256 | `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957` (1438 files, 10 symlinks) | Same format-2 stream over `NEMO-feat-native-plugin-isolation/` |
-| Declared delta | 78 modified / 9 declared added entries covering 29 files / 1 removed / 0 symlink deltas / 0 retyped / 0 mode changes | `delta` object in the manifest; must equal the computed delta class-for-class |
+| Declared delta | 78 modified / 10 declared added entries covering 29 files / 1 removed / 0 symlink deltas / 0 retyped / 0 mode changes | `delta` object in the manifest; must equal the computed delta class-for-class |
 | Provenance policy SHA-256 | `0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1` | Bound into the manifest as `policy.path` + `policy.sha256`; the enumeration rules cannot drift silently |
 | Crabedence version | 0.53.2 | `VERSION` |
 | NEMO runtime version | 0.9.1-rc.4 | `runtimes/nemo-relay/Cargo.toml` `[workspace.package]` |
