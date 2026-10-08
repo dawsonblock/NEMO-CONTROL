@@ -1,0 +1,44 @@
+name: Consolidation invariants
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  authority-and-provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: crabedence-V1-fix-integration-integrity
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: crabedence-V1-fix-integration-integrity/go.mod
+          cache: false
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          toolchain: '1.96.1'
+          cache: false
+      - name: Authority boundary
+        run: |
+          bash scripts/check-nemo-runtime-dependencies.sh
+          bash scripts/check-nemo-credential-isolation.sh
+      - name: Transfer and documentation identities
+        run: |
+          python3 scripts/verify-nemo-transfer.py --require-source
+          bash scripts/check-provenance-docs.sh
+      - name: Provenance and boundary regression tests
+        run: |
+          node --test scripts/check-nemo-runtime-dependencies.test.mjs scripts/outer-release-manifest.test.mjs scripts/package-source-archive.test.js scripts/release-rc-workflow.test.js

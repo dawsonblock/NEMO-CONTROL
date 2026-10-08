@@ -1,0 +1,560 @@
+# Capability Invocation ABI
+
+## Purpose
+
+This document freezes the semantic boundary between any
+planning/reasoning runtime and the Crabedence execution kernel.
+
+The semantic contract is stable. The transport is replaceable.
+
+## The Semantic Contract
+
+A capability invocation is a single JSON object. The canonical
+Unix-socket transport binding (see below) uses this exact structure:
+
+```json
+{
+  "capability": "gmail.message.send",
+  "arguments": {
+    "to": "bob@example.com",
+    "body": "Hello"
+  },
+  "authority": {
+    "principal": "user-123",
+    "authority_ref": "grant-456"
+  },
+  "execution_class": "MUTATION",
+  "idempotency_key": "send-001",
+  "deadline": "2025-01-01T00:00:00Z"
+}
+```
+
+### Required fields
+
+| Field              | Type   | Description                                      |
+|--------------------|--------|--------------------------------------------------|
+| `capability`       | string | Registered capability identifier                 |
+| `arguments`        | object | Arguments for the capability (validated by schema) |
+| `authority.principal` | string | Identity of the requesting principal          |
+
+### Conditionally required fields
+
+| Field                     | Type   | Required when                          |
+|---------------------------|--------|----------------------------------------|
+| `authority.authority_ref` | string | Capability's authority policy requires authorization *and* the service is not brokering the authenticated principal's grants |
+| `idempotency_key`         | string | Effect class is MUTATION or CRITICAL   |
+
+### Optional fields
+
+| Field              | Type   | Description                                      |
+|--------------------|--------|--------------------------------------------------|
+| `execution_class`  | string | Caller assertion; checked against registry. If absent, registry's pinned class is used. Mismatch = DENIED. |
+| `deadline`         | string | RFC3339 timestamp; request is DENIED after this time |
+| `mediation`        | object | Middleware provenance for the request (see below) |
+| `session`          | object | Runtime-attestation binding for the request (see below) |
+
+### Mediation object
+
+The `mediation` field carries provenance about the middleware that
+handled the invocation *before* it crossed the ABI — for a runtime like
+NEMO, which middleware/plugin set rewrote the arguments and which
+release composed the call:
+
+```json
+{
+  "middleware_set_digest": "64-char hex SHA-256",
+  "original_args_digest": "64-char hex SHA-256",
+  "release_root_digest": "64-char hex SHA-256",
+  "plugin_manifest_sha256": "64-char hex SHA-256",
+  "plugin_library_sha256": "64-char hex SHA-256",
+  "activation_config_sha256": "64-char hex SHA-256"
+}
+```
+
+- `middleware_set_digest` (required when `mediation` is present):
+  digest of the exact middleware composition that ran — the activated
+  plugin identities, their registration descriptors and activation
+  configuration, and the host executable that served them.
+- `original_args_digest` (required when `mediation` is present):
+  digest of the caller's `arguments` *before* middleware rewrote them.
+  The `arguments` field itself always carries the post-middleware
+  (effective) arguments.
+- `release_root_digest` (optional): digest identifying the qualified
+  release/component manifest the calling runtime shipped in.
+- `plugin_manifest_sha256` and `plugin_library_sha256` (optional): the
+  activated plugin's manifest and exact library bytes.
+- `activation_config_sha256` (optional): the canonical activated-component
+  configuration digest. Raw configuration is not sent because it may contain
+  credentials.
+
+Mediation is evidence, not authorization input. Every present field is bound
+into the durable request identity and persisted on the durable record; the
+terminal receipt signs that request identity. It never selects the capability,
+route, authority, or outcome. A present `mediation` object missing either
+required field is refused.
+
+### Session object
+
+The `session` field carries the runtime-attestation binding — evidence the
+server verifies, never a grant:
+
+```json
+{
+  "id": "rts-…",
+  "proof": "base64 Ed25519 signature"
+}
+```
+
+- `id` (required when `session` is present): the attested session identifier
+  issued by the `attest_challenge`/`attest` handshake (see *Runtime
+  attestation* below).
+- `proof` (required when `session` is present): the runtime's Ed25519
+  signature over the pipe-joined request binding
+  `crabedence-session-proof-v1|session_id|capability|idempotency_key|principal|authority_ref|deadline|sha256(arguments)|sha256(mediation)`,
+  proving the sender holds the key the session attested — for THIS request.
+
+The session object is proof-of-possession, not authorization: a valid proof
+verifies which runtime sent the request and binds its identity onto the
+durable record as provenance; it never selects capability, route, assurance,
+or authority, and it is not part of the request digest — a request
+re-attested under a new session replays to the same execution identity.
+When the deployment requires attestation
+(`CRABEDENCE_ATTESTATION_REQUIRED`), an invocation without a verified
+session is DENIED. A present `session` object missing either field is
+refused.
+
+### Authority object
+
+The `authority` field groups identity and authorization material:
+
+```json
+{
+  "principal": "user-123",
+  "authority_ref": "grant-456",
+  "grant_id": "grant-456"
+}
+```
+
+- `principal` (required): the requesting principal's identity. It is a
+  claimed attribute unless the deployment enables peer authentication
+  (`CRABEDENCE_PEER_PRINCIPALS`), in which case it is verified against
+  the kernel-supplied Unix peer UID. Authorization derives from
+  resolving `authority_ref` — or, when the request carries none, from
+  the service brokering the authenticated principal's live grants; in
+  both cases the authority store checks principal and grant together.
+- `authority_ref` (optional): an unguessable bearer reference to
+  authority material. Crabedence resolves it internally. When absent on
+  a grant-required capability, the request must arrive over an
+  authenticated peer channel and the service resolves which of the
+  principal's live grants admits it — exactly one must, or the request
+  is denied. When present, treat it like a credential: never log it,
+  never expose it to parties that should not hold the authority, never
+  place it on process arguments (argv is readable by every account on
+  the host — the `CRABEDENCE_AUTHORITY_REF` environment variable is the
+  caller-side channel), and provision it with entropy comparable to a
+  token (the built-in issuer uses 96-bit random IDs).
+- `grant_id` (deprecated alias): accepted for backward compatibility
+  and mapped to `authority_ref` when `authority_ref` is absent.
+
+### Fields the planner must NOT send
+
+These are security-relevant properties pinned inside Crabedence's
+registry, not supplied by the planner:
+
+- `authority_policy` — resolved from the capability descriptor
+- `authority_generation` / `authority_digest` — assigned by Crabedence
+  from the resolved grant; they bind the exact immutable authority
+  material that admitted the request into the execution identity
+- `provider` / `adapter` — resolved via server-controlled adapter policy
+- `schema` — resolved from the capability descriptor
+- `receipt_version` — determined by Crabedence
+- `evidence` — generated by Crabedence
+- `assurance_profile` — resolved from the capability descriptor
+
+If a planner sends one of these:
+- `authority_policy`
+- `authority_generation` / `authority_digest`
+- `provider` / `adapter`
+- `schema`
+- `receipt_version`
+- `evidence`
+- `assurance_profile`
+- `execution_route`
+
+## Strict parsing rules
+
+The wire request is parsed under explicit structural rules, mirrored by
+NEMO and verified by the shared conformance corpus
+(`internal/execution/testdata/invocation-abi-conformance/vectors.json`).
+A request that violates any rule is refused with `INVALID_REQUEST`
+before admission — it is never partially interpreted.
+
+| Rule | Behavior |
+|---|---|
+| Encoding | The request must be valid UTF-8. |
+| One value | Exactly one JSON value; trailing data is refused. |
+| Root shape | The request must be a JSON object. |
+| Duplicate keys | Refused anywhere in the document — `encoding/json` and `JSON.parse` otherwise silently take the last value. |
+| Nesting depth | At most 64 open containers. |
+| Known fields | Root, `authority`, `mediation`, and `session` accept only the documented fields. |
+| Null | Explicit `null` is refused for every known field; omit the field instead. `null` inside `arguments` is governed by the capability schema. |
+| Types | Known fields carry their declared JSON types. `authority_generation` must be a canonical JSON integer literal (no fraction, exponent, or leading zeros) that fits in a signed 64-bit integer. |
+
+`grant_id` remains a deliberate compatibility alias for
+`authority_ref`. `authority_generation` and `authority_digest` are
+tolerated on the wire for backward compatibility and carry **zero
+authority**: the server overwrites them unconditionally from the
+resolved grant before dispatch — a caller can neither forge authority
+binding nor omit it. "Present on the wire" must never be read as
+"trusted by the server". Every other server-resolved field in the list
+above is outside the ABI, so sending one is an `unknown field` refusal
+rather than a silent ignore. A future ABI version may reject the legacy
+authority fields outright; planners should omit them today.
+
+## Unix Socket Transport Binding
+
+The persistent execution service uses a length-prefixed JSON protocol
+over a Unix domain socket:
+
+1. The client connects to the socket (0600 permissions, 0700 directory).
+2. The client sends a 4-byte big-endian length prefix followed by
+   the UTF-8 JSON request body.
+3. Maximum message size is 4 MiB.
+4. The service responds with a 4-byte big-endian length prefix
+   followed by the UTF-8 JSON response body.
+
+The request body is the JSON object described above. There is no
+envelope, no `abi_version` field — the semantic contract is enforced
+by the capability registry, not a version tag on the wire.
+
+### Runtime attestation
+
+Two framed service messages sit beside the invocation frame — they are
+not capability invocations and are refused when attestation is not
+configured on the service:
+
+1. `{"type":"attest_challenge"}` → the service answers with a
+   single-use, short-lived `{"session_id","nonce","expires_at","protocol"}`.
+2. `{"type":"attest","session_id","runtime_identity":{…},"signature"}` →
+   the runtime signs the pipe-joined attestation envelope
+   (`crabedence-attestation-v1|session_id|nonce|runtime_key|release_digest|release_root_digest|plugin_manifest_digest|plugin_host_version|activation_digest|abi_version|runtime_config_digest`)
+   with its Ed25519 key, asserted inside `runtime_identity.runtime_key`.
+   The service verifies the signature against the approved-key set and
+   the asserted identity against the deployment's allowlists, binds the
+   session to the connection's kernel-supplied peer credentials — the
+   peer UID, and on Linux the peer executable resolved from
+   `/proc/<pid>/exe` — and answers
+   `{"status":"attested","session_id","runtime_identity_digest","expires_at"}`
+   or `{"status":"denied","error"}`.
+
+Each invocation then carries `session.id` + `session.proof` as above.
+Challenges are single-use, sessions expire, and a session bound to one
+peer cannot be exercised by another: a different peer UID is denied,
+and on Linux a same-UID process running a *different executable* is
+denied too — a sibling binary cannot ride a stolen session ID. Where
+the platform reports only the UID (BSD, macOS), the binding is the
+UID alone. Deployment controls:
+`CRABEDENCE_ATTESTATION_REQUIRED` (mandatory in production),
+`CRABEDENCE_APPROVED_RUNTIME_KEYS`,
+`CRABEDENCE_APPROVED_RELEASES`,
+`CRABEDENCE_APPROVED_PLUGIN_MANIFESTS`, `CRABEDENCE_APPROVED_ABI`,
+`CRABEDENCE_ATTESTATION_SESSION_TTL`, and the development-only
+`CRABEDENCE_ATTESTATION_RELAXED`. Attestation supplements peer
+authentication; it never replaces it.
+
+## Why `authority_ref` instead of `grant_id`
+
+Today, authority is a grant. Tomorrow it may be a delegated
+capability token, workload identity, session authorization, signed
+assertion, or another mechanism. Calling the stable field `grant_id`
+would freeze one implementation model.
+
+`authority_ref` is an opaque bearer reference to authority material.
+Crabedence resolves it internally:
+
+```
+authority_ref → grant record (today)
+authority_ref → capability token (future)
+authority_ref → workload identity (future)
+```
+
+The ABI does not prescribe the authority mechanism.
+
+### Bearer and brokered semantics
+
+When `authority_ref` is present it is bearer authority: possession
+of the reference — plus a `principal` matching the resolved material —
+is the complete authorization proof. When it is absent on a
+grant-required capability, authority is *brokered*: the service
+enumerates the authenticated principal's live grants and admits iff
+exactly one covers the capability and its resource constraints (zero
+is denial; more than one is ambiguous denial). Brokered resolution
+exists only under peer authentication — an unverified `principal`
+claim is not an identity the service can broker against, and letting
+it enumerate grants would leak which principals hold authority for
+which capabilities.
+
+The trust boundary therefore rests on three controls:
+
+1. `authority_ref` values are unguessable and treated as secrets —
+   they must never appear in logs, receipts, metrics, or process
+   arguments (argv is world-readable; `CRABEDENCE_AUTHORITY_REF` is
+   the caller-side environment channel for naming a specific grant).
+2. The transport boundary (a `0600` Unix socket today) restricts who
+   can present references at all.
+3. Brokered resolution requires the authenticated peer principal —
+   the claim alone is insufficient.
+
+Deployments that need stronger principal authentication can enable
+peer authentication: `CRABEDENCE_PEER_PRINCIPALS` maps Unix peer UIDs
+to principals, the kernel supplies the UID over the socket, and a
+claim that disagrees with the mapping is denied — the authenticated
+principal replaces the claim before admission (see
+`docs/architecture/authority-model.md`). A `uid:*` wildcard — a peer
+that may claim any principal — additionally requires the UID to be
+declared in `CRABEDENCE_TRUSTED_PROXY_UIDS`. The service requires
+`CRABBOX_MODE` to be declared at all — `development` or `production`,
+never assumed — so startup fails rather than guessing a posture.
+Production then requires the
+map: `CRABBOX_MODE=production` refuses to start without a nonempty
+one, and refuses a wildcard its trusted-proxy list does not cover,
+because an unverified claim is not an identity. Alternatively, an
+authenticated proxy or a future signed-session authority mechanism can
+front the socket.
+
+Whether or not peer authentication is configured, the service resolves
+the kernel-supplied peer credentials once per connection and persists
+them on the durable execution record as local-caller evidence — peer
+UID (every supported platform), plus peer PID and executable where the
+kernel reports them (Linux). This is provenance, not a policy input:
+it names which local process invoked the request, participates in the
+attestation session binding described above, and is never bound into
+the request digest, so the same request invoked by a different local
+process replays to the same execution identity.
+
+## Three Orthogonal Dimensions
+
+### Effect class
+
+Determines side-effect semantics:
+
+| Class     | Side effects | Example                        |
+|-----------|--------------|--------------------------------|
+| PURE      | None         | Pure function, deterministic   |
+| READ      | None (read)  | API query, database read        |
+| MUTATION  | Yes          | Send email, write database      |
+| CRITICAL  | Yes + evidence | Payment, irreversible action |
+
+PURE capabilities do not cross the Crabedence execution boundary.
+They execute in the planner or function hooks layer. PURE is part
+of the capability vocabulary but not a Crabedence execution path.
+
+### Assurance profile
+
+Determines admission, durability, and evidence requirements:
+
+| Profile        | Durability | Evidence | Idempotency | Use case              |
+|----------------|------------|----------|-------------|-----------------------|
+| NONE           | No         | No       | No          | PURE (local)          |
+| STANDARD       | No         | No       | No          | Public READ           |
+| DURABLE        | Yes        | No       | Yes         | MUTATION              |
+| HIGH_ASSURANCE  | Yes        | Yes (V3) | Yes         | CRITICAL              |
+
+The registry decides the assurance profile. A public weather API
+READ and a medical records READ are both READ effect class, but
+may have different assurance profiles. Do not hard-wire every READ
+into a single fast path.
+
+### Execution route
+
+Determines which execution mechanism handles the capability:
+
+| Route       | Mechanism                          | Use case                          |
+|-------------|-------------------------------------|-----------------------------------|
+| LOCAL       | Calling process, no socket hop     | PURE (math, parsing, transforms)  |
+| DIRECT      | Direct adapter with admission      | Low-risk READ (public weather)    |
+| CRABEDENCE  | Trusted execution kernel           | Sensitive READ, MUTATION, CRITICAL|
+
+The route is pinned in the capability descriptor. The dispatch
+layer (Function Hooks or equivalent) reads it to decide routing.
+The planner does not decide what is "safe" — the descriptor does.
+
+### Why three dimensions
+
+Effect class answers: *What kind of side effect does this operation have?*
+Assurance answers: *What guarantees does this operation require?*
+Route answers: *Which execution mechanism should handle it?*
+
+Do not infer one entirely from another. For example:
+
+```
+READ + STANDARD    → DIRECT
+READ + HIGH_ASSURANCE → CRABEDENCE
+MUTATION + DURABLE → CRABEDENCE
+PURE + NONE        → LOCAL
+```
+
+The capability definition explicitly pins each resolved dimension;
+defaults are only a registration-time convenience. Security-relevant
+execution semantics are frozen at registration and do not change
+during execution.
+
+### Invalid combinations are rejected at registration
+
+Not every combination of dimensions is valid. The route must be able
+to satisfy the stated assurance contract:
+
+| Combination | Valid? | Reason |
+|-------------|--------|--------|
+| PURE/NONE/LOCAL | Yes | Local can satisfy NONE for PURE |
+| READ/STANDARD/DIRECT | Yes | Direct can satisfy STANDARD for READ |
+| READ/HIGH_ASSURANCE/CRABEDENCE | Yes | Crabedence satisfies HIGH_ASSURANCE |
+| MUTATION/DURABLE/CRABEDENCE | Yes | Crabedence satisfies DURABLE |
+| CRITICAL/HIGH_ASSURANCE/CRABEDENCE | Yes | Crabedence satisfies HIGH_ASSURANCE |
+| CRITICAL/HIGH_ASSURANCE/LOCAL | No | LOCAL cannot satisfy HIGH_ASSURANCE |
+| MUTATION/DURABLE/DIRECT | No | DIRECT cannot handle MUTATION effects |
+| READ/HIGH_ASSURANCE/DIRECT | No | DIRECT cannot satisfy HIGH_ASSURANCE |
+| PURE/HIGH_ASSURANCE/LOCAL | No | LOCAL cannot satisfy HIGH_ASSURANCE |
+
+Invalid combinations are rejected at registration time. They cannot
+enter the active registry. This prevents the bypass problem at
+descriptor configuration time — e.g. registering
+CRITICAL/HIGH_ASSURANCE/DIRECT is impossible.
+
+### Typical mapping
+
+```
+PURE     → NONE           → LOCAL
+READ     → STANDARD       → DIRECT (default) or HIGH_ASSURANCE → CRABEDENCE
+MUTATION → DURABLE        → CRABEDENCE
+CRITICAL → HIGH_ASSURANCE → CRABEDENCE
+```
+
+### Example capability descriptors
+
+```
+weather.current
+  effect = READ
+  assurance = STANDARD
+  route = DIRECT
+
+gmail.message.read
+  effect = READ
+  assurance = HIGH_ASSURANCE
+  route = CRABEDENCE
+
+home.light.set
+  effect = MUTATION
+  assurance = DURABLE
+  route = CRABEDENCE
+
+email.send
+  effect = CRITICAL
+  assurance = HIGH_ASSURANCE
+  route = CRABEDENCE
+
+math.calculate
+  effect = PURE
+  assurance = NONE
+  route = LOCAL
+```
+
+## What Crabedence Resolves Independently
+
+When a request arrives, Crabedence:
+
+1. Looks up the capability in its registry.
+2. Resolves the effect class (PURE, READ, MUTATION, CRITICAL).
+3. Resolves the assurance profile (NONE, STANDARD, DURABLE, HIGH_ASSURANCE).
+4. Resolves the argument schema and validates arguments.
+5. Resolves the authority policy and verifies `authority_ref` — or, for
+   a peer-authenticated request carrying none, resolves which of the
+   principal's live grants admits the request.
+6. Resolves the adapter/provider via server-controlled policy.
+7. Checks idempotency requirements.
+8. Admits or denies.
+9. Dispatches to the provider.
+10. Generates evidence and receipts (for HIGH_ASSURANCE).
+11. Returns a typed outcome.
+
+The planner has no influence over steps 2-8. It can only assert
+the effect class (step 2), which is checked against the registry.
+
+## Provider Resolution
+
+`AdapterID` in the capability descriptor may be either:
+
+- A fixed adapter ID (one-to-one capability → provider mapping)
+- A server-controlled adapter policy (capability → provider selector)
+
+A capability like `compute.job.run` may resolve among local Crabbox,
+RunPod, AWS, or a macOS worker based on constraints. The caller
+cannot force the provider unless the capability explicitly permits
+that as an argument. Crabedence's registry owns provider selection.
+
+## Response
+
+```json
+{
+  "status": "SUCCEEDED | FAILED | DENIED | UNKNOWN",
+  "result": {},
+  "error": "human-readable error",
+  "failure_code": "UNAUTHORIZED | ...",
+  "evidence": {
+    "digest": "64-char hex SHA-256",
+    "receipt_version": 3
+  },
+  "execution": {
+    "provider": "gmail-adapter",
+    "run_id": "run-..."
+  }
+}
+```
+
+`IN_FLIGHT` is a valid wire status but is converted to `UNKNOWN`
+at the client boundary — it is not a terminal outcome for the caller.
+
+## Transport Bindings
+
+The semantic contract is stable. The transport is replaceable.
+
+```
+Capability Invocation ABI (semantic contract)
+        |
+        +-- Unix socket binding (current, local)
+        +-- HTTP/2 binding (future, remote)
+        +-- gRPC binding (future, remote)
+        +-- in-process binding (future, embedded)
+        +-- QUIC binding (future, inter-machine)
+```
+
+### Current binding: Unix domain socket
+
+```
+[4-byte big-endian length] [UTF-8 JSON body]
+```
+
+Maximum message size: 4 MiB.
+
+This is the first binding, not the only binding. Future bindings
+will carry the same semantic contract over different transports.
+
+## Stability Guarantee
+
+The semantic contract is frozen:
+- Request fields will not be removed or change semantics.
+- Response fields will not be removed or change semantics.
+- Status values will not be removed.
+- Idempotency semantics will not change.
+- Authority resolution remains server-controlled.
+- Provider selection remains server-controlled.
+
+Changes are additive only:
+- New optional request fields may be added.
+- New response fields may be added.
+- New transport bindings may be added.
+- New authority mechanisms may be supported (via `authority_ref`).
+
+Any planner — Hermes, OpenAI Agents SDK, LangGraph, custom —
+can target this ABI and remain compatible with future Crabedence
+versions.

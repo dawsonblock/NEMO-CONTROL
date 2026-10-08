@@ -1,0 +1,18 @@
+✔ canonical source binds all HEAD paths, outer documents, symlinks and executable modes (9554.354546ms)
+✔ extracted verification fails content, executable mode, symlink, missing and extra paths (404.479906ms)
+✔ manifest trust anchor rejects replacement manifest and forged registry payload (354.79812ms)
+✔ unsafe paths, normalized collisions and symlink ancestors fail closed (443.519782ms)
+✔ dirty worktree content is captured, not confused with HEAD, and cannot finalize (742.814506ms)
+✔ runtime canonical union includes ignored untracked source but excludes generated output (969.984355ms)
+✔ finalization requires source identity, registry identity, actual check evidence and bundle digest (1123.282397ms)
+✔ finalization refuses post-qualification source or HEAD changes (496.968753ms)
+✔ archive independently carries whole outer root and real frozen reference without Git or Go (900.243363ms)
+✔ archive extraction rejects traversal, symlink ancestors, collisions and special objects before writing (1314.145829ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16385.449959
