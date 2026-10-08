@@ -48,10 +48,11 @@ binds all ten release identities and the qualification record.
 
 **Limits:** binding an operator record does not execute qualification, prove
 the truth of its checks, satisfy the production qualification matrix, or
-authorize publication. Authenticate the finalized release manifest as well
-as the source manifest; a trusted source hash alone cannot authenticate an
-operator's qualification assertion. No signing keys or promotion authority
-are supplied by this tooling.
+authorize publication. Finalized-bundle verification requires both trusted
+source and release manifest hashes (`--expected-manifest-sha256` and
+`--expected-release-manifest-sha256`); a trusted source hash alone cannot
+authenticate an operator's qualification assertion. No signing keys or
+promotion authority are supplied by this tooling.
 
 The root consolidation workflow exercises independent archive extraction
 and source verification. Rebuilding the extracted source, rerunning the full

@@ -55,6 +55,7 @@ export function safePath(p) {
 function absolute(p) {
   if (!path.isAbsolute(p)) fail(`absolute path required: ${p}`);
   const resolved = path.resolve(p);
+  if (/(^|\/)\.github\/agents(\/|$)/.test(resolved)) fail(`unsafe path: ${resolved}`);
   let current = path.parse(resolved).root;
   for (const part of resolved.slice(current.length).split("/").filter(Boolean)) {
     current = path.join(current, part);
@@ -66,15 +67,19 @@ function ancestors(root, relative) {
   safePath(relative);
   const stamps = [];
   let current = absolute(root);
+  const rootStat = fs.lstatSync(current, { bigint: true });
+  if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) fail(`unsafe root: ${current}`);
+  stamps.push([current, rootStat.dev, rootStat.ino]);
   for (const part of relative.split("/").slice(0, -1)) {
     current = path.join(current, part);
-    const s = fs.lstatSync(current);
+    const s = fs.lstatSync(current, { bigint: true });
     if (!s.isDirectory() || s.isSymbolicLink()) fail(`unsafe ancestor: ${current}`);
     stamps.push([current, s.dev, s.ino]);
   }
   return () => {
+    absolute(root);
     for (const [p, dev, ino] of stamps) {
-      const s = fs.lstatSync(p);
+      const s = fs.lstatSync(p, { bigint: true });
       if (!s.isDirectory() || s.dev !== dev || s.ino !== ino) fail(`ancestor changed during read: ${p}`);
     }
   };
@@ -208,6 +213,13 @@ function dirtyPaths(root, headEntries, entries, format) {
     return oid !== h.oid || mode !== h.mode;
   }).map((e) => e.path);
 }
+function gitDirtyPaths(root, headEntries, entries) {
+  const tracked = new Set(headEntries.map((e) => e.path));
+  const changed = run("git", ["diff", "--name-only", "-z", "--no-ext-diff", "--no-textconv", "HEAD"], root)
+    .split("\0").filter(Boolean);
+  for (const p of changed) safePath(p);
+  return ordered(new Set([...changed, ...entries.filter((e) => !tracked.has(e.path)).map((e) => e.path)]));
+}
 function untrackedOuter(root, paths) {
   const allowed = new Set(paths);
   const extra = run("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], root)
@@ -256,9 +268,10 @@ function componentDigests(entries, runtimeDigest) {
     crabedence_digest: subset((p) => below(p, CRAB)),
     plugin_host_digest: subset((p) => below(p, `${RUNTIME}/crates/plugin-host`) || below(p, `${RUNTIME}/crates/native-loader`)),
     abi_digest: subset((p) => below(p, `${RUNTIME}/crates/native-abi`) || below(p, `${RUNTIME}/crates/worker-proto`)),
-    build_recipe_digest: subset((p) => /(^|\/)(scripts|\.github\/workflows)\//.test(p)
-      || /(^|\/)(Makefile|GNUmakefile|build\.rs|pyproject\.toml|package\.json|\.goreleaser[^/]*)$/.test(p)),
-    toolchain_lock_digest: subset((p) => /(^|\/)(Cargo\.lock|go\.mod|go\.sum|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|uv\.lock|poetry\.lock|rust-toolchain(?:\.toml)?|\.tool-versions|requirements[^/]*\.txt)$/.test(p)),
+    build_recipe_digest: subset((p) => /(^|\/)(scripts|\.github\/(?:workflows|actions))\//.test(p)
+      || /(^|\/)(Makefile|GNUmakefile|[^/]+\.mk|build\.rs|Cargo\.toml|go\.mod|go\.work|pyproject\.toml|setup\.py|setup\.cfg|package\.json|CMakeLists\.txt|\.goreleaser[^/]*)$/.test(p)
+      || /(^|\/)\.cargo\/config(?:\.toml)?$/.test(p)),
+    toolchain_lock_digest: subset((p) => /(^|\/)(Cargo\.lock|go\.mod|go\.sum|go\.work(?:\.sum)?|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|uv\.lock|poetry\.lock|rust-toolchain(?:\.toml)?|\.tool-versions|\.(?:python|node|go)-version|\.nvmrc|requirements[^/]*\.txt)$/.test(p)),
   };
 }
 function envelope(value) {
@@ -306,7 +319,8 @@ export function createSource(root, out) {
     const registry = JSON.parse(run("go", ["run", "./cmd/registry-digest", "-envelope"], path.join(frozen, CRAB)));
     const capabilityRegistryDigest = envelope(registry);
     verifyEntries(frozen, entries);
-    const dirty = dirtyPaths(frozen, initial.entries, entries, initial.objectFormat);
+    const headDifferences = dirtyPaths(frozen, initial.entries, entries, initial.objectFormat);
+    const dirty = gitDirtyPaths(root, initial.entries, entries);
     const manifest = {
       format: FORMAT, source_commit: initial.commit, source_tree_digest: digest(entries),
       ...componentDigests(entries, runtime.runtime_digest),
@@ -316,10 +330,12 @@ export function createSource(root, out) {
       source_object_format: initial.objectFormat,
       runtime_inventory: ordered(runtime.paths), frozen_runtime_digest: runtime.frozen_digest,
       dirty_paths: dirty,
+      head_byte_differences: headDifferences,
     };
     const currentRuntime = runtimes(root);
     if (canonical(currentRuntime) !== canonical(runtime) || canonical(head(root)) !== canonical(initial)) fail("source/HEAD changed during generation");
     untrackedOuter(root, paths);
+    if (!same(gitDirtyPaths(root, initial.entries, entries), dirty)) fail("Git worktree status changed during generation");
     for (const e of entries) if (canonical(readEntry(root, e.path)) !== canonical(e)) fail(`source changed during generation: ${e.path}`);
     writeJSON(path.join(out, "source-manifest.json"), manifest);
     return manifest;
@@ -342,7 +358,9 @@ function sourceManifest(bundle, expected) {
   for (const h of m.head_inventory) if (!m.entries.some((e) => e.path === h.path)) fail("missing HEAD path");
   if (envelope(m.registry_envelope) !== m.capability_registry_digest) fail("registry digest mismatch");
   verifyEntries(path.join(bundle, "root"), m.entries);
-  if (!same(dirtyPaths(path.join(bundle, "root"), m.head_inventory, m.entries, m.source_object_format), m.dirty_paths)) fail("dirty inventory mismatch");
+  if (!same(dirtyPaths(path.join(bundle, "root"), m.head_inventory, m.entries, m.source_object_format), m.head_byte_differences)) fail("HEAD byte-difference inventory mismatch");
+  if (!Array.isArray(m.dirty_paths) || !same(m.dirty_paths, ordered(new Set(m.dirty_paths)))
+      || m.dirty_paths.some((p) => !m.entries.some((e) => e.path === p))) fail("invalid Git dirty-path declaration");
   const runtime = runtimes(path.join(bundle, "root"));
   if (!same(ordered(runtime.paths), m.runtime_inventory) || runtime.frozen_digest !== m.frozen_runtime_digest) fail("runtime inventory mismatch");
   if (!same(ordered(new Set([...m.head_inventory.map((e) => e.path), ...runtime.paths])), m.entries.map((e) => e.path))) fail("source union mismatch");
@@ -359,25 +377,111 @@ function evidenceEntries(root) {
   });
 }
 export function evidenceDigest(root) { return digest(evidenceEntries(absolute(root))); }
+export const OUTER_REQUIRED_GATES = {
+  "outer-source-archive": "PROVENANCE",
+  "authority-boundary": "STATIC_ANALYSIS",
+  "credential-isolation": "STATIC_ANALYSIS",
+  "crabedence-build": "BUILD",
+  "nemo-runtime-build": "BUILD",
+  "nemo-plugin-host-build": "BUILD",
+  "nemo-runtime-e2e": "INTEGRATION",
+  "nemo-critical-path": "INTEGRATION",
+  "nemo-expired-authority": "INTEGRATION",
+  "nemo-restart-idempotency": "INTEGRATION",
+  "nemo-plugin-host": "INTEGRATION",
+  "nemo-installed-distribution": "INTEGRATION",
+};
+export function requiredQualificationGates(sourceRoot) {
+  const p = `${CRAB}/scripts/generate-release-evidence.sh`;
+  const { entry, bytes } = readEntry(sourceRoot, p, undefined, true);
+  if (entry.kind !== "file") fail("regular qualification producer required");
+  const required = { ...OUTER_REQUIRED_GATES };
+  const calls = [...bytes.toString("utf8").matchAll(/^\s*(run_gate|run_live_postgres_gate|run_required_live_go_gate)\s+([a-z][a-z0-9-]*)\s+([A-Z_]+|[^\s]+)/gm)];
+  if (!calls.length) fail("qualification producer declares no discoverable gates");
+  for (const [, runner, id, type] of calls) {
+    const gateType = runner === "run_live_postgres_gate" ? "INTEGRATION" : type;
+    if (Object.hasOwn(required, id)) fail(`duplicate required qualification gate: ${id}`);
+    required[id] = gateType;
+  }
+  return required;
+}
 function qualification(record, m, bundleDigest) {
   if (record.format !== "nemo-outer-qualification-v1" || record.status !== "passed"
       || record.source_commit !== m.source_commit || record.source_tree_digest !== m.source_tree_digest
       || record.qualification_bundle_digest !== bundleDigest
       || record.capability_registry_digest !== m.capability_registry_digest) fail("qualification record identity/evidence mismatch");
   if (!Array.isArray(record.checks) || !record.checks.length) fail("qualification checks required");
+  safePath(record.inner_qualification);
+  const seen = new Set();
   for (const check of record.checks) {
-    if (!check || typeof check.command !== "string" || !check.command.trim() || check.exit_code !== 0
+    if (!check || typeof check.gate_id !== "string" || !check.gate_id || seen.has(check.gate_id)
+        || typeof check.command !== "string" || !check.command.trim() || check.exit_code !== 0
         || !Array.isArray(check.evidence_paths) || !check.evidence_paths.length) fail("passed checks with evidence required");
+    seen.add(check.gate_id);
     for (const p of check.evidence_paths) safePath(p);
   }
 }
+function qualificationAdmission(sourceRoot, evidenceRoot, record, m, entries) {
+  const files = new Map(entries.map((e) => [e.path, e]));
+  const boundFile = (ref) => {
+    if (!ref || !DIGEST.test(ref.sha256 ?? "")) fail("qualification evidence/artifact digest required");
+    safePath(ref.file);
+    const e = files.get(ref.file);
+    if (!e || e.kind !== "file" || e.sha256 !== ref.sha256) fail(`qualification evidence/artifact binding mismatch: ${ref.file}`);
+    return e;
+  };
+  if (!files.has(record.inner_qualification)) fail("inner qualification record missing from evidence bundle");
+  const inner = jsonFile(path.join(evidenceRoot, record.inner_qualification));
+  if (!inner.outer_provenance || inner.outer_provenance.source_commit !== m.source_commit
+      || inner.outer_provenance.source_tree_digest !== m.source_tree_digest
+      || inner.outer_provenance.capability_registry_digest !== m.capability_registry_digest) fail("inner qualification outer-source binding mismatch");
+  if (!Array.isArray(inner.gates) || !inner.gates.length) fail("inner qualification gates required");
+  const required = requiredQualificationGates(sourceRoot);
+  const gates = new Map();
+  const innerPrefix = path.posix.dirname(record.inner_qualification);
+  for (const gate of inner.gates) {
+    if (!gate || typeof gate.gate_id !== "string" || gates.has(gate.gate_id)) fail("duplicate/malformed qualification gate");
+    gates.set(gate.gate_id, gate);
+    if (!gate.evidence) fail("gate evidence binding required");
+    safePath(gate.evidence.file);
+    const file = innerPrefix === "." ? gate.evidence.file : `${innerPrefix}/${gate.evidence.file}`;
+    boundFile({ file, sha256: gate.evidence.sha256 });
+    if (gate.mandatory !== true || gate.status !== "PASS" || gate.exit_code !== 0) fail(`qualification gate not executed/passed: ${gate.gate_id}`);
+    const check = record.checks.find((c) => c.gate_id === gate.gate_id);
+    if (!check || !check.evidence_paths.includes(file)) fail(`qualification check/gate evidence mismatch: ${gate.gate_id}`);
+    if (["TEST", "INTEGRATION", "SECURITY", "FAULT_INJECTION"].includes(gate.gate_type)
+        && (!Number.isSafeInteger(gate.tests_executed) || gate.tests_executed < 1
+          || gate.tests_failed !== 0 || gate.tests_skipped !== 0)) fail(`qualification test gate counts/skips invalid: ${gate.gate_id}`);
+  }
+  if (record.checks.length !== gates.size) fail("qualification checks must exactly cover admitted gates");
+  for (const [id, type] of Object.entries(required)) {
+    const gate = gates.get(id);
+    if (!gate || gate.gate_type !== type) fail(`required qualification gate missing/wrong type: ${id}`);
+  }
+  for (const role of ["nemo_runtime", "crabedence", "plugin_host"]) {
+    const ref = record.artifact_bindings?.[role];
+    const e = boundFile(ref);
+    if (!e.executable || fs.statSync(path.join(evidenceRoot, ref.file)).size === 0) fail(`nonempty executable qualification artifact required: ${role}`);
+    if (canonical(inner.outer_provenance.artifact_bindings?.[role]) !== canonical(ref)) fail(`inner tested artifact binding mismatch: ${role}`);
+  }
+  // Reuse the existing schema/gate semantics, summaries, invariants and evidence
+  // verifier instead of treating the outer record's status string as admission.
+  const checker = `${CRAB}/scripts/check-release-admission.sh`;
+  const shared = `${CRAB}/scripts/lib/qualification-gates.sh`;
+  for (const p of [checker, shared]) if (readEntry(sourceRoot, p).kind !== "file") fail("regular admission verifier required");
+  run("bash", [path.join(sourceRoot, checker), path.join(evidenceRoot, record.inner_qualification)], sourceRoot);
+}
 export function finalize(root, source, expected, recordPath, evidence, out) {
   root = absolute(root); source = absolute(source); evidence = absolute(evidence);
+  recordPath = absolute(recordPath);
+  if (recordPath.startsWith(`${source}/`) || recordPath.startsWith(`${evidence}/`)) fail("qualification record must be outside source bundle and evidence (no circular hashes)");
   const m = verifyBundle(source, expected);
   if (m.format !== FORMAT || m.dirty_paths.length) fail("finalization requires HEAD-clean source");
+  if (m.entries.some((e) => path.join(root, e.path) === recordPath)) fail("qualification record cannot be a tracked source input (no circular hashes)");
   const initial = head(root);
   if (initial.commit !== m.source_commit || canonical(initial.entries) !== canonical(m.head_inventory)) fail("qualification is not for current HEAD");
   untrackedOuter(root, m.entries.map((e) => e.path));
+  if (gitDirtyPaths(root, initial.entries, m.entries).length) fail("finalization requires HEAD-clean worktree");
   for (const e of m.entries) if (canonical(readEntry(root, e.path)) !== canonical(e)) fail(`current source differs: ${e.path}`);
   const currentRuntime = runtimes(root);
   if (!same(ordered(currentRuntime.paths), m.runtime_inventory) || currentRuntime.runtime_digest !== m.nemo_runtime_digest
@@ -389,6 +493,7 @@ export function finalize(root, source, expected, recordPath, evidence, out) {
   qualification(record, m, bundleDigest);
   const evidencePaths = new Set(evidenceBefore.map((e) => e.path));
   for (const c of record.checks) for (const p of c.evidence_paths) if (!evidencePaths.has(p)) fail(`missing check evidence: ${p}`);
+  qualificationAdmission(path.join(source, "root"), evidence, record, m, evidenceBefore);
   out = absolute(out);
   if (out === source || out.startsWith(`${source}/`) || source.startsWith(`${out}/`)
       || out === evidence || out.startsWith(`${evidence}/`) || evidence.startsWith(`${out}/`)) fail("output overlaps release inputs");
@@ -404,13 +509,14 @@ export function finalize(root, source, expected, recordPath, evidence, out) {
       qualification_bundle_digest: bundleDigest,
       qualification_record_sha256: sha256(fs.readFileSync(path.join(out, "qualification-record.json"))),
       evidence_entries: evidenceBefore,
-      qualification_statement: "Operator-supplied passed check record; this tool did not execute builds or qualification.",
+      qualification_statement: "Complete required gate coverage, existing admission semantics and source/evidence/tested-artifact bindings validated. This tool did not execute builds or qualification; execution authenticity requires an independently trusted qualification runner.",
     };
     writeJSON(path.join(out, "release-manifest.json"), release);
     verifyBundle(out, expected, sha256(jsonBytes(path.join(out, "release-manifest.json"))));
     if (!same(evidenceEntries(evidence), evidenceBefore) || canonical(jsonFile(recordPath)) !== canonical(record)
         || canonical(head(root)) !== canonical(initial)) fail("release input changed during finalization");
     untrackedOuter(root, m.entries.map((e) => e.path));
+    if (gitDirtyPaths(root, initial.entries, m.entries).length) fail("Git source changed during finalization");
     for (const e of m.entries) if (canonical(readEntry(root, e.path)) !== canonical(e)) fail("source changed during finalization");
     return release;
   } catch (error) { fs.rmSync(out, { recursive: true, force: true }); throw error; }
@@ -443,6 +549,7 @@ export function verifyBundle(bundle, expected, expectedRelease) {
   for (const c of record.checks) for (const p of c.evidence_paths) {
     if (!release.evidence_entries.some((e) => e.path === p)) fail(`missing check evidence: ${p}`);
   }
+  qualificationAdmission(path.join(bundle, "root"), path.join(bundle, "evidence"), record, m, release.evidence_entries);
   return release;
 }
 export function archive(bundle, expected, output, expectedRelease) {
@@ -482,13 +589,23 @@ with tarfile.open(archive,"r:gz") as t:
    if parent not in seen or not seen[parent].isdir():raise ValueError("missing or symlink archive ancestor")
    parent=posixpath.dirname(parent)
  for p,m in sorted(seen.items(),key=lambda x:(x[0].count("/"),x[0])):
-  dest=os.path.join(out,p)
-  if m.isdir():os.mkdir(dest,0o755)
-  elif m.issym():os.symlink(m.linkname,dest)
-  else:
-   with t.extractfile(m) as src,open(dest,"xb") as dst:
-    __import__("shutil").copyfileobj(src,dst)
-   os.chmod(dest,0o755 if m.mode & 0o111 else 0o644)
+  if m.isdir():os.mkdir(os.path.join(out,p),0o755)
+ # Reopen in streaming mode: random extractfile seeks on gzip otherwise
+ # re-decompress the archive thousands of times on a complete outer tree.
+ with tarfile.open(archive,"r|gz") as stream:
+  written=set()
+  for m in stream:
+   p=m.name.rstrip("/") if m.isdir() else m.name
+   expected=seen.get(p)
+   if p in written or expected is None or (m.type,m.mode,m.size,m.linkname)!=(expected.type,expected.mode,expected.size,expected.linkname):raise ValueError("archive changed after preflight")
+   written.add(p);dest=os.path.join(out,p)
+   if m.isdir():continue
+   if m.issym():os.symlink(m.linkname,dest)
+   else:
+    with stream.extractfile(m) as src,open(dest,"xb") as dst:
+     __import__("shutil").copyfileobj(src,dst)
+    os.chmod(dest,0o755 if m.mode & 0o111 else 0o644)
+  if written!=set(seen):raise ValueError("archive changed after preflight")
 `;
 export function extract(archivePath, out, expected, expectedRelease) {
   archivePath = absolute(archivePath);
@@ -521,9 +638,34 @@ checkout. After real qualification,
 supply {"format":"nemo-outer-qualification-v1","status":"passed","source_commit":...,
 "source_tree_digest":...,"capability_registry_digest":...,
 "qualification_bundle_digest":<evidence-digest output>,
-"checks":[{"command":<actual command>,"exit_code":0,"evidence_paths":["log.txt"]}]}.
+"inner_qualification":"qualification.json",
+"artifact_bindings":{ "nemo_runtime":{"file":"artifacts/runtime","sha256":...},
+"crabedence":{"file":"artifacts/crabbox","sha256":...},
+"plugin_host":{"file":"artifacts/plugin-host","sha256":...}},
+"checks":[{"gate_id":...,"command":<actual command>,"exit_code":0,
+"evidence_paths":["gate-results/log.txt"]}]}.
+qualification.json must pass the EXISTING check-release-admission.sh (requires
+bash/jq), bind outer_provenance {source_commit,source_tree_digest,
+capability_registry_digest,artifact_bindings}, and include ALL static gate call
+sites in the frozen generate-release-evidence.sh (including conditional live
+sites), plus these outer gates and types:
+${canonical(OUTER_REQUIRED_GATES)}
+Every gate must be mandatory/PASS/exit 0, with intact evidence and a matching
+check. Test-bearing gates must execute >0 tests, fail 0 and explicitly skip 0.
+Artifact bindings must refer to nonempty executable bytes inside evidence; they
+must match the inner record's tested artifact bindings, not source component
+digests. Gate coverage extraction supports the producer's three current runner
+forms; changing its gate declaration language requires updating this verifier.
 Record and evidence are separate from source identity: no circular tracked output.
-Rebuilds/qualification and authenticity of the operator record remain prerequisites.
+dirty_paths records Git's HEAD/worktree comparison (checkout attributes honored);
+head_byte_differences independently records raw Git-blob versus WORKTREE bytes and
+modes, including expected CRLF checkout transformations. Offline verification
+recomputes the latter; Git's clean-status declaration is bound by the trusted
+source manifest, and finalization rechecks it with Git on the exact live source.
+Real rebuilds/full qualification and independent authenticated-runner provenance
+remain prerequisites. Well-formed evidence cannot cryptographically prove that
+commands were executed: retain both manifest hashes through a trusted channel.
+This CLI does not generate qualification records or claim it ran these gates.
 Use a quiescent source/evidence tree: reads are no-follow and mutation-checked,
 snapshots reverified, but this tool is not an OS transaction against hostile writers.
 `;

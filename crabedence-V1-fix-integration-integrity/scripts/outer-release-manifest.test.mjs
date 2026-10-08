@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import {
   archive, canonical, createSource, evidenceDigest, extract, finalize, safePath,
-  sha256, verifyBundle,
+  requiredQualificationGates, sha256, verifyBundle,
 } from "./outer-release-manifest.mjs";
 
 const scripts = path.dirname(fileURLToPath(import.meta.url));
@@ -31,12 +31,19 @@ function fixture(t) {
   const root = path.join(workspace, "checkout");
   fs.mkdirSync(root);
   put(root, ".gitignore", "target/\nreal-authority/\n");
+  put(root, ".gitattributes", "*.cmd text eol=crlf\n");
+  put(root, "checkout-filter.cmd", "echo fixture\r\n");
   put(root, "README.md", "outer source\n");
   put(root, `long/${"a".repeat(160)}/${"b".repeat(120)}.txt`, "PAX long-path fixture\n");
   put(root, "authority/policy.json", '{"decision":"deny"}\n');
   put(root, `${CRAB}/go.mod`, "module outerfixture\n\ngo 1.20\n");
   put(root, `${CRAB}/scripts/build.sh`, "#!/bin/sh\nexit 0\n", 0o755);
   put(root, `${CRAB}/scripts/verify-nemo-transfer.py`, fs.readFileSync(verifier));
+  for (const p of ["check-release-admission.sh", "lib/qualification-gates.sh"]) {
+    put(root, `${CRAB}/scripts/${p}`, fs.readFileSync(path.join(scripts, p)));
+  }
+  put(root, `${CRAB}/scripts/generate-release-evidence.sh`,
+    "run_gate exact-toolchain BUILD fixture\nrun_live_postgres_gate postgres fixture.ts\nrun_required_live_go_gate critical INTEGRATION fixture\n");
   // A standard-library-only fixture authority, not a replacement production registry.
   put(root, `${CRAB}/cmd/registry-digest/main.go`, `package main
 import("fmt";"crypto/sha256";"encoding/base64")
@@ -83,18 +90,49 @@ with open("runtimes/nemo-transfer-manifest.json","w") as f:json.dump(m,f)
 function qualification(f) {
   const evidence = path.join(f.workspace, "qualification-evidence");
   fs.mkdirSync(evidence);
-  put(evidence, "checks/log.txt", "actual fixture check passed\n");
+  const artifactBindings = {};
+  for (const role of ["nemo_runtime", "crabedence", "plugin_host"]) {
+    const bytes = Buffer.from(`synthetic fixture artifact: ${role}\n`);
+    const file = `artifacts/${role}`;
+    put(evidence, file, bytes, 0o755);
+    artifactBindings[role] = { file, sha256: sha256(bytes) };
+  }
+  const gates = Object.entries(requiredQualificationGates(path.join(f.bundle, "root"))).map(([id, type]) => {
+    const file = `gate-results/${id}.log`;
+    const bytes = Buffer.from(`synthetic fixture evidence: ${id}\n`);
+    put(evidence, file, bytes);
+    return {
+      gate_id: id, gate_type: type, mandatory: true, status: "PASS", exit_code: 0,
+      tests_executed: ["TEST", "INTEGRATION"].includes(type) ? 1 : 0,
+      tests_failed: 0, tests_skipped: 0, duration_ms: 1,
+      evidence: { file, sha256: sha256(bytes) },
+    };
+  });
+  const inner = {
+    schema_version: 2, gates,
+    release_status: "PASS", artifact_promotable: true,
+    gate_summary: { total: gates.length, passed: gates.length, failed: 0 },
+    outer_provenance: {
+      source_commit: f.manifest.source_commit,
+      source_tree_digest: f.manifest.source_tree_digest,
+      capability_registry_digest: f.manifest.capability_registry_digest,
+      artifact_bindings: artifactBindings,
+    },
+  };
+  put(evidence, "qualification.json", JSON.stringify(inner));
   const record = {
     format: "nemo-outer-qualification-v1", status: "passed",
     source_commit: f.manifest.source_commit,
     source_tree_digest: f.manifest.source_tree_digest,
     capability_registry_digest: f.manifest.capability_registry_digest,
     qualification_bundle_digest: evidenceDigest(evidence),
-    checks: [{ command: "fixture check", exit_code: 0, evidence_paths: ["checks/log.txt"] }],
+    inner_qualification: "qualification.json", artifact_bindings: artifactBindings,
+    checks: gates.map((g) => ({ gate_id: g.gate_id, command: `synthetic fixture ${g.gate_id}`,
+      exit_code: 0, evidence_paths: [g.evidence.file] })),
   };
   const recordPath = path.join(f.workspace, "qualification.json");
   put(f.workspace, "qualification.json", JSON.stringify(record));
-  return { evidence, record, recordPath };
+  return { evidence, record, recordPath, inner };
 }
 
 test("canonical source binds all HEAD paths, outer documents, symlinks and executable modes", (t) => {
@@ -102,6 +140,8 @@ test("canonical source binds all HEAD paths, outer documents, symlinks and execu
   const expectedPaths = command("git", ["ls-tree", "-rz", "--name-only", "HEAD"], f.root).split("\0").filter(Boolean);
   assert.deepEqual(f.manifest.entries.map((e) => e.path).sort(), expectedPaths.sort());
   assert.equal(f.manifest.dirty_paths.length, 0);
+  assert.ok(f.manifest.head_byte_differences.includes("checkout-filter.cmd"));
+  assert.equal(fs.readFileSync(path.join(f.bundle, "root/checkout-filter.cmd"), "utf8"), "echo fixture\r\n");
   assert.ok(f.manifest.entries.find((e) => e.path === `${RUNTIME}/manifest-link`).target === "Cargo.toml");
   assert.equal(f.manifest.entries.find((e) => e.path === `${CRAB}/scripts/build.sh`).executable, true);
   assert.equal(f.manifest.qualification_bundle_digest, null);
@@ -217,6 +257,11 @@ with open("runtimes/nemo-transfer-manifest.json","w") as f:json.dump(m,f)
 test("finalization requires source identity, registry identity, actual check evidence and bundle digest", (t) => {
   const f = fixture(t);
   const q = qualification(f);
+  const circular = path.join(q.evidence, "outer-record.json");
+  put(q.evidence, "outer-record.json", JSON.stringify(q.record));
+  assert.throws(() => finalize(f.root, f.bundle, f.expected, circular, q.evidence,
+    path.join(f.workspace, "circular-release")), /circular hashes/);
+  fs.unlinkSync(circular);
   for (const mutation of [
     { source_commit: "0".repeat(40) },
     { source_tree_digest: "0".repeat(64) },
@@ -240,7 +285,7 @@ test("finalization requires source identity, registry identity, actual check evi
   const expectedRelease = sha256(fs.readFileSync(path.join(release, "release-manifest.json")));
   assert.throws(() => verifyBundle(release, f.expected), /expected-release-manifest/);
   verifyBundle(release, f.expected, expectedRelease);
-  put(release, "evidence/checks/log.txt", "tampered evidence");
+  put(release, "evidence/gate-results/outer-source-archive.log", "tampered evidence");
   assert.throws(() => verifyBundle(release, f.expected, expectedRelease), /tampered/);
   const changed = JSON.parse(fs.readFileSync(path.join(release, "release-manifest.json")));
   changed.qualification_statement = "forged claim";
@@ -261,12 +306,40 @@ test("finalization refuses post-qualification source or HEAD changes", (t) => {
   fs.unlinkSync(path.join(f.root, "untracked-source.go"));
   put(f.root, "README.md", "changed after qualification");
   assert.throws(() => finalize(f.root, f.bundle, f.expected, q.recordPath, q.evidence,
-    path.join(f.workspace, "bad-release")), /current source differs/);
+    path.join(f.workspace, "bad-release")), /current source differs|HEAD-clean worktree/);
   command("git", ["checkout", "--", "README.md"], f.root);
   command("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
     "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "new HEAD"], f.root);
   assert.throws(() => finalize(f.root, f.bundle, f.expected, q.recordPath, q.evidence,
     path.join(f.workspace, "bad-release")), /current HEAD/);
+});
+
+test("self-reported PASS cannot replace complete admitted gates and tested artifact bindings", (t) => {
+  const f = fixture(t);
+  const q = qualification(f);
+  const mutations = [
+    (inner) => { inner.outer_provenance.source_tree_digest = "0".repeat(64); },
+    (inner) => { inner.gates.find((g) => g.gate_id === "nemo-runtime-e2e").tests_executed = 0; },
+    (inner) => { inner.gates.find((g) => g.gate_id === "nemo-runtime-e2e").tests_skipped = 1; },
+    (inner) => { inner.gates[0].evidence.sha256 = "0".repeat(64); },
+    (inner) => { inner.outer_provenance.artifact_bindings.plugin_host.sha256 = "0".repeat(64); },
+    (inner) => { inner.gate_summary.passed = 0; },
+    (inner, record) => {
+      inner.gates = inner.gates.filter((g) => g.gate_id !== "nemo-plugin-host");
+      record.checks = record.checks.filter((g) => g.gate_id !== "nemo-plugin-host");
+    },
+    (inner, record) => { delete record.artifact_bindings.crabedence; },
+  ];
+  mutations.forEach((mutate, i) => {
+    const inner = structuredClone(q.inner), record = structuredClone(q.record);
+    mutate(inner, record);
+    put(q.evidence, "qualification.json", JSON.stringify(inner));
+    record.qualification_bundle_digest = evidenceDigest(q.evidence);
+    fs.writeFileSync(q.recordPath, JSON.stringify(record));
+    assert.throws(() => finalize(f.root, f.bundle, f.expected, q.recordPath, q.evidence,
+      path.join(f.workspace, `rejected-${i}`)));
+    assert.equal(fs.existsSync(path.join(f.workspace, `rejected-${i}`)), false);
+  });
 });
 
 test("archive independently carries whole outer root and real frozen reference without Git or Go", (t) => {
@@ -286,9 +359,11 @@ test("archive independently carries whole outer root and real frozen reference w
   assert.equal(fs.lstatSync(path.join(extracted, "root", FROZEN)).isDirectory(), true);
   assert.equal(fs.lstatSync(path.join(extracted, "root", FROZEN)).isSymbolicLink(), false);
   assert.equal(fs.readFileSync(path.join(extracted, "root/README.md"), "utf8"), "outer source\n");
-  const bin = path.join(f.workspace, "python-only-bin");
+  const bin = path.join(f.workspace, "verification-only-bin");
   fs.mkdirSync(bin);
-  fs.symlinkSync(command("sh", ["-c", "command -v python3"], f.workspace).trim(), path.join(bin, "python3"));
+  for (const name of ["python3", "bash", "jq", "shasum", "awk", "seq", "dirname", "grep"]) {
+    fs.symlinkSync(command("sh", ["-c", `command -v ${name}`], f.workspace).trim(), path.join(bin, name));
+  }
   const cli = path.join(scripts, "outer-release-manifest.mjs");
   const result = execFileSync(process.execPath, [cli, "verify", "--bundle", extracted,
     "--expected-manifest-sha256", f.expected, "--expected-release-manifest-sha256", expectedRelease], {
