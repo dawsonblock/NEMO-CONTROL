@@ -9,3 +9,7 @@
 
 # OS state
 .DS_Store
+
+# Outer provenance snapshots and isolated test workspaces are release output.
+/.outer-provenance-*/
+/.outer-release/

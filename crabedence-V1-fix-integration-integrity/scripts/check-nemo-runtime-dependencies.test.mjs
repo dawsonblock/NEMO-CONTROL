@@ -71,6 +71,8 @@ test("outer repository CI runs the production guards and provenance checks", () 
     "python3 scripts/verify-nemo-transfer.py --require-source",
     "bash scripts/check-provenance-docs.sh",
     "scripts/outer-release-manifest.test.mjs",
+    'source --root "$GITHUB_WORKSPACE"',
+    'extract --archive "$archive" --expected-manifest-sha256 "$digest"',
   ]) {
     assert.ok(workflow.includes(gate), `outer CI must run ${gate}`);
   }

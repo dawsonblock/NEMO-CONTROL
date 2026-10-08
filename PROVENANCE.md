@@ -15,6 +15,53 @@ to re-verify every one of them, and what the baseline found.
 
 ## The identity chain
 
+### Complete outer-repository identity
+
+The transfer identity below covers the NEMO subtree, not the complete
+NEMO-CONTROL release. The outer-source tool is
+`crabedence-V1-fix-integration-integrity/scripts/outer-release-manifest.mjs`.
+Its `--help` describes the source, verify, archive, extract, evidence-digest,
+and finalize commands. All path arguments must be absolute; keep generated
+bundles and logs outside the source checkout, such as under `/tmp`.
+
+The source bundle contains `root/` (both component trees, including the
+frozen reference) and `source-manifest.json`. Its canonical inventory binds
+all HEAD paths plus both runtime provenance inventories to worktree bytes,
+symlink targets and executable bits. It carries the source commit and source
+component digests, the authoritative registry envelope, ABI, recipes and
+toolchain/dependency locks. Component digest semantics are embedded in the
+manifest: source component digests are **not binary attestations**.
+
+The source manifest hash must be retained through a trusted channel.
+Verification of an extracted bundle needs neither Git nor the original
+checkout. Every inventory digest is recomputed; extra, missing, changed,
+unsafe and colliding paths are refused. Source snapshots may describe dirty
+development bytes, but finalization refuses a dirty source or a changed
+HEAD/source inventory.
+
+The source manifest has no qualification claim. After an actual rebuild and
+qualification, finalization consumes a separate operator-supplied check
+record with matching source commit, source digest, registry digest and
+qualification evidence digest. Evidence and the check record are outside the
+source inventory to avoid circular hashes. The resulting release manifest
+binds all ten release identities and the qualification record.
+
+**Limits:** binding an operator record does not execute qualification, prove
+the truth of its checks, satisfy the production qualification matrix, or
+authorize publication. Authenticate the finalized release manifest as well
+as the source manifest; a trusted source hash alone cannot authenticate an
+operator's qualification assertion. No signing keys or promotion authority
+are supplied by this tooling.
+
+The root consolidation workflow exercises independent archive extraction
+and source verification. Rebuilding the extracted source, rerunning the full
+qualification matrix, comparing release-profile binaries and normalized
+evidence, signing, and publication remain release prerequisites. The
+historical `FINAL_QUALIFICATION_REPORT.md` must not be used as evidence for
+the newly generated outer identity.
+
+### NEMO transfer identity
+
 ```
 source commit → capability registry digest → shipped runtime digest
                                             ↘ declared source digest + delta

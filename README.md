@@ -91,6 +91,11 @@ The frozen ownership rules and enforcement limits are in
 composition root is `nemo-crabedence-runtime`; the experimental effect kernel
 is not a production authority.
 
+[`PROVENANCE.md`](PROVENANCE.md#complete-outer-repository-identity) describes
+the outer-source manifest and independent archive-verification tooling.
+This binds complete source identities; it does not replace production
+qualification, signing, or release authorization.
+
 ## Capability surface
 
 Crabedence's built-in registry currently pins eleven capabilities across the

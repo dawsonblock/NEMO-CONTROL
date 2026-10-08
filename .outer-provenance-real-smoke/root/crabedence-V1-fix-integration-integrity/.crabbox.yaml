@@ -1,3 +1,0 @@
-blacksmith:
-  workflow: .github/workflows/blacksmith-testbox.yml
-  job: go

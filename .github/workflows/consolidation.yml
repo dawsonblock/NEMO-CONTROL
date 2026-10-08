@@ -42,3 +42,16 @@ jobs:
       - name: Provenance and boundary regression tests
         run: |
           node --test scripts/check-nemo-runtime-dependencies.test.mjs scripts/outer-release-manifest.test.mjs scripts/package-source-archive.test.js scripts/release-rc-workflow.test.js
+      - name: Independently verify the complete outer source archive
+        env:
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+        run: |
+          tool="$GITHUB_WORKSPACE/crabedence-V1-fix-integration-integrity/scripts/outer-release-manifest.mjs"
+          bundle="$RUNNER_TEMP/outer-source"
+          archive="$RUNNER_TEMP/outer-source.tar.gz"
+          extracted="$RUNNER_TEMP/outer-source-extracted"
+          node "$tool" source --root "$GITHUB_WORKSPACE" --out "$bundle" > "$RUNNER_TEMP/outer-source-result.json"
+          digest="$(sha256sum "$bundle/source-manifest.json" | cut -d ' ' -f 1)"
+          node "$tool" archive --bundle "$bundle" --expected-manifest-sha256 "$digest" --out "$archive"
+          node "$tool" extract --archive "$archive" --expected-manifest-sha256 "$digest" --out "$extracted"

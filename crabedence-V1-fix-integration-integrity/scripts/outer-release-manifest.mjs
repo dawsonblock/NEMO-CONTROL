@@ -88,7 +88,7 @@ function linkTarget(p, target) {
 function stamp(s) {
   return [s.dev, s.ino, s.size, s.mode, s.mtimeNs, s.ctimeNs].map(String);
 }
-function readEntry(root, p, copyTo) {
+function readEntry(root, p, copyTo, withBytes = false) {
   const check = ancestors(root, p);
   const full = path.join(root, p);
   const before = fs.lstatSync(full, { bigint: true });
@@ -115,7 +115,7 @@ function readEntry(root, p, copyTo) {
     if (entry.kind === "symlink") fs.symlinkSync(entry.target, dest);
     else fs.writeFileSync(dest, bytes, { flag: "wx", mode: entry.executable ? 0o755 : 0o644 });
   }
-  return entry;
+  return withBytes ? { entry, bytes } : entry;
 }
 function validatePaths(paths) {
   const seen = new Set();
@@ -194,11 +194,17 @@ function dirtyPaths(root, headEntries, entries, format) {
   return entries.filter((e) => {
     const h = byPath.get(e.path);
     if (!h) return true;
-    const bytes = gitBlob(e) ?? fs.readFileSync(path.join(root, e.path));
+    const bytes = gitBlob(e) ?? readEntry(root, e.path, undefined, true).bytes;
     const oid = crypto.createHash(format).update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
     const mode = e.kind === "symlink" ? "120000" : e.executable ? "100755" : "100644";
     return oid !== h.oid || mode !== h.mode;
   }).map((e) => e.path);
+}
+function untrackedOuter(root, paths) {
+  const allowed = new Set(paths);
+  const extra = run("git", ["ls-files", "--others", "--exclude-standard", "-z"], root)
+    .split("\0").filter(Boolean).filter((p) => !allowed.has(p));
+  if (extra.length) fail(`untracked outer paths not in source inventory (commit source or ignore output): ${extra[0]}`);
 }
 const PYTHON_INVENTORY = `
 import importlib.util,json,os,sys,contextlib
@@ -257,12 +263,13 @@ function envelope(value) {
 function writeJSON(p, value) {
   fs.writeFileSync(p, `${canonical(value)}\n`, { flag: "wx", mode: 0o644 });
 }
-function jsonFile(p) {
+function jsonBytes(p) {
   const root = path.dirname(absolute(p));
-  const entry = readEntry(root, path.basename(p));
+  const { entry, bytes } = readEntry(root, path.basename(p), undefined, true);
   if (entry.kind !== "file") fail(`regular JSON required: ${p}`);
-  return JSON.parse(fs.readFileSync(p, "utf8"));
+  return bytes;
 }
+function jsonFile(p) { return JSON.parse(jsonBytes(p).toString("utf8")); }
 function newDirectory(p, sourceRoot) {
   p = absolute(p);
   if (p === sourceRoot || (sourceRoot && sourceRoot.startsWith(`${p}/`))) fail("output cannot contain source root");
@@ -276,6 +283,7 @@ export function createSource(root, out) {
   const runtime = runtimes(root);
   const paths = ordered(new Set([...initial.entries.map((e) => e.path), ...runtime.paths]));
   validatePaths(paths);
+  untrackedOuter(root, paths);
   out = absolute(out);
   if (paths.some((p) => path.join(root, p) === out || path.join(root, p).startsWith(`${out}/`))) fail("output overlaps source inventory");
   newDirectory(out, root);
@@ -302,6 +310,7 @@ export function createSource(root, out) {
     };
     const currentRuntime = runtimes(root);
     if (canonical(currentRuntime) !== canonical(runtime) || canonical(head(root)) !== canonical(initial)) fail("source/HEAD changed during generation");
+    untrackedOuter(root, paths);
     for (const e of entries) if (canonical(readEntry(root, e.path)) !== canonical(e)) fail(`source changed during generation: ${e.path}`);
     writeJSON(path.join(out, "source-manifest.json"), manifest);
     return manifest;
@@ -313,9 +322,9 @@ export function createSource(root, out) {
 function sourceManifest(bundle, expected) {
   if (!DIGEST.test(expected ?? "")) fail("trusted --expected-manifest-sha256 is required");
   const p = path.join(bundle, "source-manifest.json");
-  const bytes = fs.readFileSync(p);
+  const bytes = jsonBytes(p);
   if (sha256(bytes) !== expected) fail("source manifest does not match trusted SHA-256");
-  const m = jsonFile(p);
+  const m = JSON.parse(bytes.toString("utf8"));
   if (m.format !== FORMAT || !COMMIT.test(m.source_commit) || m.qualification_bundle_digest !== null
       || canonical(m.digest_semantics) !== canonical(semantics)) fail("invalid source manifest");
   if (digest(m.entries) !== m.source_tree_digest) fail("source digest mismatch");
@@ -359,7 +368,11 @@ export function finalize(root, source, expected, recordPath, evidence, out) {
   if (m.format !== FORMAT || m.dirty_paths.length) fail("finalization requires HEAD-clean source");
   const initial = head(root);
   if (initial.commit !== m.source_commit || canonical(initial.entries) !== canonical(m.head_inventory)) fail("qualification is not for current HEAD");
+  untrackedOuter(root, m.entries.map((e) => e.path));
   for (const e of m.entries) if (canonical(readEntry(root, e.path)) !== canonical(e)) fail(`current source differs: ${e.path}`);
+  const currentRuntime = runtimes(root);
+  if (!same(ordered(currentRuntime.paths), m.runtime_inventory) || currentRuntime.runtime_digest !== m.nemo_runtime_digest
+      || currentRuntime.frozen_digest !== m.frozen_runtime_digest) fail("current runtime union differs");
   const record = jsonFile(recordPath);
   const evidenceBefore = evidenceEntries(evidence);
   if (!evidenceBefore.length) fail("empty qualification bundle");
@@ -385,14 +398,15 @@ export function finalize(root, source, expected, recordPath, evidence, out) {
       qualification_statement: "Operator-supplied passed check record; this tool did not execute builds or qualification.",
     };
     writeJSON(path.join(out, "release-manifest.json"), release);
-    verifyBundle(out, expected);
+    verifyBundle(out, expected, sha256(jsonBytes(path.join(out, "release-manifest.json"))));
     if (!same(evidenceEntries(evidence), evidenceBefore) || canonical(jsonFile(recordPath)) !== canonical(record)
         || canonical(head(root)) !== canonical(initial)) fail("release input changed during finalization");
+    untrackedOuter(root, m.entries.map((e) => e.path));
     for (const e of m.entries) if (canonical(readEntry(root, e.path)) !== canonical(e)) fail("source changed during finalization");
     return release;
   } catch (error) { fs.rmSync(out, { recursive: true, force: true }); throw error; }
 }
-export function verifyBundle(bundle, expected) {
+export function verifyBundle(bundle, expected, expectedRelease) {
   bundle = absolute(bundle);
   const m = sourceManifest(bundle, expected);
   const names = ordered(fs.readdirSync(bundle));
@@ -402,7 +416,10 @@ export function verifyBundle(bundle, expected) {
     : ["root", "source-manifest.json"]);
   if (!same(names, allowed)) fail("missing/extra bundle paths");
   if (!isRelease) return m;
-  const release = jsonFile(path.join(bundle, "release-manifest.json"));
+  if (!DIGEST.test(expectedRelease ?? "")) fail("trusted --expected-release-manifest-sha256 is required for finalized release");
+  const releaseBytes = jsonBytes(path.join(bundle, "release-manifest.json"));
+  if (sha256(releaseBytes) !== expectedRelease) fail("release manifest does not match trusted SHA-256");
+  const release = JSON.parse(releaseBytes.toString("utf8"));
   if (release.format !== RELEASE || release.source_manifest_sha256 !== expected || m.dirty_paths.length) fail("invalid finalized release");
   for (const key of ["source_commit", ...Object.keys(semantics).filter((k) => k !== "qualification_bundle_digest")]) {
     if (release[key] !== m[key]) fail(`release identity mismatch: ${key}`);
@@ -410,24 +427,25 @@ export function verifyBundle(bundle, expected) {
   verifyEntries(path.join(bundle, "evidence"), release.evidence_entries);
   if (digest(release.evidence_entries) !== release.qualification_bundle_digest) fail("qualification bundle mismatch");
   const recordPath = path.join(bundle, "qualification-record.json");
-  if (sha256(fs.readFileSync(recordPath)) !== release.qualification_record_sha256) fail("qualification record mismatch");
-  const record = jsonFile(recordPath);
+  const recordBytes = jsonBytes(recordPath);
+  if (sha256(recordBytes) !== release.qualification_record_sha256) fail("qualification record mismatch");
+  const record = JSON.parse(recordBytes.toString("utf8"));
   qualification(record, m, release.qualification_bundle_digest);
   for (const c of record.checks) for (const p of c.evidence_paths) {
     if (!release.evidence_entries.some((e) => e.path === p)) fail(`missing check evidence: ${p}`);
   }
   return release;
 }
-export function archive(bundle, expected, output) {
+export function archive(bundle, expected, output, expectedRelease) {
   bundle = absolute(bundle); output = absolute(output);
-  verifyBundle(bundle, expected);
+  verifyBundle(bundle, expected, expectedRelease);
   if (fs.existsSync(output) || output.startsWith(`${bundle}/`)) fail("archive output must be new and outside bundle");
   const check = `${output}.verification`;
   if (fs.existsSync(check)) fail("archive verification directory already exists");
   try {
     run("tar", ["--format=ustar", "-czf", output, "-C", bundle, ...ordered(fs.readdirSync(bundle))], bundle);
-    verifyBundle(bundle, expected);
-    extract(output, check, expected);
+    verifyBundle(bundle, expected, expectedRelease);
+    extract(output, check, expected, expectedRelease);
   } catch (error) { fs.rmSync(output, { force: true }); throw error; }
   finally { fs.rmSync(check, { recursive: true, force: true }); }
 }
@@ -463,7 +481,7 @@ with tarfile.open(archive,"r:gz") as t:
     __import__("shutil").copyfileobj(src,dst)
    os.chmod(dest,0o755 if m.mode & 0o111 else 0o644)
 `;
-export function extract(archivePath, out, expected) {
+export function extract(archivePath, out, expected, expectedRelease) {
   archivePath = absolute(archivePath);
   if (!DIGEST.test(expected ?? "")) fail("trusted manifest hash required before extraction");
   const st = readEntry(path.dirname(archivePath), path.basename(archivePath));
@@ -472,7 +490,7 @@ export function extract(archivePath, out, expected) {
   try {
     run("python3", ["-B", "-c", EXTRACT, archivePath, out], path.dirname(out));
     if (canonical(readEntry(path.dirname(archivePath), path.basename(archivePath))) !== canonical(st)) fail("archive changed during extraction");
-    verifyBundle(out, expected);
+    verifyBundle(out, expected, expectedRelease);
   } catch (error) { fs.rmSync(out, { recursive: true, force: true }); throw error; }
 }
 export const HELP = `Outer source/release provenance (Node, Python 3, Git, Go, tar; no new dependencies).
@@ -480,14 +498,17 @@ All paths must be absolute. Outputs must not exist. Keep output outside tracked 
   source --root ROOT --out BUNDLE
   evidence-digest --evidence DIRECTORY
   finalize --root ROOT --source BUNDLE --expected-manifest-sha256 SHA256 --record RECORD.json --evidence DIRECTORY --out RELEASE
-  verify --bundle BUNDLE --expected-manifest-sha256 SHA256
-  archive --bundle BUNDLE --expected-manifest-sha256 SHA256 --out ARCHIVE.tar.gz
-  extract --archive ARCHIVE.tar.gz --expected-manifest-sha256 SHA256 --out DIRECTORY
+  verify --bundle BUNDLE --expected-manifest-sha256 SHA256 [--expected-release-manifest-sha256 SHA256]
+  archive --bundle BUNDLE --expected-manifest-sha256 SHA256 [--expected-release-manifest-sha256 SHA256] --out ARCHIVE.tar.gz
+  extract --archive ARCHIVE.tar.gz --expected-manifest-sha256 SHA256 [--expected-release-manifest-sha256 SHA256] --out DIRECTORY
 Compute SHA256 with sha256sum BUNDLE/source-manifest.json; retain it through a trusted
-channel. verify/extract need no Git or Go. Source embeds the authoritative registry
+channel. Finalized bundles additionally REQUIRE SHA256 of release-manifest.json
+through that channel. verify/extract need no Git or Go. Source embeds the authoritative registry
 envelope; verification checks its bytes, not a fabricated identity or a new registry.
 Source may bind dirty WORKTREE bytes; finalization refuses dirty source or a changed
-HEAD/inventory/byte/mode. It does not build or qualify. After real qualification,
+HEAD/inventory/byte/mode or untracked nonignored outer source. It does not build or
+qualify. Run qualification against BUNDLE/root, never against an implicit live
+checkout. After real qualification,
 supply {"format":"nemo-outer-qualification-v1","status":"passed","source_commit":...,
 "source_tree_digest":...,"capability_registry_digest":...,
 "qualification_bundle_digest":<evidence-digest output>,
@@ -513,15 +534,19 @@ function cli(argv) {
     archive: ["bundle", "expected-manifest-sha256", "out"],
     extract: ["archive", "expected-manifest-sha256", "out"],
   }[command];
+  if (["verify", "archive", "extract"].includes(command) && Object.hasOwn(options, "expected-release-manifest-sha256")) {
+    required.push("expected-release-manifest-sha256");
+  }
   if (!required || !same(ordered(Object.keys(options)), ordered(required))) fail("invalid options; use --help");
   const a = options, expected = a["expected-manifest-sha256"];
+  const expectedRelease = a["expected-release-manifest-sha256"];
   switch (command) {
     case "source": console.log(canonical(createSource(a.root, a.out))); break;
     case "evidence-digest": console.log(evidenceDigest(a.evidence)); break;
     case "finalize": console.log(canonical(finalize(a.root, a.source, expected, a.record, a.evidence, a.out))); break;
-    case "verify": console.log(canonical(verifyBundle(a.bundle, expected))); break;
-    case "archive": archive(a.bundle, expected, a.out); console.log(a.out); break;
-    case "extract": extract(a.archive, a.out, expected); console.log(a.out); break;
+    case "verify": console.log(canonical(verifyBundle(a.bundle, expected, expectedRelease))); break;
+    case "archive": archive(a.bundle, expected, a.out, expectedRelease); console.log(a.out); break;
+    case "extract": extract(a.archive, a.out, expected, expectedRelease); console.log(a.out); break;
   }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

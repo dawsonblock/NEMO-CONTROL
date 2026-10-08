@@ -30,6 +30,7 @@ function fixture(t) {
   t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
   const root = path.join(workspace, "checkout");
   fs.mkdirSync(root);
+  put(root, ".gitignore", "target/\nreal-authority/\n");
   put(root, "README.md", "outer source\n");
   put(root, "authority/policy.json", '{"decision":"deny"}\n');
   put(root, `${CRAB}/go.mod`, "module outerfixture\n\ngo 1.20\n");
@@ -228,14 +229,25 @@ test("finalization requires source identity, registry identity, actual check evi
   const r = finalize(f.root, f.bundle, f.expected, q.recordPath, q.evidence, release);
   assert.equal(r.qualification_bundle_digest, q.record.qualification_bundle_digest);
   assert.match(r.qualification_statement, /did not execute/);
-  verifyBundle(release, f.expected);
+  const expectedRelease = sha256(fs.readFileSync(path.join(release, "release-manifest.json")));
+  assert.throws(() => verifyBundle(release, f.expected), /expected-release-manifest/);
+  verifyBundle(release, f.expected, expectedRelease);
   put(release, "evidence/checks/log.txt", "tampered evidence");
-  assert.throws(() => verifyBundle(release, f.expected), /tampered/);
+  assert.throws(() => verifyBundle(release, f.expected, expectedRelease), /tampered/);
+  const changed = JSON.parse(fs.readFileSync(path.join(release, "release-manifest.json")));
+  changed.qualification_statement = "forged claim";
+  put(release, "release-manifest.json", canonical(changed));
+  assert.throws(() => verifyBundle(release, f.expected, expectedRelease), /release manifest.*trusted/);
 });
 
 test("finalization refuses post-qualification source or HEAD changes", (t) => {
   const f = fixture(t);
   const q = qualification(f);
+  put(f.root, "untracked-source.go", "package unexpected\n");
+  assert.throws(() => finalize(f.root, f.bundle, f.expected, q.recordPath, q.evidence,
+    path.join(f.workspace, "untracked-release")), /untracked outer paths/);
+  assert.throws(() => createSource(f.root, path.join(f.workspace, "untracked-source")), /untracked outer paths/);
+  fs.unlinkSync(path.join(f.root, "untracked-source.go"));
   put(f.root, "README.md", "changed after qualification");
   assert.throws(() => finalize(f.root, f.bundle, f.expected, q.recordPath, q.evidence,
     path.join(f.workspace, "bad-release")), /current source differs/);
@@ -251,13 +263,14 @@ test("archive independently carries whole outer root and real frozen reference w
   const q = qualification(f);
   const release = path.join(f.workspace, "release");
   finalize(f.root, f.bundle, f.expected, q.recordPath, q.evidence, release);
+  const expectedRelease = sha256(fs.readFileSync(path.join(release, "release-manifest.json")));
   const tarball = path.join(f.workspace, "outer.tar.gz");
-  archive(release, f.expected, tarball);
+  archive(release, f.expected, tarball, expectedRelease);
   fs.rmSync(f.root, { recursive: true });
   fs.rmSync(f.bundle, { recursive: true });
   fs.rmSync(release, { recursive: true });
   const extracted = path.join(f.workspace, "independent");
-  extract(tarball, extracted, f.expected);
+  extract(tarball, extracted, f.expected, expectedRelease);
   assert.equal(fs.existsSync(path.join(extracted, "root/.git")), false);
   assert.equal(fs.lstatSync(path.join(extracted, "root", FROZEN)).isDirectory(), true);
   assert.equal(fs.lstatSync(path.join(extracted, "root", FROZEN)).isSymbolicLink(), false);
@@ -267,7 +280,7 @@ test("archive independently carries whole outer root and real frozen reference w
   fs.symlinkSync(command("sh", ["-c", "command -v python3"], f.workspace).trim(), path.join(bin, "python3"));
   const cli = path.join(scripts, "outer-release-manifest.mjs");
   const result = execFileSync(process.execPath, [cli, "verify", "--bundle", extracted,
-    "--expected-manifest-sha256", f.expected], {
+    "--expected-manifest-sha256", f.expected, "--expected-release-manifest-sha256", expectedRelease], {
     encoding: "utf8", env: { ...process.env, PATH: bin, PYTHONDONTWRITEBYTECODE: "1" },
   });
   assert.equal(JSON.parse(result).source_tree_digest, f.manifest.source_tree_digest);
