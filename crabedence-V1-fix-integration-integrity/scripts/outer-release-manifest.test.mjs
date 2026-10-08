@@ -32,6 +32,7 @@ function fixture(t) {
   fs.mkdirSync(root);
   put(root, ".gitignore", "target/\nreal-authority/\n");
   put(root, "README.md", "outer source\n");
+  put(root, `long/${"a".repeat(160)}/${"b".repeat(120)}.txt`, "PAX long-path fixture\n");
   put(root, "authority/policy.json", '{"decision":"deny"}\n');
   put(root, `${CRAB}/go.mod`, "module outerfixture\n\ngo 1.20\n");
   put(root, `${CRAB}/scripts/build.sh`, "#!/bin/sh\nexit 0\n", 0o755);
@@ -152,6 +153,13 @@ test("unsafe paths, normalized collisions and symlink ancestors fail closed", (t
     "-c", "commit.gpgsign=false", "commit", "-qm", "collision"], f.root);
   assert.throws(() => createSource(f.root, path.join(f.workspace, "collision")), /colliding/);
   command("git", ["reset", "--hard", "-q", "HEAD~1"], f.root);
+  put(f.root, "Folder/a", "one");
+  put(f.root, "folder/b", "two");
+  command("git", ["add", "Folder/a", "folder/b"], f.root);
+  command("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+    "-c", "commit.gpgsign=false", "commit", "-qm", "directory collision"], f.root);
+  assert.throws(() => createSource(f.root, path.join(f.workspace, "directory-collision")), /colliding path component/);
+  command("git", ["reset", "--hard", "-q", "HEAD~1"], f.root);
   fs.renameSync(path.join(f.root, "authority"), path.join(f.root, "real-authority"));
   fs.symlinkSync("real-authority", path.join(f.root, "authority"));
   assert.throws(() => createSource(f.root, path.join(f.workspace, "ancestor")), /unsafe ancestor/);
@@ -247,6 +255,9 @@ test("finalization refuses post-qualification source or HEAD changes", (t) => {
   assert.throws(() => finalize(f.root, f.bundle, f.expected, q.recordPath, q.evidence,
     path.join(f.workspace, "untracked-release")), /untracked outer paths/);
   assert.throws(() => createSource(f.root, path.join(f.workspace, "untracked-source")), /untracked outer paths/);
+  command("git", ["add", "untracked-source.go"], f.root);
+  assert.throws(() => createSource(f.root, path.join(f.workspace, "staged-source")), /index-only additions/);
+  command("git", ["reset", "-q", "HEAD", "--", "untracked-source.go"], f.root);
   fs.unlinkSync(path.join(f.root, "untracked-source.go"));
   put(f.root, "README.md", "changed after qualification");
   assert.throws(() => finalize(f.root, f.bundle, f.expected, q.recordPath, q.evidence,

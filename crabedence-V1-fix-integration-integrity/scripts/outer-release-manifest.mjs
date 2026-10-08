@@ -120,12 +120,20 @@ function readEntry(root, p, copyTo, withBytes = false) {
 function validatePaths(paths) {
   const seen = new Set();
   const collision = new Set();
+  const namespace = new Map();
   for (const p of paths) {
     safePath(p);
     const folded = p.normalize("NFC").toLowerCase();
     if (seen.has(p) || collision.has(folded)) fail(`duplicate/colliding path: ${p}`);
     seen.add(p);
     collision.add(folded);
+    let name = p;
+    while (name !== ".") {
+      const key = name.normalize("NFC").toLowerCase();
+      if (namespace.has(key) && namespace.get(key) !== name) fail(`duplicate/colliding path component: ${name}`);
+      namespace.set(key, name);
+      name = path.posix.dirname(name);
+    }
   }
   for (const p of paths) {
     let parent = path.posix.dirname(p);
@@ -202,9 +210,9 @@ function dirtyPaths(root, headEntries, entries, format) {
 }
 function untrackedOuter(root, paths) {
   const allowed = new Set(paths);
-  const extra = run("git", ["ls-files", "--others", "--exclude-standard", "-z"], root)
+  const extra = run("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], root)
     .split("\0").filter(Boolean).filter((p) => !allowed.has(p));
-  if (extra.length) fail(`untracked outer paths not in source inventory (commit source or ignore output): ${extra[0]}`);
+  if (extra.length) fail(`untracked outer paths or index-only additions not in source inventory (commit source or ignore output): ${extra[0]}`);
 }
 const PYTHON_INVENTORY = `
 import importlib.util,json,os,sys,contextlib
@@ -283,6 +291,7 @@ export function createSource(root, out) {
   const runtime = runtimes(root);
   const paths = ordered(new Set([...initial.entries.map((e) => e.path), ...runtime.paths]));
   validatePaths(paths);
+  for (const p of paths) ancestors(root, p);
   untrackedOuter(root, paths);
   out = absolute(out);
   if (paths.some((p) => path.join(root, p) === out || path.join(root, p).startsWith(`${out}/`))) fail("output overlaps source inventory");
@@ -443,7 +452,7 @@ export function archive(bundle, expected, output, expectedRelease) {
   const check = `${output}.verification`;
   if (fs.existsSync(check)) fail("archive verification directory already exists");
   try {
-    run("tar", ["--format=ustar", "-czf", output, "-C", bundle, ...ordered(fs.readdirSync(bundle))], bundle);
+    run("tar", ["--format=posix", "-czf", output, "-C", bundle, ...ordered(fs.readdirSync(bundle))], bundle);
     verifyBundle(bundle, expected, expectedRelease);
     extract(output, check, expected, expectedRelease);
   } catch (error) { fs.rmSync(output, { force: true }); throw error; }

@@ -11,5 +11,6 @@
 .DS_Store
 
 # Outer provenance snapshots and isolated test workspaces are release output.
-/.outer-provenance-*/
+/.outer-provenance-*
+/crabedence-V1-fix-integration-integrity/scripts/.outer-provenance-tests-*/
 /.outer-release/
