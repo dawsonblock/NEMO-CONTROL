@@ -11,9 +11,9 @@ canonical pipeline (or the lane named beside it) executed in this environment
 against these exact bytes; the machine-readable records live in
 `crabedence-V1-fix-integration-integrity/dist/release-evidence/`.
 
-- Source commit: `0725423a7bc90b924859e827abe4af1f97bcdfa3`
+- Source commit: `e1e5f2ce8c622ee2e01a6e1b362b5d4be99a94a6`
   (branch `fix/execution-admission-and-qualprovider-durability`)
-- Source tree: `406b6ae21fceb531b7c37ccd730dd2e66e586cf2`
+- Source tree: `3e6a0ce8faed1df1a65547eefdba7c4c90882ddd`
 - Frozen source: `NEMO-feat-native-plugin-isolation`
   - `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957`
   - 1438 files, 10 symlinks (provenance format 2)
@@ -27,8 +27,8 @@ against these exact bytes; the machine-readable records live in
   in `runtimes/nemo-transfer-manifest.json`
 - Qualification run: `RELEASE_VERSION=0.54.0-rc.1`, `GOTOOLCHAIN=local`
   `go1.26.5`, live gates against a managed PostgreSQL 16 (initdb fallback),
-  qualified at `2026-10-09T03:47:50Z`
-- Evidence root: `0d45ba24d8b67f6f7107f7e19be766de3b10b4476909ec3819f9a9a5caf8dcc5`
+  qualified at `2026-10-09T07:02:58Z`
+- Evidence root: `f4de5ff304de2c18e3dbfa179c445e9fe4724afc180ac9068423db8ef207b39b`
   (`evidence-root.json`; per-gate records and log digests in
   `dist/release-evidence/gates/` and `gate-results/`)
 
@@ -50,6 +50,29 @@ previous identity `e1279ef2…` (1466 files, 78 modified / 29 added / 1 removed)
 was qualified by the prior revision of this report; its verdict applies only
 to those bytes.
 
+## Corrective record (v0.54.0-rc.2, F-001)
+
+The rc.2 audit found a real defect in the checkpoint feature qualified at
+`0725423a`: terminal evidence was enumerated in `execution_id` order, but
+execution ids are random UUIDv4 — not terminalization order — so a record
+that terminalized late legitimately inserted into the middle of an
+already-checkpointed prefix and invalidated it. The repair makes the
+enumeration append-only by construction: schema migration 17 adds a
+`terminal_seq` column and a single-row `terminal_counter` on both engines;
+each terminalization (`Finalize`, `ResolveRecovery`) allocates its position
+inside the same transaction as the terminal write, so a rolled-back or
+CAS-losing attempt leaves no gap and the counter lock makes sequence order
+equal durable commit order under concurrent writers. Existing terminal rows
+backfill in `(updated_at, execution_id)` order; a convergence pass at every
+open heals rolling-upgrade stragglers at the ledger end, and a terminal row
+still lacking a position is a fail-closed enumeration error. Checkpoints are
+now `evidence-checkpoint-v2`, binding each covered record's ledger position
+into the chain (renumbering is detected like rewriting); v1 checkpoints
+remain verifiable under their own semantics. The commit-order regression
+test fails on the previous implementation and passes on this one. The
+pipeline was rerun for this identity; the results are the table below, and
+the prior verdict applies only to its bytes.
+
 ## Supersession record (prior cycle)
 
 That cycle replaced the one before it: it bound runtime digest
@@ -68,7 +91,7 @@ regenerated.
 The canonical pipeline (`scripts/generate-release-evidence.sh`, run through
 `scripts/test-live-postgres.sh` so the live gates have PostgreSQL) executed
 against the identity above: **32/32 gates PASS, 0 failed, 0 skipped, RELEASE
-ADMISSION PASS**, all 22 CRAB-V1 invariants, evidence root `0d45ba24…`.
+ADMISSION PASS**, all 22 CRAB-V1 invariants, evidence root `f4de5ff3…`.
 
 | Gate | Type | Tests | Status |
 |---|---|---|---|
@@ -83,14 +106,14 @@ ADMISSION PASS**, all 22 CRAB-V1 invariants, evidence root `0d45ba24…`.
 | go-race-providers | TEST | 788 | PASS |
 | effect-fabric-contract | TEST | 31 | PASS |
 | effect-fabric-reconciliation | TEST | 32 | PASS |
-| effect-fabric-evidence | TEST | 14 | PASS |
+| effect-fabric-evidence | TEST | 36 | PASS |
 | effect-fabric-post-dispatch-timeout | TEST | 2 | PASS (32s ambiguous-wait + 65s late-response, real wall-clock) |
-| effect-fabric-race | TEST | 912 | PASS |
+| effect-fabric-race | TEST | 947 | PASS |
 | registry-digest | PROVENANCE | — | PASS |
 | nemo-transfer-provenance | PROVENANCE | — | PASS |
 | postgres-fencing | INTEGRATION | 4 | PASS |
 | postgres-parity | INTEGRATION | 4 | PASS |
-| effect-fabric-postgres | INTEGRATION | 146 | PASS |
+| effect-fabric-postgres | INTEGRATION | 158 | PASS |
 | provider-github-faults | FAULT_INJECTION | 7 | PASS |
 | provider-github-real-api | — | — | SKIP (the gate's own "not applicable" semantics: no test token/repo configured) |
 | authority-postgres | INTEGRATION | 11 | PASS |
@@ -121,8 +144,8 @@ Lanes outside the pipeline, executed against the same identity:
 | Admission ceilings | `go test ./internal/execution/ -run TestAdmission\|TestConnectionCeiling\|TestHandshakeCeiling\|TestHeaderTimeout\|TestStopDrains` | PASS (rerun: 6 tests, each red before the fix) |
 | Provenance gates | `check-nemo-transfer-manifest.sh`; `check-provenance-docs.sh`; `verify-nemo-transfer.py --require-source` | PASS (rerun, cross-language parity on the new identity) |
 | Credential isolation | `scripts/check-nemo-credential-isolation.sh` | PASS (rerun) |
-| Evidence checkpoints | `go test ./internal/evidence/` — sign/verify roundtrip; a rewritten covered field, a deleted or reordered covered record, a store rolled back below the covered count, an untrusted signer, a tampered signed field, and a signer/public_key mismatch all fail; appended records do not disturb an older checkpoint | PASS (rerun) |
-| Terminal-evidence enumeration | `TestStoreConformanceTerminalEvidence` on both engines (postgres under the live DSN): every terminal record enumerated in execution_id order with its immutable digests and provider identity; non-terminal records excluded | PASS (rerun) |
+| Evidence checkpoints | `go test ./internal/evidence/` — sign/verify roundtrip; a rewritten covered field, a deleted or reordered covered record, a store rolled back below the covered count, an untrusted signer, a tampered signed field, a signer/public_key mismatch, a renumbered ledger position, and a non-commit-order enumeration all fail; a pre-upgrade v1 checkpoint still verifies under its own canon; appended records do not disturb an older checkpoint | PASS (rerun) |
+| Terminal-evidence enumeration | `TestStoreConformanceTerminalEvidence*` on both engines (postgres under the live DSN): every terminal record enumerated in durable commit order (`terminal_seq`) with its immutable digests and provider identity; non-terminal records excluded; a late-terminalizing older execution appends rather than rewriting a checkpointed prefix; 16-way concurrent terminalization yields unique strictly-ordered positions; UNKNOWN→COMMITTED recovery terminalization lands in the ledger; upgrade backfill assigns commit-order positions without collisions; a terminal row missing its position fails closed and self-heals at open | PASS (rerun) |
 | Checkpoint emission | `go test ./internal/execution/ -run TestEmitCheckpoint` — emitted file verifies; sequence increments; an unreadable existing file is refused rather than overwritten | PASS (rerun) |
 | Independent verifier CLI | `go test ./cmd/evidence-checkpoint/` — end-to-end: emit → verify → tamper → rollback → usage, over a real sqlite store | PASS (rerun) |
 | NEMO Relay Python binding | `just test-python` | CARRIED (no files on that surface changed this cycle; last qualified against `e1279ef2…`) |
@@ -213,9 +236,9 @@ Lanes outside the pipeline, executed against the same identity:
 ## Verdict
 
 **Locally qualified for the executed gate set on `darwin_arm64`** for source
-commit `0725423a`, source tree `406b6ae2`, runtime `f2033ac7…` (1466 files,
+commit `e1e5f2ce`, source tree `3e6a0ce8`, runtime `f2033ac7…` (1466 files,
 79 modified / 29 added / 1 removed): the canonical pipeline passed 32/32
-gates with RELEASE ADMISSION PASS and evidence root `0d45ba24…`, the Rust
+gates with RELEASE ADMISSION PASS and evidence root `f4de5ff3…`, the Rust
 workspace lane and the runtime e2e passed on the same bytes, and the
 provenance gates agree on the identity.
 
