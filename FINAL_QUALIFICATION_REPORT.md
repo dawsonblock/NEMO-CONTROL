@@ -11,26 +11,53 @@ canonical pipeline (or the lane named beside it) executed in this environment
 against these exact bytes; the machine-readable records live in
 `crabedence-V1-fix-integration-integrity/dist/release-evidence/`.
 
-- Source commit: `e1e5f2ce8c622ee2e01a6e1b362b5d4be99a94a6`
-  (branch `fix/execution-admission-and-qualprovider-durability`)
-- Source tree: `3e6a0ce8faed1df1a65547eefdba7c4c90882ddd`
+- Source commit: (recorded by the rc.3 requalification run below; the
+  branch is `fix/rc3-pr03-deterministic-evidence`)
+- Source tree: (recorded by the rc.3 requalification run)
 - Frozen source: `NEMO-feat-native-plugin-isolation`
   - `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957`
   - 1438 files, 10 symlinks (provenance format 2)
 - Canonical runtime: `runtimes/nemo-relay`
-  - `f2033ac7eddc2ee8f5b35c2ad8a3d5a3260f8e4aad03d761f3959918ba011776`
+  - `f6229bb342d31fc1fa3224fd24b53490ceb507e4489f305605bb274947c16d0f`
   - 1466 files, 10 symlinks, version `0.9.1-rc.4`, format 2
 - Provenance policy: `runtimes/nemo-provenance-policy.json`
   - `0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1`
-- Declared source→runtime delta: 79 modified, 29 added, 1 removed file
+- Declared source→runtime delta: 80 modified, 29 added, 1 removed file
   (10 declared added entries); 0 link/retype/mode changes — all declared
   in `runtimes/nemo-transfer-manifest.json`
-- Qualification run: `RELEASE_VERSION=0.54.0-rc.1`, `GOTOOLCHAIN=local`
-  `go1.26.5`, live gates against a managed PostgreSQL 16 (initdb fallback),
-  qualified at `2026-10-09T07:02:58Z`
+- Qualification run: `RELEASE_VERSION=0.54.0-rc.3`, `GOTOOLCHAIN=local`
+  `go1.26.5`, live gates against a local PostgreSQL 14.20 started by
+  `initdb` (Docker daemon read-only in this environment; the CI image
+  lane `postgres:16` is `NOT_RUN` here), in progress at the time of this
+  edit
 - Evidence root: `f4de5ff304de2c18e3dbfa179c445e9fe4724afc180ac9068423db8ef207b39b`
   (`evidence-root.json`; per-gate records and log digests in
   `dist/release-evidence/gates/` and `gate-results/`)
+
+## Supersession record (rc.3 corrective cycle, descriptor inventory)
+
+The rc.3 corrective cycle moved the runtime identity again. The bounded
+3..65_536 close-on-exec sweep qualified below was still incomplete: a
+descriptor planted above the ceiling crossed `exec` unmarked. The parent
+now inventories its open descriptors before the fork boundary
+(`close_range(CLOSE_RANGE_CLOEXEC)` on Linux, a `proc_pidinfo` inventory
+on macOS) and marks every inherited descriptor — the kernel channel
+remains the one preserved fd, marking (not closing) still protects the
+child-error pipe, and a real fork/exec regression proves a marked
+descriptor is lost while the preserved one survives. The high-fd lane
+(fd 70_000) is qualified on a Linux aarch64 host — the macOS host's
+kernel ceiling (61440) cannot place it and reports SKIP. The runtime
+identity moves to `f6229bb3…` (1466 files, 80 modified / 29 added /
+1 removed); `libc` joins `plugin-host` for the two syscalls rustix 1.1.4
+does not wrap, and the TCB budget raise is recorded in `security/tcb.toml`
+with its rationale. The previous identity `f2033ac7…` (1466 files,
+79 modified / 29 added / 1 removed) was qualified by the prior revision
+of this report; its verdict applies only to those bytes. The same cycle
+made execution `Stop` linearizable against admission (PR-04), made the
+evidence inventory canonical across generation/finalization/packaging
+(PR-06), made source packaging portable across BSD and GNU tar (PR-07),
+and gave evidence checkpoints a retained append-only sequence with a
+scoped custody path (PR-08).
 
 ## Supersession record (descriptor boundary)
 
