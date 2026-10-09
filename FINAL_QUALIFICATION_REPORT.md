@@ -6,21 +6,56 @@ never PASS. Status vocabulary is defined in `PROVENANCE.md`.
 
 ## Artifact identity (tested bytes)
 
+**The tree has moved past this report's qualified identity.** The identity below
+is the current tree; it has not been through the qualification pipeline. The last
+identity the pipeline executed against was `e1279ef2…` (1466 files, 78 modified /
+29 added / 1 removed), and every gate result further down binds that identity —
+none of it carries forward.
+
 - Frozen source: `NEMO-feat-native-plugin-isolation`
   - `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957`
   - 1438 files, 10 symlinks (provenance format 2)
 - Canonical runtime: `runtimes/nemo-relay`
-  - `e1279ef20acc448ac52a6ac2332c81f71e278b2bf71579160ffc953d0f9567a0`
+  - `f2033ac7eddc2ee8f5b35c2ad8a3d5a3260f8e4aad03d761f3959918ba011776`
   - 1466 files, 10 symlinks, version `0.9.1-rc.4`, format 2
 - Provenance policy: `runtimes/nemo-provenance-policy.json`
   - `0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1`
-- Declared source→runtime delta: 78 modified, 29 added, 1 removed file
+- Declared source→runtime delta: 79 modified, 29 added, 1 removed file
   (10 declared added entries); 0 link/retype/mode changes — all declared
   in `runtimes/nemo-transfer-manifest.json`
-- Installed distribution (tested root):
+- Installed distribution (tested root for the superseded identity):
   `dist/nemo-control_0.53.2_darwin_arm64`, component manifest
   `7a4585d24a0cbbca426bc68ebf3b418ac6e225175c7e974755816b06a95933ab`,
   6 components, unsigned (development build; no signing key configured)
+
+## Supersession record (descriptor boundary)
+
+This cycle's change is a boundary fix, not a gate rerun. The plugin host now
+marks every inherited descriptor close-on-exec before `exec`
+(`crates/plugin-host/src/supervisor.rs`, with the sweep ceiling in
+`limits.rs`), so a descriptor the kernel process holds without close-on-exec
+can no longer cross into the host and through it into a plugin; the intercept
+fixture witnesses descriptors by inode identity, and the runtime e2e plants a
+caller descriptor and asserts it does not cross. That moves the canonical
+runtime to the identity above. The previous identity `e1279ef2…` (78 modified)
+was qualified by the gate table below; its verdict does not carry forward.
+
+Rerun for the new identity, recorded here as the evidence that exists:
+
+- `cargo test -p nemo-relay-plugin-host` — the 128 lib tests and every
+  integration suite (architecture, lifecycle conformance, limits, platform
+  boundary, process backend) pass.
+- `cargo clippy -p nemo-relay-plugin-host --all-targets --all-features --
+  -D warnings` and `cargo fmt --check` pass.
+- `scripts/test-nemo-runtime-e2e.sh` — 30 checks pass, including the new
+  descriptor-boundary check; with the boundary removed the same check fails
+  with `canary_fds=3`, so it detects the defect it exists for.
+- `scripts/check-nemo-transfer-manifest.sh` and
+  `scripts/check-provenance-docs.sh` pass against the regenerated manifest.
+
+Everything else in the gate table was executed against the superseded identity
+and is stale by construction; the next qualification cycle must rerun the
+pipeline before any verdict applies to `f2033ac7…`.
 
 ## Supersession record
 
@@ -150,14 +185,19 @@ not change this cycle; everything else is `NOT_RUN` and named.
 
 ## Verdict
 
-**Locally qualified for the executed gate set on `darwin_arm64`**: the
-provenance chain, source-packaging verification, installed-artifact
-qualification, and every rerun test lane pass on the exact artifact
-described by the evidence above — identity `e1279ef2…`, not the
-superseded `060719d7…`.
+**NOT QUALIFIED for the current identity `f2033ac7…`.** The descriptor-boundary
+fix moved the canonical runtime past the identity this report's gate table was
+executed against; the table and everything below bind only the superseded
+`e1279ef2…`. What was rerun for the move is in the supersession record above;
+the next qualification cycle must rerun the pipeline (including the clean-room,
+live-provider, and signing lanes) before a verdict applies to the current tree.
 
-**Not SIGNED, not PUBLISHED** — and the standalone-checkout-bound
-`internal/cli` subset plus a real clean-room run on the packaged
-archive remain to confirm in the release environment. The evidence
-pipeline itself ran end-to-end here: 32/32 gates, admission PASS,
-all 22 release invariants.
+**Superseded verdict (identity `e1279ef2…`):** locally qualified for the
+executed gate set on `darwin_arm64` — the provenance chain, source-packaging
+verification, installed-artifact qualification, and every rerun test lane pass
+on that exact artifact.
+
+**Not SIGNED, not PUBLISHED** — and the standalone-checkout-bound `internal/cli`
+subset plus a real clean-room run on the packaged archive remain to confirm in
+the release environment. The evidence pipeline itself ran end-to-end for the
+superseded identity: 32/32 gates, admission PASS, all 22 release invariants.
