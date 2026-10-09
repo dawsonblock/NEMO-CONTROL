@@ -11,9 +11,9 @@ canonical pipeline (or the lane named beside it) executed in this environment
 against these exact bytes; the machine-readable records live in
 `crabedence-V1-fix-integration-integrity/dist/release-evidence/`.
 
-- Source commit: (recorded by the rc.3 requalification run below; the
-  branch is `fix/rc3-pr03-deterministic-evidence`)
-- Source tree: (recorded by the rc.3 requalification run)
+- Source commit: `24a493a4e5c4bbf7b01c32dc225f56b5352730b5`
+  (branch `fix/rc3-pr03-deterministic-evidence`)
+- Source tree: `e8d5922f79fcc4db838dc329193d44d8626a0d83`
 - Frozen source: `NEMO-feat-native-plugin-isolation`
   - `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957`
   - 1438 files, 10 symlinks (provenance format 2)
@@ -28,9 +28,8 @@ against these exact bytes; the machine-readable records live in
 - Qualification run: `RELEASE_VERSION=0.54.0-rc.3`, `GOTOOLCHAIN=local`
   `go1.26.5`, live gates against a local PostgreSQL 14.20 started by
   `initdb` (Docker daemon read-only in this environment; the CI image
-  lane `postgres:16` is `NOT_RUN` here), in progress at the time of this
-  edit
-- Evidence root: `f4de5ff304de2c18e3dbfa179c445e9fe4724afc180ac9068423db8ef207b39b`
+  lane `postgres:16` is `NOT_RUN` here), qualified at `2026-10-09T23:38:06Z`
+- Evidence root: `4db591607f89005593458458f4add770b5312c4bc2180d2eaebeaaf537cb9962`
   (`evidence-root.json`; per-gate records and log digests in
   `dist/release-evidence/gates/` and `gate-results/`)
 
@@ -115,10 +114,13 @@ regenerated.
 
 ## Qualification run
 
-The canonical pipeline (`scripts/generate-release-evidence.sh`, run through
-`scripts/test-live-postgres.sh` so the live gates have PostgreSQL) executed
-against the identity above: **32/32 gates PASS, 0 failed, 0 skipped, RELEASE
-ADMISSION PASS**, all 22 CRAB-V1 invariants, evidence root `f4de5ff3…`.
+The canonical pipeline (`scripts/generate-release-evidence.sh`, with
+`CRABBOX_TEST_DATABASE_URL` pointed at a local `initdb` PostgreSQL so the
+live gates have a database) executed against the identity above:
+**32/32 gates PASS, 0 failed, RELEASE ADMISSION PASS**, all 22 CRAB-V1
+invariants, evidence root `4db59160…`. `provider-github-real-api` is the
+one SKIP — its own "not applicable" semantics, no test token/repo
+configured — and is not counted among the 32 gate records.
 
 | Gate | Type | Tests | Status |
 |---|---|---|---|
@@ -133,9 +135,9 @@ ADMISSION PASS**, all 22 CRAB-V1 invariants, evidence root `f4de5ff3…`.
 | go-race-providers | TEST | 788 | PASS |
 | effect-fabric-contract | TEST | 31 | PASS |
 | effect-fabric-reconciliation | TEST | 32 | PASS |
-| effect-fabric-evidence | TEST | 36 | PASS |
+| effect-fabric-evidence | TEST | 40 | PASS |
 | effect-fabric-post-dispatch-timeout | TEST | 2 | PASS (32s ambiguous-wait + 65s late-response, real wall-clock) |
-| effect-fabric-race | TEST | 947 | PASS |
+| effect-fabric-race | TEST | 964 | PASS |
 | registry-digest | PROVENANCE | — | PASS |
 | nemo-transfer-provenance | PROVENANCE | — | PASS |
 | postgres-fencing | INTEGRATION | 4 | PASS |
@@ -156,35 +158,77 @@ ADMISSION PASS**, all 22 CRAB-V1 invariants, evidence root `f4de5ff3…`.
 | nemo-tests | TEST | 145 | PASS |
 | evidence-secret-scan | PROVENANCE | — | PASS |
 
-Lanes outside the pipeline, executed against the same identity:
+Lanes outside the pipeline, executed against the same identity unless
+noted otherwise:
 
 | Lane | Command / check | Status |
 |---|---|---|
-| Rust workspace tests | `cargo test --workspace --locked --no-fail-fast` | PASS (rerun: 5353 passed / 47 ignored / 0 failed across 106 targets) |
-| Plugin-host crate | `cargo test -p nemo-relay-plugin-host` | PASS (rerun: 128 lib tests + architecture / lifecycle / limits / platform-boundary / process-backend suites) |
-| Clippy / fmt (changed crate) | `cargo clippy -p nemo-relay-plugin-host --all-targets --all-features -- -D warnings`; `cargo fmt --check` | PASS (rerun) |
-| Runtime e2e | `scripts/test-nemo-runtime-e2e.sh` | PASS (rerun: 30 checks, including the new descriptor canary; mutation check fails `canary_fds=3`) |
-| Critical-path e2e | `scripts/test-nemo-critical-path.sh` | PASS (rerun: CRITICAL commit with evidence through the deployed service and provider) |
-| Full Go suite | `go test -race -timeout=20m ./...` | PASS (rerun: every package green, `internal/cli` 1162s — the prior cycle's nested-checkout carve-out did not reproduce) |
-| Live-PostgreSQL matrix | `scripts/test-live-postgres.sh` — `TestLive` across idempotency / reconcile / execution / authority | PASS (rerun, `-race`; the 100-way concurrency qualification classifies ceiling refusals: 50 of 100 refused pre-dispatch, `counter=1`) |
-| Qualification provider regressions | `go test ./internal/qualprovider/` + crash-phase and injected-failure suites | PASS (rerun: 20 tests; a mutation check that disables the repair fails the suite) |
-| Admission ceilings | `go test ./internal/execution/ -run TestAdmission\|TestConnectionCeiling\|TestHandshakeCeiling\|TestHeaderTimeout\|TestStopDrains` | PASS (rerun: 6 tests, each red before the fix) |
-| Provenance gates | `check-nemo-transfer-manifest.sh`; `check-provenance-docs.sh`; `verify-nemo-transfer.py --require-source` | PASS (rerun, cross-language parity on the new identity) |
-| Credential isolation | `scripts/check-nemo-credential-isolation.sh` | PASS (rerun) |
-| Evidence checkpoints | `go test ./internal/evidence/` — sign/verify roundtrip; a rewritten covered field, a deleted or reordered covered record, a store rolled back below the covered count, an untrusted signer, a tampered signed field, a signer/public_key mismatch, a renumbered ledger position, and a non-commit-order enumeration all fail; a pre-upgrade v1 checkpoint still verifies under its own canon; appended records do not disturb an older checkpoint | PASS (rerun) |
-| Terminal-evidence enumeration | `TestStoreConformanceTerminalEvidence*` on both engines (postgres under the live DSN): every terminal record enumerated in durable commit order (`terminal_seq`) with its immutable digests and provider identity; non-terminal records excluded; a late-terminalizing older execution appends rather than rewriting a checkpointed prefix; 16-way concurrent terminalization yields unique strictly-ordered positions; UNKNOWN→COMMITTED recovery terminalization lands in the ledger; upgrade backfill assigns commit-order positions without collisions; a terminal row missing its position fails closed and self-heals at open | PASS (rerun) |
-| Checkpoint emission | `go test ./internal/execution/ -run TestEmitCheckpoint` — emitted file verifies; sequence increments; an unreadable existing file is refused rather than overwritten | PASS (rerun) |
-| Independent verifier CLI | `go test ./cmd/evidence-checkpoint/` — end-to-end: emit → verify → tamper → rollback → usage, over a real sqlite store | PASS (rerun) |
-| NEMO Relay Python binding | `just test-python` | CARRIED (no files on that surface changed this cycle; last qualified against `e1279ef2…`) |
+| Plugin-host crate — Linux aarch64 | `cargo test -p nemo-relay-plugin-host` (lima VM, kernel fd ceiling 1048576) | PASS — 126 lib + 5 architecture + 34 process-boundary + lifecycle/limits suites; `inherited_descriptor_above_the_legacy_ceiling_is_marked` plants fd 70_000 and verifies it is marked close-on-exec; the real fork/exec regression proves a marked descriptor is lost and the preserved kernel channel survives |
+| Plugin-host crate — macOS arm64 | `cargo test -p nemo-relay-plugin-host` | PASS — same suite minus the fd-70_000 placement (host kernel ceiling 61440; the check reports SKIP locally by design) |
+| Clippy (changed crate) | `cargo clippy -p nemo-relay-plugin-host --all-targets --all-features -- -D warnings` | PASS |
+| Rust workspace tests | `cargo test --workspace --locked --no-fail-fast` | NOT_RUN this cycle — the plugin-host crate suite is the changed surface; last full-workspace qualified against `f2033ac7…` |
+| Runtime e2e | `scripts/test-nemo-runtime-e2e.sh` | NOT_RUN this cycle — last qualified against `f2033ac7…`; the descriptor containment it exercises is covered on this identity by the plugin-host process-boundary suite above |
+| Critical-path e2e | `scripts/test-nemo-critical-path.sh` | NOT_RUN this cycle — last qualified against `f2033ac7…` |
+| Full Go suite | `go test -race -timeout=20m ./...` | PASS — every package green including `internal/cli` (1056s); checkpoint config/emission regressions included |
+| Live-PostgreSQL matrix | `scripts/test-live-postgres.sh` — `TestLive` across idempotency / reconcile / execution / authority | PASS (`-race`, local `initdb` PostgreSQL 14.20 — the Docker `postgres:16` lane is NOT_RUN, daemon read-only in this environment) |
+| Stop/admission boundary | deterministic barrier test + 1000-schedule randomized campaign (`internal/execution/stop_accept_race_test.go`) | PASS — a handler can no longer register after the drain decision; refusals post-stop verified; campaign 1.15s |
+| Transport-refusal classification | `TestConcurrentIdenticalMutations` — 100-way burst against bounded admission | PASS — definitive FAILED frames and pre-frame closes both counted as fail-closed refusals; zero successes, zero mutations |
+| Provenance gates | `check-provenance-docs.sh`; `verify-nemo-transfer.py`; `cmd/nemo-runtime-digest` verify | PASS on `f6229bb3…` — manifest regenerated, delta 80 modified / 29 added / 1 removed all declared, policy and baseline-source digests unchanged |
+| Checkpoint custody | `go test ./internal/execution/ -run TestEmitCheckpoint` + `go test ./internal/evidence/` + `go test ./cmd/evidence-checkpoint/` | PASS — every emission retained in `<path>.jsonl`, sequence survives latest-file loss, corrupt retained tail refuses emission, custody path mirrors latest + log; **independent custody itself is NOT_QUALIFIED as a deployment property** — it requires the custody target to live outside the service host's failure domain, which this environment does not provide |
+| Source-packaging clean room | `package-source-archive.sh --format tar.gz\|zip` + extraction verification | PASS — both formats built and verified on extracted bytes (manifest 4115 entries, transfer provenance ok); tar.gz `f2538aba…`, zip `6701f858…`; both BSD-tar and GNU-tar branches exercised in the packager suite |
+| Evidence-bundle packaging | `package-release-evidence.sh` | PASS — `crabedence-0.54.0-rc.3-release-evidence.tar.gz` `b16475b2…` (qualification-state bundle; `artifact.json` binding lands at release-archive time) |
+| NEMO Relay Python binding | `just test-python` | CARRIED — no files on that surface changed this cycle; last qualified against `f2033ac7…` |
 | NEMO Relay Node binding | `just test-node` | CARRIED (same reason) |
 | NEMO Relay Go binding | `just test-go` | CARRIED (same reason) |
-| Installed-artifact qualification | `scripts/test-nemo-installed-distribution.sh` | NOT_RUN — the `dist/` build is from the superseded identity; building and qualifying a new one is the release lane |
-| Source-packaging clean room | `package-source-archive.sh` + extraction verification | NOT_RUN this cycle (no packaging change; last qualified against `e1279ef2…`) |
+| Installed-artifact qualification | `scripts/test-nemo-installed-distribution.sh` | NOT_RUN — release lane; no binary artifact was produced in this environment |
 | macOS release lane | Developer ID signing + notarization | NOT_RUN — no signing authority in this environment |
+| Release-archive build (`artifact.json`) | `scripts/build-release-candidate.sh` | NOT_RUN — requires the merged authorize-source record for `v0.54.0-rc.3`; evidence bundle is therefore qualification-state, pre-artifact |
 | SIGNED | signature on the exact qualified artifact | NOT_RUN |
 | PUBLISHED | the exact signed artifact published | NOT_RUN |
 
-## Defects fixed this cycle
+## Defects fixed this cycle (rc.3 corrective register)
+
+1. **F-005 — `Stop()` could race a late `handlers.Add(1)`.** The accept
+   loop registered accepted connections after `handlers.Wait()` could
+   already observe zero, so a connection served after the service
+   reported stopped. Admission and lifecycle now move under the service
+   mutex (running→stopping→stopped), the accept loop is joined before
+   the drain, and a drain timeout cannot report a clean stop.
+2. **F-004 — descriptor sweeping was capped below high-numbered fds.**
+   The bounded 3..65_536 sweep is replaced by an open-descriptor
+   inventory (`close_range` on Linux, `proc_pidinfo` on macOS) marking
+   every inherited descriptor `CLOEXEC`; the kernel channel is
+   preserved; a planted fd 70_000 verifies on Linux and reports SKIP on
+   hosts that cannot place it.
+3. **F-008 — evidence inventory disagreement.** Finalization silently
+   pruned hidden entries the packager rejected. One canonical inventory
+   (`scripts/lib/evidence-inventory.sh`) now binds generation,
+   finalization, verification and packaging: strays fail closed,
+   attestation members in sealed bundles ship.
+4. **F-009 — nonportable `tar --format=gnutar`.** The packager detects
+   the tar implementation and uses its own spelling (`--format=gnu` /
+   `--format=gnutar`); both write the same on-disk format.
+5. **F-006 — no retained checkpoint sequence or custody path.** Every
+   emission is now appended to a tamper-evident `<path>.jsonl` (the
+   sequence authority; a corrupt tail refuses emission), and
+   `CRABEDENCE_CHECKPOINT_CUSTODY_PATH` mirrors the sequence onto a
+   second target. Independent custody is a deployment property the
+   service cannot verify: with no custody target the startup report
+   says so and this report scopes the property NOT_QUALIFIED.
+6. **F-007 — stale transfer manifest.** Regenerated: shipped identity
+   `f6229bb3…` (80 modified / 29 added / 1 removed, all declared);
+   the hand-edited provenance documents restate it.
+7. **Q-001 — stale release identity.** `VERSION` and every
+   version-carrying surface moved `0.54.0-rc.1` → `0.54.0-rc.3`;
+   `verify-version-consistency.mjs` passes.
+8. **Q-002 — qualification evidence.** The canonical pipeline reran
+   (32/32 PASS) on the exact corrected tree; lane results above record
+   honest PASS / NOT_RUN per surface.
+
+Prior-cycle defect records are below, unchanged — their verdicts apply
+to the bytes they qualified.
+
+## Defects fixed in the previous cycle
 
 1. **Unbounded execution admission (release-blocking for hostile-local
    use).** The accept loop spawned a handler goroutine per accepted
@@ -241,11 +285,16 @@ Lanes outside the pipeline, executed against the same identity:
 - The Python/Node/Go binding lanes are carried: no files on those surfaces
   changed this cycle, and the Rust workspace suite that backs them passed on
   this identity.
-- The live PostgreSQL gates ran against a local PostgreSQL 16 started by
-  `scripts/test-live-postgres.sh` (initdb fallback; Docker unavailable in
-  this environment). A reused database across pipeline runs flips
-  `postgres-parity` — the gate requires a fresh database per run, which the
-  script provides.
+- The live PostgreSQL gates ran against a local PostgreSQL 14.20 started
+  by `initdb` (Docker daemon read-only in this environment — the CI image
+  lane `postgres:16` is `NOT_RUN` here). A reused database across pipeline
+  runs flips `postgres-parity` — the gate requires a fresh database per
+  run.
+- Independent checkpoint custody is implemented but scoped NOT_QUALIFIED:
+  `CRABEDENCE_CHECKPOINT_CUSTODY_PATH` mirrors the retained checkpoint
+  sequence, and custody is only independent when that storage lives
+  outside the service host's failure domain — a deployment property this
+  environment cannot establish.
 - The macOS release lane needs a Developer ID identity and a notary profile;
   nothing in this environment can produce them, so the restricted-macos
   confinement cannot be exercised here (its refusal paths are covered by
@@ -263,14 +312,22 @@ Lanes outside the pipeline, executed against the same identity:
 ## Verdict
 
 **Locally qualified for the executed gate set on `darwin_arm64`** for source
-commit `e1e5f2ce`, source tree `3e6a0ce8`, runtime `f2033ac7…` (1466 files,
-79 modified / 29 added / 1 removed): the canonical pipeline passed 32/32
-gates with RELEASE ADMISSION PASS and evidence root `f4de5ff3…`, the Rust
-workspace lane and the runtime e2e passed on the same bytes, and the
+commit `24a493a4`, source tree `e8d5922f`, runtime `f6229bb3…` (1466 files,
+80 modified / 29 added / 1 removed): the canonical pipeline passed 32/32
+gates with RELEASE ADMISSION PASS and evidence root `4db59160…`, the
+plugin-host crate suite passed on both this host and a Linux aarch64
+target (including the fd-70_000 lane the macOS kernel cannot run), the
+full Go race suite and live-PostgreSQL lanes are green, and the
 provenance gates agree on the identity.
 
-**Not SIGNED, not PUBLISHED.** The installed-distribution qualification, the
-packaging clean room, and the macOS signing/notarization lane are `NOT_RUN`
-for this identity — they belong to the release environment. The binding lanes
-are carried from the previous cycle and must be rerun there if any file on
-those surfaces changes.
+**Not SIGNED, not PUBLISHED — STOP-SHIP remains.** The release-archive
+build (`artifact.json`), installed-distribution qualification, macOS
+signing/notarization, and publication lanes are `NOT_RUN` — they belong
+to the release environment, and admission of the signed deliverable
+requires rerunning the mandatory gates against those exact bytes. The
+binding lanes are carried from the previous cycle and must be rerun
+there if any file on those surfaces changes. Independent checkpoint
+custody is scoped NOT_QUALIFIED: the mechanism exists
+(`CRABEDENCE_CHECKPOINT_CUSTODY_PATH`), but custody is only independent
+when its storage lives outside the service host's failure domain — a
+deployment property no test in this environment can establish.
