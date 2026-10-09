@@ -368,6 +368,11 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	// routing change).
 	service.SetAdapterAvailability(adapterStates)
 
+	// Admission ceilings: bounded by the validated configuration, so a
+	// malformed, idle, or adversarial client cannot allocate unbounded
+	// handler goroutines, memory, or file descriptors.
+	service.SetAdmissionLimits(cfg.MaxConnections, cfg.MaxHandshakeConnections)
+
 	// Wire production authority: PostgreSQL-backed grant resolution.
 	// Without this, the service defaults to NoopGrantResolver which
 	// denies all grant-required capabilities in production.
@@ -462,6 +467,15 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 				fmt.Fprintf(os.Stderr, "reconciliation supervisor stopped: %v\n", err)
 			}
 		}()
+
+		// Evidence checkpoint: periodically commit the canonical
+		// terminal-evidence enumeration to a signed file an operator can
+		// archive independently — the anchor that proves the store still
+		// contains everything it covered (cmd/evidence-checkpoint
+		// verifies). Disabled unless a path is configured.
+		if cfg.CheckpointPath != "" {
+			go runCheckpointLoop(ctx, store, signer, cfg.CheckpointPath, cfg.CheckpointInterval)
+		}
 	}
 
 	// Start service
