@@ -11,9 +11,9 @@ canonical pipeline (or the lane named beside it) executed in this environment
 against these exact bytes; the machine-readable records live in
 `crabedence-V1-fix-integration-integrity/dist/release-evidence/`.
 
-- Source commit: `92ce2073deb926def7c2942b330499ddb8cb4a1e`
+- Source commit: `0725423a7bc90b924859e827abe4af1f97bcdfa3`
   (branch `fix/execution-admission-and-qualprovider-durability`)
-- Source tree: `959a79f20f7161e94321e1a155404fa2477aecff`
+- Source tree: `406b6ae21fceb531b7c37ccd730dd2e66e586cf2`
 - Frozen source: `NEMO-feat-native-plugin-isolation`
   - `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957`
   - 1438 files, 10 symlinks (provenance format 2)
@@ -27,8 +27,8 @@ against these exact bytes; the machine-readable records live in
   in `runtimes/nemo-transfer-manifest.json`
 - Qualification run: `RELEASE_VERSION=0.54.0-rc.1`, `GOTOOLCHAIN=local`
   `go1.26.5`, live gates against a managed PostgreSQL 16 (initdb fallback),
-  qualified at `2026-10-09T02:47:48Z`
-- Evidence root: `2e22799f07d8fa7522318efd2efaa02e828b76dc146c8f81327e97affa12f5b2`
+  qualified at `2026-10-09T03:47:50Z`
+- Evidence root: `0d45ba24d8b67f6f7107f7e19be766de3b10b4476909ec3819f9a9a5caf8dcc5`
   (`evidence-root.json`; per-gate records and log digests in
   `dist/release-evidence/gates/` and `gate-results/`)
 
@@ -68,7 +68,7 @@ regenerated.
 The canonical pipeline (`scripts/generate-release-evidence.sh`, run through
 `scripts/test-live-postgres.sh` so the live gates have PostgreSQL) executed
 against the identity above: **32/32 gates PASS, 0 failed, 0 skipped, RELEASE
-ADMISSION PASS**, all 22 CRAB-V1 invariants, evidence root `2e22799f…`.
+ADMISSION PASS**, all 22 CRAB-V1 invariants, evidence root `0d45ba24…`.
 
 | Gate | Type | Tests | Status |
 |---|---|---|---|
@@ -121,6 +121,10 @@ Lanes outside the pipeline, executed against the same identity:
 | Admission ceilings | `go test ./internal/execution/ -run TestAdmission\|TestConnectionCeiling\|TestHandshakeCeiling\|TestHeaderTimeout\|TestStopDrains` | PASS (rerun: 6 tests, each red before the fix) |
 | Provenance gates | `check-nemo-transfer-manifest.sh`; `check-provenance-docs.sh`; `verify-nemo-transfer.py --require-source` | PASS (rerun, cross-language parity on the new identity) |
 | Credential isolation | `scripts/check-nemo-credential-isolation.sh` | PASS (rerun) |
+| Evidence checkpoints | `go test ./internal/evidence/` — sign/verify roundtrip; a rewritten covered field, a deleted or reordered covered record, a store rolled back below the covered count, an untrusted signer, a tampered signed field, and a signer/public_key mismatch all fail; appended records do not disturb an older checkpoint | PASS (rerun) |
+| Terminal-evidence enumeration | `TestStoreConformanceTerminalEvidence` on both engines (postgres under the live DSN): every terminal record enumerated in execution_id order with its immutable digests and provider identity; non-terminal records excluded | PASS (rerun) |
+| Checkpoint emission | `go test ./internal/execution/ -run TestEmitCheckpoint` — emitted file verifies; sequence increments; an unreadable existing file is refused rather than overwritten | PASS (rerun) |
+| Independent verifier CLI | `go test ./cmd/evidence-checkpoint/` — end-to-end: emit → verify → tamper → rollback → usage, over a real sqlite store | PASS (rerun) |
 | NEMO Relay Python binding | `just test-python` | CARRIED (no files on that surface changed this cycle; last qualified against `e1279ef2…`) |
 | NEMO Relay Node binding | `just test-node` | CARRIED (same reason) |
 | NEMO Relay Go binding | `just test-go` | CARRIED (same reason) |
@@ -164,6 +168,18 @@ Lanes outside the pipeline, executed against the same identity:
    recovery rejections and denied CRITICAL receipts now travel on
    `reconciler-status.json` via `Health.InvariantCounters`.
 
+6. **No independently-held anchor over the terminal evidence set.** A
+   receipt left in the same store as the record it describes is rewritten
+   or deleted with it, and a store rolled back to an earlier snapshot
+   silently loses the executions that happened after it. The service now
+   periodically commits the canonical terminal-evidence enumeration to a
+   signed checkpoint (`CRABEDENCE_CHECKPOINT_PATH`,
+   `CRABEDENCE_CHECKPOINT_INTERVAL`) that an operator archives
+   independently, and `cmd/evidence-checkpoint` is the verifier that
+   proves a held checkpoint still covers the store — a deleted,
+   rewritten, reordered or rolled-back covered record fails, while
+   records appended afterwards do not disturb an older checkpoint.
+
 ## Deferred / limitations
 
 - **Phase 18 (fleet.ts decomposition):** deliberately not started.
@@ -187,8 +203,8 @@ Lanes outside the pipeline, executed against the same identity:
 - Residual audit findings recorded, not fixed: no dial-time IP policy in the
   provider transport (mitigated by TLS validation, redirect refusal, and
   plaintext restricted to loopback); the receipt does not directly carry the
-  policy/registry digest or authoritative timestamps; no independently-held
-  checkpoints; the signer is not yet a separate service identity.
+  policy/registry digest or authoritative timestamps; the signer is not yet a
+  separate service identity.
 - The workspace git root is the NEMO-CONTROL umbrella, so the packager's
   dirty-tree check also sees the sibling trees' tracked modifications; in the
   standalone Crabedence checkout the release workflow runs with the root as
@@ -197,9 +213,9 @@ Lanes outside the pipeline, executed against the same identity:
 ## Verdict
 
 **Locally qualified for the executed gate set on `darwin_arm64`** for source
-commit `92ce2073`, source tree `959a79f2`, runtime `f2033ac7…` (1466 files,
+commit `0725423a`, source tree `406b6ae2`, runtime `f2033ac7…` (1466 files,
 79 modified / 29 added / 1 removed): the canonical pipeline passed 32/32
-gates with RELEASE ADMISSION PASS and evidence root `2e22799f…`, the Rust
+gates with RELEASE ADMISSION PASS and evidence root `0d45ba24…`, the Rust
 workspace lane and the runtime e2e passed on the same bytes, and the
 provenance gates agree on the identity.
 
