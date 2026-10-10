@@ -11,9 +11,9 @@ canonical pipeline (or the lane named beside it) executed in this environment
 against these exact bytes; the machine-readable records live in
 `crabedence-V1-fix-integration-integrity/dist/release-evidence/`.
 
-- Source commit: `24a493a4e5c4bbf7b01c32dc225f56b5352730b5`
+- Source commit: `369d2860fe38a9afd4696b9f6218fb6bdb2b29e0`
   (branch `fix/rc3-pr03-deterministic-evidence`)
-- Source tree: `e8d5922f79fcc4db838dc329193d44d8626a0d83`
+- Source tree: `3306903e7b293dd69c835548d9347e2ed2f8443d`
 - Frozen source: `NEMO-feat-native-plugin-isolation`
   - `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957`
   - 1438 files, 10 symlinks (provenance format 2)
@@ -28,10 +28,27 @@ against these exact bytes; the machine-readable records live in
 - Qualification run: `RELEASE_VERSION=0.54.0-rc.3`, `GOTOOLCHAIN=local`
   `go1.26.5`, live gates against a local PostgreSQL 14.20 started by
   `initdb` (Docker daemon read-only in this environment; the CI image
-  lane `postgres:16` is `NOT_RUN` here), qualified at `2026-10-09T23:38:06Z`
-- Evidence root: `4db591607f89005593458458f4add770b5312c4bc2180d2eaebeaaf537cb9962`
+  lane `postgres:16` is `NOT_RUN` here), qualified at `2026-10-10T03:29:33Z`
+- Evidence root: `177a3afb7492078684cc0573aa8ae5c3d89f9df4dff570c8e68d2a81954fb681`
   (`evidence-root.json`; per-gate records and log digests in
   `dist/release-evidence/gates/` and `gate-results/`)
+
+## Supersession record (rc.3 clean-room lane, F-010/F-011)
+
+An earlier revision of this cycle qualified commit `24a493a4` (evidence
+root `4db59160…`) and packaged release artifacts bound to it. Running the
+`release-rc.yml` clean-room steps locally on those staged bytes exposed
+two latent defects that made the lane unpassable on any shipped archive:
+the manifest verifier's self-exemption covered only the passed manifest
+path, so the embedded `release-evidence/source-tree-sha256.txt` always
+failed the inverse check (`unexpected=1`) whenever verification ran
+against the published manifest (F-010); and the schema validator could
+never resolve — the verifier preferred the in-tree script whose `ajv`
+dependency the archive deliberately does not ship, while the workflow
+installed dependencies at `clean-room/nemo` without copying the validator
+script there (F-011). Both were fixed (PR-12), the pipeline reran on the
+repaired tree, and this report now binds commit `369d2860`; the previous
+verdict applies only to its bytes.
 
 ## Supersession record (rc.3 corrective cycle, descriptor inventory)
 
@@ -118,7 +135,7 @@ The canonical pipeline (`scripts/generate-release-evidence.sh`, with
 `CRABBOX_TEST_DATABASE_URL` pointed at a local `initdb` PostgreSQL so the
 live gates have a database) executed against the identity above:
 **32/32 gates PASS, 0 failed, RELEASE ADMISSION PASS**, all 22 CRAB-V1
-invariants, evidence root `4db59160…`. `provider-github-real-api` is the
+invariants, evidence root `177a3afb…`. `provider-github-real-api` is the
 one SKIP — its own "not applicable" semantics, no test token/repo
 configured — and is not counted among the 32 gate records.
 
@@ -175,14 +192,17 @@ noted otherwise:
 | Transport-refusal classification | `TestConcurrentIdenticalMutations` — 100-way burst against bounded admission | PASS — definitive FAILED frames and pre-frame closes both counted as fail-closed refusals; zero successes, zero mutations |
 | Provenance gates | `check-provenance-docs.sh`; `verify-nemo-transfer.py`; `cmd/nemo-runtime-digest` verify | PASS on `f6229bb3…` — manifest regenerated, delta 80 modified / 29 added / 1 removed all declared, policy and baseline-source digests unchanged |
 | Checkpoint custody | `go test ./internal/execution/ -run TestEmitCheckpoint` + `go test ./internal/evidence/` + `go test ./cmd/evidence-checkpoint/` | PASS — every emission retained in `<path>.jsonl`, sequence survives latest-file loss, corrupt retained tail refuses emission, custody path mirrors latest + log; **independent custody itself is NOT_QUALIFIED as a deployment property** — it requires the custody target to live outside the service host's failure domain, which this environment does not provide |
-| Source-packaging clean room | `package-source-archive.sh --format tar.gz\|zip` + extraction verification | PASS — both formats built and verified on extracted bytes (manifest 4115 entries, transfer provenance ok); tar.gz `f2538aba…`, zip `6701f858…`; both BSD-tar and GNU-tar branches exercised in the packager suite |
-| Evidence-bundle packaging | `package-release-evidence.sh` | PASS — `crabedence-0.54.0-rc.3-release-evidence.tar.gz` `b16475b2…` (qualification-state bundle; `artifact.json` binding lands at release-archive time) |
+| Source-packaging clean room | `package-source-archive.sh --format tar.gz\|zip` + extraction verification | PASS — both formats built and verified on extracted bytes (manifest 4115 entries, transfer provenance ok); tar.gz `ab1b6069…`, zip `7999cdcd…`; both BSD-tar and GNU-tar branches exercised in the packager suite |
+| Release-artifact binding | `artifact.json` schema v2 (the `release-rc` build-job object) | PASS — binds the qualified source `369d2860`/`3306903e`, manifest `ee07a945…`, both archive digests+sizes, the CycloneDX SBOM `3a5bf473…`, the registry, qualification `84910888…` and provenance digests, toolchain `go1.26.5`/`v24.16.0`/`11.13.0` |
+| Evidence-bundle packaging | `finalize-release-evidence.sh` + `package-release-evidence.sh` | PASS — `crabedence-0.54.0-rc.3-release-evidence.tar.gz` `97540ebc…`; the bundle is FINALIZED (artifact-bound): `artifact.json` is covered by `SHA256SUMS`, `evidence-manifest.json` `05ee5af8…` (95 files), evidence root `177a3afb…` |
+| Release clean room | the `release-rc.yml` `clean-room-verify` steps run locally on the staged bytes | PASS — published `SHA256SUMS` self-check clean; both extracted trees verify the published source manifest with the shipped verifier (`unexpected=0`); tar/zip inventories identical; `qualify-source-distribution` PASS on each tree; `verify-release-artifact --mode release` 45/45 including schema validation through the materialized `clean-room/nemo` pinned `ajv` |
 | NEMO Relay Python binding | `just test-python` | CARRIED — no files on that surface changed this cycle; last qualified against `f2033ac7…` |
 | NEMO Relay Node binding | `just test-node` | CARRIED (same reason) |
 | NEMO Relay Go binding | `just test-go` | CARRIED (same reason) |
 | Installed-artifact qualification | `scripts/test-nemo-installed-distribution.sh` | NOT_RUN — release lane; no binary artifact was produced in this environment |
 | macOS release lane | Developer ID signing + notarization | NOT_RUN — no signing authority in this environment |
-| Release-archive build (`artifact.json`) | `scripts/build-release-candidate.sh` | NOT_RUN — requires the merged authorize-source record for `v0.54.0-rc.3`; evidence bundle is therefore qualification-state, pre-artifact |
+| GoReleaser binary candidate | `scripts/build-release-candidate.sh` (credential-free producer, `vX.Y.Z` final tags only) | NOT_RUN — rejects `-rc` tags by design and requires the merged authorize-source record on `main`; the rc deliverable is the source-archive object above, which is bound |
+| Attestation | `actions/attest` SLSA + qualification predicate | NOT_RUN — requires GitHub OIDC (`id-token: write`); the attestation subjects are the staged bytes verified above |
 | SIGNED | signature on the exact qualified artifact | NOT_RUN |
 | PUBLISHED | the exact signed artifact published | NOT_RUN |
 
@@ -224,6 +244,24 @@ noted otherwise:
 8. **Q-002 — qualification evidence.** The canonical pipeline reran
    (32/32 PASS) on the exact corrected tree; lane results above record
    honest PASS / NOT_RUN per surface.
+9. **F-010 — the clean-room source-manifest check could never pass.**
+   `verify-source-manifest.sh` exempted only the passed manifest path
+   from its inverse check, so verifying an extracted archive against the
+   *published* manifest always failed on the packager-embedded
+   `release-evidence/source-tree-sha256.txt` (`unexpected=1`). The
+   embedded copy is now exempt exactly when it is byte-identical to the
+   manifest under verification — which also newly proves the shipped
+   self-identity equals the published record. A divergent copy still
+   fails closed.
+10. **F-011 — the clean-room schema validator could never resolve.** The
+    verifier preferred the in-tree `validate-schema.mjs`, which cannot
+    resolve `ajv` where the archive deliberately ships no
+    `node_modules`; and the workflow installed dependencies at
+    `clean-room/nemo` without ever copying the validator script there,
+    so the resolved candidate did not exist. The verifier now prefers
+    `dirname(evidence)/nemo/scripts/validate-schema.mjs`, and both
+    clean-room install steps copy the script beside the pinned
+    dependencies.
 
 Prior-cycle defect records are below, unchanged — their verdicts apply
 to the bytes they qualified.
@@ -312,16 +350,21 @@ to the bytes they qualified.
 ## Verdict
 
 **Locally qualified for the executed gate set on `darwin_arm64`** for source
-commit `24a493a4`, source tree `e8d5922f`, runtime `f6229bb3…` (1466 files,
+commit `369d2860`, source tree `3306903e`, runtime `f6229bb3…` (1466 files,
 80 modified / 29 added / 1 removed): the canonical pipeline passed 32/32
-gates with RELEASE ADMISSION PASS and evidence root `4db59160…`, the
+gates with RELEASE ADMISSION PASS and evidence root `177a3afb…`, the
 plugin-host crate suite passed on both this host and a Linux aarch64
 target (including the fd-70_000 lane the macOS kernel cannot run), the
-full Go race suite and live-PostgreSQL lanes are green, and the
-provenance gates agree on the identity.
+full Go race suite and live-PostgreSQL lanes are green, the provenance
+gates agree on the identity, `artifact.json` binds the exact archive
+digests to the qualified source, the evidence bundle is finalized and
+packaged, and the release clean-room lane verified the shipped bytes
+end-to-end — including the two defects (F-010, F-011) that made the lane
+unpassable before this cycle's fix.
 
-**Not SIGNED, not PUBLISHED — STOP-SHIP remains.** The release-archive
-build (`artifact.json`), installed-distribution qualification, macOS
+**Not SIGNED, not PUBLISHED — STOP-SHIP remains.** The GoReleaser binary
+candidate (`build-release-candidate.sh` — a `vX.Y.Z` final-tag lane),
+installed-distribution qualification, GitHub OIDC attestation, macOS
 signing/notarization, and publication lanes are `NOT_RUN` — they belong
 to the release environment, and admission of the signed deliverable
 requires rerunning the mandatory gates against those exact bytes. The
