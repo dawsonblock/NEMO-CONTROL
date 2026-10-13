@@ -2,6 +2,7 @@ package execution
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -105,20 +106,84 @@ func clearStaleSocket(path string) error {
 
 // verifySocketFile confirms a freshly bound socket is owner-only and
 // owned by the current user — the chmod result is verified, not
-// assumed.
-func verifySocketFile(path string) error {
+// assumed. On success it returns the socket's filesystem identity so
+// Stop can later remove only that same object.
+func verifySocketFile(path string) (*socketFileID, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
-		return fmt.Errorf("inspect socket %s: %w", path, err)
+		return nil, fmt.Errorf("inspect socket %s: %w", path, err)
 	}
 	if info.Mode()&os.ModeSocket == 0 {
-		return fmt.Errorf("socket path %s is not a socket after listen (mode %s)", path, info.Mode())
+		return nil, fmt.Errorf("socket path %s is not a socket after listen (mode %s)", path, info.Mode())
 	}
 	if err := verifyOwnership(path, info, "socket"); err != nil {
-		return err
+		return nil, err
 	}
 	if perm := info.Mode().Perm(); perm&0o077 != 0 {
-		return fmt.Errorf("socket %s is group/world accessible (mode %04o)", path, perm)
+		return nil, fmt.Errorf("socket %s is group/world accessible (mode %04o)", path, perm)
+	}
+	return socketFileIdentity(info), nil
+}
+
+// socketFileID identifies one filesystem object by device, inode and
+// inode change time. A path that later names a different object — the
+// socket was deleted and a successor or attacker re-created the name —
+// fails the identity comparison even though the name matches. The
+// change time matters on filesystems that aggressively recycle inode
+// numbers (Linux tmpfs returns the just-freed inode to the next create,
+// where APFS does not): device+inode alone cannot tell the recycled
+// successor apart from the object this lifecycle bound, but a new
+// object never inherits the original's ctime.
+type socketFileID struct {
+	dev uint64
+	ino uint64
+	// ctim is the inode change time in nanoseconds, or 0 on platforms
+	// where Stat_t does not expose it — the comparison then degrades to
+	// device+inode as before.
+	ctim int64
+}
+
+// removeOwnedSocket deletes the socket path gen bound, and only that
+// object — the identity consulted is the GENERATION's, captured before
+// the drain, never whatever a later Start may have published. A path
+// that no longer names the bound socket — already removed, replaced by
+// a successor, or swapped for a foreign file — is left alone rather
+// than unlinked: the bytes at that name may belong to somebody else.
+//
+// The result is an error whenever the path is left unresolved — an
+// inspect failure, a foreign occupant, or a remove failure — so Stop
+// reports a non-clean stop and the service stays STOPPING instead of
+// claiming a drain it did not finish. A path that already names nothing
+// is a finished cleanup, not a failure.
+//
+// Note for the threat model: a same-UID actor able to mutate the socket
+// directory between the lstat and the remove defeats any pathname-based
+// identity check — deployments under that threat model require a
+// private socket directory (ensureSocketDir's 0700 owner-only
+// guarantee), which is the OS-level boundary this cleanup relies on.
+func (s *Service) removeOwnedSocket(gen *lifecycleGeneration) error {
+	if s.stopCleanupGate != nil {
+		s.stopCleanupGate()
+	}
+	info, err := os.Lstat(s.socketPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		log.Printf("execution service: cannot inspect socket path %s for cleanup: %v", s.socketPath, err)
+		return fmt.Errorf("cannot inspect socket path %s for cleanup: %w", s.socketPath, err)
+	}
+	if info.Mode()&os.ModeSocket == 0 {
+		log.Printf("execution service: not removing %s: the path is no longer a socket (mode %s)", s.socketPath, info.Mode())
+		return fmt.Errorf("socket path %s no longer names a socket (mode %s) — the occupant is not this lifecycle's to remove; resolve it and retry Stop", s.socketPath, info.Mode())
+	}
+	if ident := socketFileIdentity(info); ident != nil && gen.socketIdent != nil && *ident != *gen.socketIdent {
+		log.Printf("execution service: not removing %s: the socket at that path is not the one this lifecycle bound", s.socketPath)
+		return fmt.Errorf("socket path %s names a socket this lifecycle did not bind — the occupant is not this lifecycle's to remove; resolve it and retry Stop", s.socketPath)
+	}
+	if err := os.Remove(s.socketPath); err != nil && !os.IsNotExist(err) {
+		log.Printf("execution service: cannot remove socket %s: %v", s.socketPath, err)
+		return fmt.Errorf("cannot remove socket %s: %w", s.socketPath, err)
 	}
 	return nil
 }
