@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "baseline": "0.54.0-rc.7.3",
+  "target": "0.54.0-rc.7.4-dev",
+  "commit_at_baseline": "303caba62fb7546ccdbb8fb273bd0a8645bb904c",
+  "current_commit": "303caba62fb7546ccdbb8fb273bd0a8645bb904c",
+  "commands": [
+    {
+      "cmd": "go build -trimpath -o bin/crabbox ./cmd/crabbox",
+      "exit": 0
+    },
+    {
+      "cmd": "go vet ./...",
+      "exit": 0
+    },
+    {
+      "cmd": "go test -race -timeout=20m ./internal/sandboxexecutor/",
+      "exit": 0,
+      "duration_s": 605,
+      "note": "baseline package run; earlier 5m-timeout failures were harness timeouts"
+    },
+    {
+      "cmd": "go test -race -timeout=20m ./...",
+      "exit": "see QUALIFICATION_REPORT.md"
+    },
+    {
+      "cmd": "node --test scripts/go-test-case-evidence.test.js",
+      "exit": 0,
+      "tests": 30
+    },
+    {
+      "cmd": "node --test scripts/msb-runtime-pins.test.js scripts/check-docker-base-images.test.js",
+      "exit": 0
+    },
+    {
+      "cmd": "bash scripts/verify-msb-runtime-pins.sh",
+      "exit": 0
+    },
+    {
+      "cmd": "node scripts/verify-version-consistency.mjs",
+      "exit": 0
+    },
+    {
+      "cmd": "python3 scripts/verify-nemo-transfer.py (both directions)",
+      "exit": 0
+    }
+  ],
+  "not_run": [
+    {
+      "test": "linux-kvm live lane",
+      "reason": "requires amd64 KVM runner; host is darwin/arm64"
+    },
+    {
+      "test": "external custody service",
+      "reason": "no third-party custody service deployed; local custodyd interface tested"
+    },
+    {
+      "test": "crabbox remote validation",
+      "reason": "remote execution not exercised this session"
+    }
+  ]
+}
