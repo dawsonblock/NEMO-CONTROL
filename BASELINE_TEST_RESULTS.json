@@ -3,7 +3,7 @@
   "baseline": "0.54.0-rc.7.3",
   "target": "0.54.0-rc.7.4-dev",
   "commit_at_baseline": "303caba62fb7546ccdbb8fb273bd0a8645bb904c",
-  "current_commit": "303caba62fb7546ccdbb8fb273bd0a8645bb904c",
+  "current_commit": "4a864309e4376fb1e9469420697cbe76a075085f",
   "commands": [
     {
       "cmd": "go build -trimpath -o bin/crabbox ./cmd/crabbox",
@@ -14,14 +14,16 @@
       "exit": 0
     },
     {
-      "cmd": "go test -race -timeout=20m ./internal/sandboxexecutor/",
+      "cmd": "go test -race -timeout=20m ./...",
       "exit": 0,
-      "duration_s": 605,
-      "note": "baseline package run; earlier 5m-timeout failures were harness timeouts"
+      "note": "all packages pass; internal/cli 1122s on dedicated run (first attempt hit the 20m package timeout only because the live-VM lane ran concurrently \u2014 contention, not a test failure); internal/sandboxexecutor 633s"
     },
     {
-      "cmd": "go test -race -timeout=20m ./...",
-      "exit": "see QUALIFICATION_REPORT.md"
+      "cmd": "CRABBOX_MSB_LIVE=1 go test -race -count=1 -timeout=900s -run TestMSBLive ./internal/sandboxexecutor/",
+      "exit": 0,
+      "duration_s": 79,
+      "lane": "apple-hypervisor-framework",
+      "note": "real microVMs on pin-verified msb 0.7.8, image at pinned arm64 digest"
     },
     {
       "cmd": "node --test scripts/go-test-case-evidence.test.js",
@@ -38,11 +40,17 @@
     },
     {
       "cmd": "node scripts/verify-version-consistency.mjs",
-      "exit": 0
+      "exit": 0,
+      "version": "0.54.0-rc.7.4-dev"
     },
     {
       "cmd": "python3 scripts/verify-nemo-transfer.py (both directions)",
       "exit": 0
+    },
+    {
+      "cmd": "bash scripts/package-source-archive.sh --format zip (fresh-extraction verify)",
+      "exit": 0,
+      "artifact_sha256": "ec25838de3e97b6d777b177c02d0607ce60916df6930cb93463e26b471592e5b"
     }
   ],
   "not_run": [

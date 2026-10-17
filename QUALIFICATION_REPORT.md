@@ -13,13 +13,13 @@ environments or services unavailable on this host remain explicit blockers and a
 | Source identity (canonical runtime + frozen reference digests) | **PASS** | `verify-nemo-transfer.py`, both digests match rc.7.3 baseline |
 | Build | **PASS** | `go build -trimpath ./cmd/crabbox` |
 | `go vet ./...` | **PASS** | clean |
-| Full race suite `go test -race -timeout=20m ./...` | see below | recorded on completion |
+| Full race suite `go test -race -timeout=20m ./...` | **PASS** | every package green; `internal/cli` 1122s, `internal/sandboxexecutor` 633s (a first combined attempt timed cli out at 20m only because the live-VM lane ran concurrently — contention, not a failure; dedicated rerun passed) |
 | `internal/sandboxexecutor` race suite | **PASS** | baseline + post-change runs |
 | WP1–WP4 regression tests | **PASS** | see `TEST_MATRIX.md` |
 | Evidence lifecycle adversarial corpus | **PASS** | 30/30 in `go-test-case-evidence.test.js` |
 | Runtime pins (executable + firmware + doctor) | **PASS** | `verify-msb-runtime-pins.sh` |
 | Version consistency | **PASS** | `verify-version-consistency.mjs` → `0.54.0-rc.7.4-dev` |
-| `apple-hypervisor-framework` live lane | recorded per run | runnable on this host |
+| `apple-hypervisor-framework` live lane | **PASS** | `CRABBOX_MSB_LIVE=1 go test -race -run TestMSBLive` — 79s, real microVMs on pin-verified msb 0.7.8, image at pinned arm64 digest |
 | `linux-kvm` live lane | **NOT_RUN** | needs amd64 KVM runner — blocker |
 | External custody service | **NOT_RUN** | no deployed service; local `custodyd` interface tested — blocker |
 | Crabbox remote auditable validation | **NOT_RUN** | not exercised this session — blocker |

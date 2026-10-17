@@ -7,7 +7,7 @@ Host: macOS arm64 (Apple Silicon), `go1.26.5`, node `v24.16.0`, python `3.12.0`,
 
 | Suite | Command | Result |
 |---|---|---|
-| Whole repo | `go test -race -timeout=20m ./...` | see QUALIFICATION_REPORT (in-flight/recorded) |
+| Whole repo | `go test -race -timeout=20m ./...` | **PASS** — all packages; cli 1122s, sandboxexecutor 633s |
 | `internal/sandboxexecutor` | `go test -race -timeout=20m ./internal/sandboxexecutor/` | PASS (~605s baseline; re-run after changes) |
 | Build | `go build -trimpath -o bin/crabbox ./cmd/crabbox` | PASS |
 | Vet | `go vet ./...` | PASS |
@@ -32,7 +32,7 @@ Host: macOS arm64 (Apple Silicon), `go1.26.5`, node `v24.16.0`, python `3.12.0`,
 
 | Lane | Status | Reason |
 |---|---|---|
-| `apple-hypervisor-framework` (`CRABBOX_MSB_LIVE=1 go test -race -run TestMSBLive ./internal/sandboxexecutor/`) | runnable locally — runtime pin-verified, doctor healthy | See QUALIFICATION_REPORT for run outcome |
+| `apple-hypervisor-framework` (`CRABBOX_MSB_LIVE=1 go test -race -run TestMSBLive ./internal/sandboxexecutor/`) | **PASS** | 79s — real microVMs, pin-verified runtime, pinned image digest |
 | `linux-kvm` | **NOT_RUN** | requires amd64 KVM runner (`ubuntu-latest`); cannot run on darwin/arm64 |
 | Live PostgreSQL (`CRABBOX_TEST_DATABASE_URL` / `test-live-postgres.sh`) | runnable if docker/initdb available | helper now defaults to the pinned image digest |
 | External custody service integration | **NOT_RUN** | no external custody service available — interface tested locally via `sandbox-custodyd`; gate stays unsatisfied |
