@@ -245,6 +245,21 @@ commit (the nemo-relay symlink entries were already preserved as git links here,
 go1.27.2 (the pinned toolchain is go1.26.5 — re-verify under the pin before citing),
 targeted `internal/sandboxexecutor` tests PASS under `-race` (186s).
 
+## Residual closures (this branch, pending requalification)
+
+| Residual | Status | Mechanism |
+|---|---|---|
+| D-RC75-11 archive drops symlinks | **Closed (packaging)** | `verify-rc75-release.py pack` now writes real symlink members (unix `S_IFLNK`, link text as content); `verify` extracts them, binds each to a manifest declaration (undeclared link or mismatched target → fail), and still materializes manifest-declared links for legacy containers. Verified: `unzip` of a fresh pack reproduces `CLAUDE.md → AGENTS.md`, `LICENSE → ../../LICENSE`; 4263-entry pack/attest/sign/verify round-trips green. |
+| Trusted release signature | **Mechanism closed, ceremony open** | `attest --sign-key` SSH-signs the attestation under the `rc75-release` namespace (`<att>.sig`); `verify --signature/--allowed-signers/--sign-identity` runs `ssh-keygen -Y verify` before all checks, `--require-signature` makes it mandatory. Negative tests cover tampered attestation, wrong signer, wrong identity, missing signature. The actual release key and its allowed-signers binding remain an operator ceremony — the mechanism, not a specific key, is what ships. |
+| D-RC75-3 hosted macOS lane | **Closed (mapping)** | `apple-hypervisor-framework` now maps to `["self-hosted","macOS","ARM64"]` — hosted `macos-15` is itself virtualized and cannot boot microVMs (run 39186297140). Claiming the lane without a registered bare-metal runner queues the lane job (a claim with no evidence) instead of executing a certain failure. `runs-on` consumes the label array natively. |
+| Contradictory release identity | **Closed (annotation)** | `FINAL_QUALIFICATION_REPORT.md` (RC3-era, commit `369d2860`) now carries a supersession banner pointing at `RELEASE_MANIFEST.json` + `DEFECT_REGISTER.md` as the current identity. |
+| External independent custodian | **Open — not a code fix** | Requires an independently administered custody deployment + outage/replay/forgery drills; nothing in this tree can produce that. |
+
+`verify-rc75-release.test.py`: 20/20 PASS, including new container-symlink
+(undeclared/mismatched/escape) and signature (tamper/wrong-signer/wrong-identity/
+required-missing) adversarial cases. Shipped RC7.5 archive still verifies exit 0
+through the legacy manifest-materialization path.
+
 ## D-RC74-1 (P0, WP1) — Fallback-discovered boot mismatch destroyed the VM and reported a definitive failure
 
 **File:** `internal/sandboxexecutor/backend_msb.go`, fallback discovery path of `MSBBackend.Dispatch()`.

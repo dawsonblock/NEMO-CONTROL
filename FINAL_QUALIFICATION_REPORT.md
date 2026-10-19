@@ -1,5 +1,13 @@
 # Final Qualification Report
 
+> **SUPERSEDED — RC3-era record.** This report qualifies commit `369d2860`
+> (`fix/rc3-pr03-deterministic-evidence`, `0.54.0-rc.3`), not the current
+> release candidate. The authoritative qualification identity for the shipped
+> artifact is `RELEASE_MANIFEST.json` (RC7.5, `796437dd…`, NOT QUALIFIED)
+> with the campaign record in `DEFECT_REGISTER.md` and evidence under
+> `rc75-evidence/`. Do not read anything below as a status claim about
+> RC7.5 or RC7.6.
+
 Qualification evidence for the extracted NEMO-CONTROL workspace.
 Verdict and per-gate status are honest: a gate that did not run is `NOT_RUN`,
 never PASS. Status vocabulary is defined in `PROVENANCE.md`.
