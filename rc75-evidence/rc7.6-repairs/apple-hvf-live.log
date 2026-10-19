@@ -1,0 +1,45 @@
+=== RUN   TestMSBLiveJobLifecycle
+    msb_live_test.go:231: qualifying the apple-hypervisor-framework lane on darwin/arm64
+    msb_live_test.go:269: artifact /var/folders/xt/jh84t2kj6hl26tk5qx3m_28h0000gn/T/sx-346296729/artifacts/sx-msb-live-ok-ed85c0cd3861989193d0c4b946a2fa01.out sha=5ec5b5fcba0999d7 bytes=17
+--- PASS: TestMSBLiveJobLifecycle (0.96s)
+=== RUN   TestMSBLiveArtifactIntegrityUnderConcurrency
+    msb_live_test.go:305: qualifying the apple-hypervisor-framework lane on darwin/arm64
+--- PASS: TestMSBLiveArtifactIntegrityUnderConcurrency (1.23s)
+=== RUN   TestMSBLiveRefusesPreexistingSandbox
+    msb_live_test.go:354: qualifying the apple-hypervisor-framework lane on darwin/arm64
+--- PASS: TestMSBLiveRefusesPreexistingSandbox (1.04s)
+=== RUN   TestMSBLiveNetworkIsolation
+    msb_live_test.go:441: qualifying the apple-hypervisor-framework lane on darwin/arm64
+--- PASS: TestMSBLiveNetworkIsolation (2.76s)
+=== RUN   TestMSBLiveCredentialIsolation
+    msb_live_test.go:516: qualifying the apple-hypervisor-framework lane on darwin/arm64
+--- PASS: TestMSBLiveCredentialIsolation (0.71s)
+=== RUN   TestMSBLiveMonitorInterruptedLeavesJobUncertain
+    msb_live_test.go:542: qualifying the apple-hypervisor-framework lane on darwin/arm64
+--- PASS: TestMSBLiveMonitorInterruptedLeavesJobUncertain (40.73s)
+=== RUN   TestMSBLiveTransportFailureLeavesJobUncertain
+--- PASS: TestMSBLiveTransportFailureLeavesJobUncertain (8.47s)
+=== RUN   TestMSBLiveContractTimeoutIsObserved
+    msb_live_test.go:681: qualifying the apple-hypervisor-framework lane on darwin/arm64
+--- PASS: TestMSBLiveContractTimeoutIsObserved (3.79s)
+=== RUN   TestMSBLiveMountIsReadOnly
+    msb_live_test.go:720: qualifying the apple-hypervisor-framework lane on darwin/arm64
+--- PASS: TestMSBLiveMountIsReadOnly (0.73s)
+=== RUN   TestMSBLiveRefusalsAndCleanup
+=== RUN   TestMSBLiveRefusalsAndCleanup/forged_contract_never_reaches_a_VM
+--- PASS: TestMSBLiveRefusalsAndCleanup (0.02s)
+    --- PASS: TestMSBLiveRefusalsAndCleanup/forged_contract_never_reaches_a_VM (0.00s)
+=== RUN   TestMSBLiveRecoveryResumesInterruptedJob
+    msb_live_test.go:796: qualifying the apple-hypervisor-framework lane on darwin/arm64
+--- PASS: TestMSBLiveRecoveryResumesInterruptedJob (5.86s)
+=== RUN   TestMSBLiveSubstitutedVMIsNeverAdopted
+    msb_live_test.go:870: qualifying the apple-hypervisor-framework lane on darwin/arm64
+--- PASS: TestMSBLiveSubstitutedVMIsNeverAdopted (9.31s)
+=== RUN   TestMSBLivePlatformIdentity
+    msb_live_test.go:989: microVM qualification lane: apple-hypervisor-framework (darwin/arm64)
+--- PASS: TestMSBLivePlatformIdentity (0.02s)
+=== RUN   TestMSBLiveLinuxKVM
+    msb_live_test.go:1006: Linux KVM qualification requires a Linux host with KVM: this is darwin/arm64 (lane apple-hypervisor-framework)
+--- SKIP: TestMSBLiveLinuxKVM (0.00s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/sandboxexecutor	75.659s
