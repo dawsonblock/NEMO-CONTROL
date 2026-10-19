@@ -4,6 +4,67 @@ Baseline source: `crabedence-V1-fix-integration-integrity` @ `303caba6` (version
 Every entry below was reproduced against that revision before repair; reproduction commands and
 pre-fix behavior are recorded per defect.
 
+# RC7.5 qualification findings (2026-10-19)
+
+Baseline source: `NEMO-CONTROL-v0.54.0-rc7.5-development.zip`
+(SHA-256 `796437dd…f6c0`, attestation-verified). Live-lane evidence under
+`rc75-evidence/rc7.5-qualification/`; CI run
+`https://github.com/dawsonblock/nemo-rc75-qualification/actions/runs/39186297140`
+(source commit `67bacdb` on private repo `dawsonblock/nemo-rc75-qualification`).
+All three entries are **OPEN** — reproduced on `ubuntu-latest` CI, none reproduced on
+darwin/arm64 bare metal (M2 Pro).
+
+## D-RC75-1 (P1) — `msb inspect` of a dead sandbox hangs on Linux; crash reconciliation can never settle DISPATCH_AMBIGUOUS
+
+**File:** `internal/sandboxexecutor/recovery.go` reconcile path → `MSBBackend` inspect;
+symptom test `crash_test.go` `TestDaemonCrashPreservesAcknowledgedJobs`.
+
+**Defect:** after the daemon is SIGKILLed mid-dispatch, the recovered daemon calls
+`msb inspect sx-crash-1` to bind the dead sandbox's boot generation. On Linux the call never
+returns — it dies on the reconcile context deadline (`msb inspect sx-crash-1: context canceled`),
+so the job stays `DISPATCH_AMBIGUOUS` and the registry residue ESCALATION persists. The system
+fails *closed* (no blind retry, no unverified destroy), but on the linux-kvm lane a crashed
+dispatch permanently strands jobs for operator reconciliation.
+
+**Reproduction:** `go test -run TestDaemonCrashPreservesAcknowledgedJobs ./internal/sandboxexecutor/`
+on `ubuntu-latest` with pinned msb 0.7.8 installed — failed identically in 3 consecutive CI
+invocations (race suite twice, plain suite once; 21–61s before the context deadline). Same test on
+darwin/arm64 passes in ~1.2s: `msb inspect` reports the dead sandbox absent immediately and
+recovery settles `SUCCEEDED` via run `job_…`/boot binding.
+
+## D-RC75-2 (P2) — Ambiguous dispatch not observable before terminal resolution on Linux
+
+**File:** `internal/sandboxexecutor/maintenance.go` scan ordering vs
+`maintenance_test.go:366` `TestMaintenanceAmbiguousDispatchReconcilesNotRetries` (stub backend).
+
+**Defect:** the test injects an ambiguous dispatch and expects the ledger to record
+`DISPATCH_AMBIGUOUS`; on the CI runner the stub backend completed the run first — the job
+transitioned `UNCERTAIN`-class dispatch straight to `SUCCEEDED` and the ambiguous state was never
+observed (`job amb-1 never reached [DISPATCH_AMBIGUOUS] — state SUCCEEDED`). Either the
+maintenance scan reads the ledger before the ambiguity transition commits, or the test's ordering
+assumption does not hold under Linux scheduler timing.
+
+**Reproduction:** `go test -run TestMaintenanceAmbiguousDispatchReconcilesNotRetries
+./internal/sandboxexecutor/` on `ubuntu-latest` — failed in both CI invocations (15.1s, 15.0s).
+Passes on darwin/arm64 in 0.06s.
+
+## D-RC75-3 (P1) — Apple lane runner mapping targets a runner that cannot boot microVMs
+
+**File:** `.github/workflows/release-qualification.yml`, lane-matrix runner selection
+(`apple-hypervisor-framework → macos-15`).
+
+**Defect:** GitHub-hosted `macos-15` runners are themselves virtualized; `msb` installs and
+`doctor` reports ready, but `msb create` fails at `build_vm: VM enter: build_microvm:
+Internal(Vm(VmSetup(VmCreate)))` — every `TestMSBLive*` case failed. The workflow comment already
+notes the intended Blacksmith (bare-metal Mac) label "does not resolve here", so the fallback
+runner is a lane that cannot ever pass. A push-triggered run claiming `apple-hypervisor-framework`
+fails release admission on hosted CI by construction; lane evidence must come from bare-metal
+Apple Silicon (local run or self-hosted runner).
+
+**Reproduction:** run `39186297140`, job `Live microVM (apple-hypervisor-framework)`, failed
+identically in both invocations; the same suite passes on the M2 Pro host (13/13, log in
+`rc75-evidence/rc7.5-qualification/apple-hypervisor-framework/local-m2pro-test.log`).
+
 ## D-RC74-1 (P0, WP1) — Fallback-discovered boot mismatch destroyed the VM and reported a definitive failure
 
 **File:** `internal/sandboxexecutor/backend_msb.go`, fallback discovery path of `MSBBackend.Dispatch()`.
