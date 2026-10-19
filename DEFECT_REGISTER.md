@@ -184,8 +184,10 @@ archive digest; bind per-lane evidence (logs/artifacts) to the same commit.
 # RC7.6 repair status (branch `fix/rc7.6-defect-repair`, over RC7.5 baseline `67bacdb3`)
 
 Repairs implemented in the extracted RC7.5 source tree; `main` remains the frozen RC7.5
-baseline. Status is source-level: each fix is verified by the package test suite (fake-runtime
-model plus real-daemon crash tests); live-lane requalification is a separate, still-open gate.
+baseline. Each fix is verified by the package test suite (fake-runtime model plus
+real-daemon crash tests, `-race`, 754.8s) and by the apple-hypervisor-framework live lane
+against real `msb 0.7.8` (`-race`, qualifying mode, PASS 14 / SKIP 1 / FAIL 0 —
+`rc75-evidence/rc7.6-repairs/`). The linux-kvm lane remains a separate, still-open gate.
 
 | Defect | Status on `fix/rc7.6-defect-repair` | Mechanism |
 |---|---|---|
@@ -202,6 +204,7 @@ model plus real-daemon crash tests); live-lane requalification is a separate, st
 
 **Residual release blockers (not closed by repairs):** trusted release signature (the attestation
 is hash-binding, not signing); independently controlled external custodian still NOT_RUN;
+linux-kvm lane not yet re-qualified on the RC7.6 branch (Apple lane passed — see above);
 hosted-macOS lane cannot boot microVMs (bare-metal only); full RC7.6 admission workflow not yet
 run — no qualification or production claim.
 
