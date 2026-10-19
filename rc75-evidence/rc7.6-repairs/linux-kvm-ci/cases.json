@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "suite": "live-microvm",
+  "lane": "linux-kvm",
+  "source_commit": "1d9536ea046ce2a7bd534653daae62fe087f9347",
+  "toolchain_go": "go version go1.26.5 linux/amd64",
+  "runner": {
+    "os": "linux",
+    "arch": "amd64"
+  },
+  "ci": {
+    "server_url": "https://github.com",
+    "repository": "dawsonblock/nemo-rc75-qualification",
+    "run_id": "39228255743",
+    "run_attempt": "1",
+    "job": "live-microvm",
+    "workflow": "Release Qualification",
+    "workflow_ref": "dawsonblock/nemo-rc75-qualification/.github/workflows/release-qualification.yml@refs/heads/fix/rc7.6-defect-repair",
+    "sha": "1d9536ea046ce2a7bd534653daae62fe087f9347",
+    "event_name": "workflow_dispatch",
+    "runner_os": "Linux",
+    "runner_arch": "X64",
+    "runner_environment": "github-hosted",
+    "image_os": "ubuntu24",
+    "image_version": "20261012.334.1"
+  },
+  "packages": [
+    "github.com/openclaw/crabbox/internal/sandboxexecutor"
+  ],
+  "tests": [
+    {
+      "name": "TestMSBLiveJobLifecycle",
+      "status": "pass",
+      "elapsed_seconds": 1.22,
+      "terminal_events": 1,
+      "output_sha256": "adfb54cbfcec36356fa19640faac4b2e9ef1d4db60281e1182e8bfebc56c2633"
+    },
+    {
+      "name": "TestMSBLiveArtifactIntegrityUnderConcurrency",
+      "status": "pass",
+      "elapsed_seconds": 6.54,
+      "terminal_events": 1,
+      "output_sha256": "d7cf909fa06a452980bf8a17b1be342dfde32b977d1facbaefa259556f83012c"
+    },
+    {
+      "name": "TestMSBLiveRefusesPreexistingSandbox",
+      "status": "pass",
+      "elapsed_seconds": 1.78,
+      "terminal_events": 1,
+      "output_sha256": "57f8be56c862a47f5f0f43d5382929acbb6f0dc6a9b94a0e51448771aa681494"
+    },
+    {
+      "name": "TestMSBLiveNetworkIsolation",
+      "status": "pass",
+      "elapsed_seconds": 3.28,
+      "terminal_events": 1,
+      "output_sha256": "16953c7a0ab6861877a6c9fa40b88d9bfc7319441555f42fde20c21e49ea0784"
+    },
+    {
+      "name": "TestMSBLiveCredentialIsolation",
+      "status": "pass",
+      "elapsed_seconds": 1.26,
+      "terminal_events": 1,
+      "output_sha256": "5a0e173dd82eb4b4df979f46df445732134598f719ffb11a18f8f249e42f1147"
+    },
+    {
+      "name": "TestMSBLiveMonitorInterruptedLeavesJobUncertain",
+      "status": "pass",
+      "elapsed_seconds": 40.53,
+      "terminal_events": 1,
+      "output_sha256": "c2d895dd8eacd8d609540e98a426aabdad5169c6d08eb7adb8745982d48d728e"
+    },
+    {
+      "name": "TestMSBLiveTransportFailureLeavesJobUncertain",
+      "status": "pass",
+      "elapsed_seconds": 8.77,
+      "terminal_events": 1,
+      "output_sha256": "3893c51d32b10c9789fa0d94cf2d9bfcacc7160b669e96a543b2f8f5a43adfb9"
+    },
+    {
+      "name": "TestMSBLiveContractTimeoutIsObserved",
+      "status": "pass",
+      "elapsed_seconds": 4.29,
+      "terminal_events": 1,
+      "output_sha256": "c9687f43c42309b3767a6101f08a47b21e00f9b90e7fcdb520e7232ad2d7d47c"
+    },
+    {
+      "name": "TestMSBLiveMountIsReadOnly",
+      "status": "pass",
+      "elapsed_seconds": 1.21,
+      "terminal_events": 1,
+      "output_sha256": "4f2c5d0ba9ed00b5433491b1d667127def45cde404d204a836eb32a7cfb5b911"
+    },
+    {
+      "name": "TestMSBLiveRefusalsAndCleanup",
+      "status": "pass",
+      "elapsed_seconds": 0.07,
+      "terminal_events": 1,
+      "output_sha256": "f7315b9fd5b2378312f81e31632fc54e37caf7f055d8c73a5dd87d62637bc3e8"
+    },
+    {
+      "name": "TestMSBLiveRefusalsAndCleanup/forged_contract_never_reaches_a_VM",
+      "status": "pass",
+      "elapsed_seconds": 0.0,
+      "terminal_events": 1,
+      "output_sha256": "301a1f70af46b19e66272fa3b7f48ef26e622ae3371f25f3316ffc2d7454cc5d"
+    },
+    {
+      "name": "TestMSBLiveRecoveryResumesInterruptedJob",
+      "status": "pass",
+      "elapsed_seconds": 6.25,
+      "terminal_events": 1,
+      "output_sha256": "05c4906bc57faa522ea359b2311c498cfbbe6ef01cbe47f0fadd2d2edfe8b505"
+    },
+    {
+      "name": "TestMSBLiveSubstitutedVMIsNeverAdopted",
+      "status": "pass",
+      "elapsed_seconds": 10.12,
+      "terminal_events": 1,
+      "output_sha256": "e06dbf174987d427a338b82457ce86952a925dd3121520e1cbed7bbd51bdca92"
+    },
+    {
+      "name": "TestMSBLivePlatformIdentity",
+      "status": "pass",
+      "elapsed_seconds": 0.01,
+      "terminal_events": 1,
+      "output_sha256": "e18c826fa4c3884ef93d4fd987607d9b1cf70adae92f2e8a4fd8641ac8cafad9"
+    },
+    {
+      "name": "TestMSBLiveLinuxKVM",
+      "status": "pass",
+      "elapsed_seconds": 0.29,
+      "terminal_events": 1,
+      "output_sha256": "e4cca95c7ca48a949bdd26805da108a5c49e64992697f616e9c1c189bba66342"
+    }
+  ],
+  "counts": {
+    "passed": 15,
+    "failed": 0,
+    "skipped": 0,
+    "incomplete": 0
+  },
+  "source_inventory": {
+    "discovered": 14,
+    "covered": 14,
+    "uncovered": []
+  }
+}
