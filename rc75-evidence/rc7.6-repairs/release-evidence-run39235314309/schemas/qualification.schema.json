@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://crabedence.dev/schemas/qualification.schema.json",
+  "title": "Crabedence Release Qualification",
+  "description": "Canonical machine-readable qualification record (schema version 2). All release admission decisions derive from this file; gate semantics are enforced by scripts/lib/qualification-gates.sh, which both admission and the standalone verifier consume.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "release",
+    "release_status",
+    "artifact_promotable",
+    "gate_summary",
+    "gates",
+    "invariants",
+    "provenance",
+    "toolchains",
+    "environment"
+  ],
+  "definitions": {
+    "boundFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "sha256"],
+      "properties": {
+        "file": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "enum": [2]
+    },
+    "release": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical release version this record qualifies; must equal the VERSION file and the release manifest."
+    },
+    "release_status": {
+      "type": "string",
+      "enum": ["PASS", "FAIL"]
+    },
+    "artifact_promotable": {
+      "type": "boolean"
+    },
+    "claimed_lanes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Virtualization lanes the release claims support for. Every claimed lane must be backed by a passing mandatory gate carrying test_suite evidence for that lane."
+    },
+    "qualified_lanes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Lanes with passing per-test evidence in this record. supported_lanes in the release manifest derives from this."
+    },
+    "gate_summary": {
+      "type": "object",
+      "required": ["total", "passed", "failed", "skipped"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["gate_id", "gate_type", "mandatory", "status", "exit_code", "evidence"],
+        "properties": {
+          "gate_id": { "type": "string", "minLength": 1 },
+          "gate_type": {
+            "type": "string",
+            "enum": [
+              "TEST",
+              "BUILD",
+              "STATIC_ANALYSIS",
+              "INTEGRATION",
+              "SECURITY",
+              "FAULT_INJECTION",
+              "REPRODUCIBILITY",
+              "PROVENANCE",
+              "CLEAN_ROOM"
+            ]
+          },
+          "mandatory": { "type": "boolean" },
+          "status": { "type": "string", "enum": ["PASS", "FAIL", "SKIP"] },
+          "exit_code": { "type": "integer" },
+          "tests_executed": { "type": "integer", "minimum": 0 },
+          "tests_failed": { "type": "integer", "minimum": 0 },
+          "duration_ms": { "type": "integer", "minimum": 0 },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file", "sha256"],
+            "properties": {
+              "file": { "type": "string", "minLength": 1 },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          },
+          "test_suite": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["suite", "lane", "inventory", "results", "raw"],
+            "description": "Per-test evidence binding: the digest-bound results file must satisfy the bundled required-test inventory for the lane — every required case exactly once, status pass, identity matching the record.",
+            "properties": {
+              "suite": { "type": "string", "minLength": 1 },
+              "lane": { "type": "string", "minLength": 1 },
+              "inventory": { "$ref": "#/definitions/boundFile" },
+              "results": { "$ref": "#/definitions/boundFile" },
+              "raw": { "$ref": "#/definitions/boundFile" }
+            }
+          }
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description"],
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["commit", "tree", "branch"],
+      "properties": {
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "branch": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "toolchains": {
+      "type": "object",
+      "required": ["go", "node", "npm", "git"],
+      "properties": {
+        "go": { "type": "string" },
+        "node": { "type": "string" },
+        "npm": { "type": "string" },
+        "git": { "type": "string" },
+        "postgres_client": { "type": "string" },
+        "worker_package_version": { "type": "string" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "required": ["os", "os_version", "arch", "date"],
+      "properties": {
+        "os": { "type": "string" },
+        "os_version": { "type": "string" },
+        "arch": { "type": "string" },
+        "date": { "type": "string" }
+      }
+    }
+  }
+}

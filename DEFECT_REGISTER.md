@@ -209,9 +209,12 @@ shipped artifact is self-verifying.
 
 Repairs implemented in the extracted RC7.5 source tree; `main` remains the frozen RC7.5
 baseline. Each fix is verified by the package test suite (fake-runtime model plus
-real-daemon crash tests, `-race`, 754.8s) and by the apple-hypervisor-framework live lane
-against real `msb 0.7.8` (`-race`, qualifying mode, PASS 14 / SKIP 1 / FAIL 0 —
-`rc75-evidence/rc7.6-repairs/`). The linux-kvm lane remains a separate, still-open gate.
+real-daemon crash tests, `-race`, 754.8s) and by both live lanes against real `msb 0.7.8`:
+apple-hypervisor-framework on bare-metal M2 Pro (`-race`, qualifying, PASS 14 / SKIP 1 /
+FAIL 0) and linux-kvm on CI (PASS 15/15, runs 39228255743 + 39235314309). The full
+admission workflow passed end-to-end on `6ceabf8` (run 39235314309: 34/34 mandatory
+gates, `artifact_promotable: true` for the claimed linux-kvm lane). Evidence:
+`rc75-evidence/rc7.6-repairs/`.
 
 | Defect | Status on `fix/rc7.6-defect-repair` | Mechanism |
 |---|---|---|
@@ -230,9 +233,9 @@ against real `msb 0.7.8` (`-race`, qualifying mode, PASS 14 / SKIP 1 / FAIL 0 �
 
 **Residual release blockers (not closed by repairs):** trusted release signature (the attestation
 is hash-binding, not signing); independently controlled external custodian still NOT_RUN;
-linux-kvm lane not yet re-qualified on the RC7.6 branch (Apple lane passed — see above);
-hosted-macOS lane cannot boot microVMs (bare-metal only); full RC7.6 admission workflow not yet
-run — no qualification or production claim.
+hosted-macOS lane cannot boot microVMs, so apple CI evidence remains bare-metal only and the
+green admission run claimed only linux-kvm; the shipped zip still drops `nemo-relay` symlinks
+(D-RC75-11) — tree repaired, archive-production repair outstanding. No production claim.
 
 ## D-RC74-1 (P0, WP1) — Fallback-discovered boot mismatch destroyed the VM and reported a definitive failure
 

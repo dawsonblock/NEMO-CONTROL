@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "record_type": "gate",
+  "gate_id": "effect-fabric-contract",
+  "gate_type": "TEST",
+  "mandatory": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "tests_executed": 31,
+  "tests_failed": 0,
+  "duration_ms": 3289,
+  "evidence": {
+    "file": "gate-results/effect-fabric-contract.log",
+    "sha256": "f258c0955a926ab7feae6726d768f9052dfae2e642eeeac7049916f5e09bc993"
+  }
+}

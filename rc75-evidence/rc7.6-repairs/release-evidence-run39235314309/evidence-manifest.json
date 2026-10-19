@@ -1,0 +1,11 @@
+{
+  "name": "crabedence-v0.54.0-rc.7.5-dev",
+  "manifest_type": "evidence-bundle",
+  "sha256": "7608409e2b3afa78595581cdff91fa804d875f0f9240a86f819cea6ec9d7b217",
+  "digest_of": "SHA256SUMS",
+  "file_count": 102,
+  "commit": "6ceabf8e5411b0090fbfc5c5ad224a3dd8024711",
+  "tree": "a142df756e0e36c0a06f0ddcb9fb6d05d8388f28",
+  "branch": "HEAD",
+  "generated_at": "2026-10-19T10:27:54Z"
+}

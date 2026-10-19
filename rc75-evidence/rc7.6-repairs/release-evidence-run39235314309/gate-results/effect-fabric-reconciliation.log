@@ -1,0 +1,84 @@
+command=go test -v -count=1 -timeout=60s ./internal/reconcile/
+started_at=2026-10-19T10:57:01Z
+---
+=== RUN   TestSupervisorPublishesReadinessToStatusWriter
+2026/10/19 10:57:01 reconciliation readiness: NOT_READY -> READY
+2026/10/19 10:57:01 reconciliation cycle failed (1 consecutive): failed to claim unknown records: injected claim failure
+--- PASS: TestSupervisorPublishesReadinessToStatusWriter (0.00s)
+=== RUN   TestSupervisorPublishesStoreInvariantCounters
+2026/10/19 10:57:01 reconciliation readiness: NOT_READY -> READY
+2026/10/19 10:57:01 reconciliation readiness: NOT_READY -> READY
+--- PASS: TestSupervisorPublishesStoreInvariantCounters (0.02s)
+=== RUN   TestSupervisorReadinessPolicy
+2026/10/19 10:57:01 reconciliation readiness: NOT_READY -> READY
+2026/10/19 10:57:01 reconciliation readiness: NOT_READY -> DEGRADED ([no successful cycle for 0s (limit 1ns)])
+2026/10/19 10:57:01 reconciliation cycle failed (1 consecutive): failed to claim unknown records: injected claim failure
+2026/10/19 10:57:01 reconciliation readiness: NOT_READY -> READY
+2026/10/19 10:57:01 reconciliation cycle failed (2 consecutive): failed to claim unknown records: injected claim failure
+2026/10/19 10:57:01 reconciliation readiness: READY -> NOT_READY ([2 consecutive failed cycles])
+--- PASS: TestSupervisorReadinessPolicy (0.00s)
+=== RUN   TestSupervisorDegradedOnUnknownBacklogAge
+2026/10/19 10:57:01 reconciliation readiness: NOT_READY -> DEGRADED ([oldest UNKNOWN is 2h0m0s old (limit 1h0m0s)])
+--- PASS: TestSupervisorDegradedOnUnknownBacklogAge (0.00s)
+=== RUN   TestSupervisorRunLoopObservesCycles
+2026/10/19 10:57:01 reconciliation readiness: NOT_READY -> READY
+--- PASS: TestSupervisorRunLoopObservesCycles (0.02s)
+=== RUN   TestWorkerCountersDeadLettersAndResolverFailures
+--- PASS: TestWorkerCountersDeadLettersAndResolverFailures (0.00s)
+=== RUN   TestSQLiteWorkerReconcileCommitted
+--- PASS: TestSQLiteWorkerReconcileCommitted (0.07s)
+=== RUN   TestNoopResolverReturnsUnknown
+--- PASS: TestNoopResolverReturnsUnknown (0.00s)
+=== RUN   TestWorkerRegisterResolver
+--- PASS: TestWorkerRegisterResolver (0.00s)
+=== RUN   TestWorkerNilDefaultResolver
+--- PASS: TestWorkerNilDefaultResolver (0.00s)
+=== RUN   TestReconcileBackoff
+=== RUN   TestReconcileBackoff/attempt_0
+=== RUN   TestReconcileBackoff/attempt_1
+=== RUN   TestReconcileBackoff/attempt_2
+=== RUN   TestReconcileBackoff/attempt_3
+=== RUN   TestReconcileBackoff/attempt_4
+=== RUN   TestReconcileBackoff/attempt_5
+=== RUN   TestReconcileBackoff/attempt_6
+=== RUN   TestReconcileBackoff/attempt_7
+=== RUN   TestReconcileBackoff/attempt_10
+=== RUN   TestReconcileBackoff/attempt_50
+=== RUN   TestReconcileBackoff/attempt_-1
+--- PASS: TestReconcileBackoff (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_0 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_1 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_2 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_3 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_4 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_5 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_6 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_7 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_10 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_50 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_-1 (0.00s)
+=== RUN   TestReconcileBackoffNeverZero
+--- PASS: TestReconcileBackoffNeverZero (0.00s)
+=== RUN   TestLiveWorkerReconciliation
+--- PASS: TestLiveWorkerReconciliation (0.28s)
+=== RUN   TestLiveWorkerDeadLettersAfterAttemptCeiling
+--- PASS: TestLiveWorkerDeadLettersAfterAttemptCeiling (0.03s)
+=== RUN   TestLiveWorkerReconcileCriticalFailedWithoutProof
+--- PASS: TestLiveWorkerReconcileCriticalFailedWithoutProof (0.03s)
+=== RUN   TestLiveClaimHeartbeatBlocksSecondWorker
+--- PASS: TestLiveClaimHeartbeatBlocksSecondWorker (0.96s)
+=== RUN   TestLiveClaimExpiryRecovery
+--- PASS: TestLiveClaimExpiryRecovery (0.03s)
+=== RUN   TestLiveWorkerSuspendsPastClaimCeiling
+--- PASS: TestLiveWorkerSuspendsPastClaimCeiling (0.03s)
+=== RUN   TestLiveWorkerResolverRunsAtLastAllowedClaim
+--- PASS: TestLiveWorkerResolverRunsAtLastAllowedClaim (0.03s)
+=== RUN   TestLiveBatchClaimHeartbeatProtectsQueuedRecords
+--- PASS: TestLiveBatchClaimHeartbeatProtectsQueuedRecords (0.94s)
+=== RUN   TestLiveReconcileSkipsResolverOnStaleClaim
+--- PASS: TestLiveReconcileSkipsResolverOnStaleClaim (0.03s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/reconcile	2.454s
+---
+finished_at=2026-10-19T10:57:04Z
+exit=0

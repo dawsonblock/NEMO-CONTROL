@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "record_type": "gate",
+  "gate_id": "effect-fabric-race",
+  "gate_type": "TEST",
+  "mandatory": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "tests_executed": 1022,
+  "tests_failed": 0,
+  "duration_ms": 60420,
+  "evidence": {
+    "file": "gate-results/effect-fabric-race.log",
+    "sha256": "bae7c59f4934875456f8c4a72bf2c923e643d1c9fd8dd705dec7d2c397868919"
+  }
+}

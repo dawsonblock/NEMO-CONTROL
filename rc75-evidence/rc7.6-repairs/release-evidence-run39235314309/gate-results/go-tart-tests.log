@@ -1,0 +1,790 @@
+command=go test -v -count=1 -timeout=120s ./internal/providers/tart/
+started_at=2026-10-19T10:36:21Z
+---
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/missing
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/legacy
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/provider
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/cloud-id
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/scope
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/lease-label
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/slug-label
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/instance-label
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/storage
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/duplicate
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/missing-marker
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/replaced-marker
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/symlink-marker
+=== RUN   TestCleanupRejectsMissingAndInconsistentOwnership/recreated-vm
+--- PASS: TestCleanupRejectsMissingAndInconsistentOwnership (0.21s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/missing (0.13s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/legacy (0.01s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/provider (0.01s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/cloud-id (0.00s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/scope (0.00s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/lease-label (0.00s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/slug-label (0.00s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/instance-label (0.00s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/storage (0.00s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/duplicate (0.00s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/missing-marker (0.00s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/replaced-marker (0.03s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/symlink-marker (0.00s)
+    --- PASS: TestCleanupRejectsMissingAndInconsistentOwnership/recreated-vm (0.00s)
+=== RUN   TestCleanupRevalidatesInventoryAndIdentity
+=== RUN   TestCleanupRevalidatesInventoryAndIdentity/running
+=== RUN   TestCleanupRevalidatesInventoryAndIdentity/missing
+=== RUN   TestCleanupRevalidatesInventoryAndIdentity/marker
+=== RUN   TestCleanupRevalidatesInventoryAndIdentity/list-error
+--- PASS: TestCleanupRevalidatesInventoryAndIdentity (0.26s)
+    --- PASS: TestCleanupRevalidatesInventoryAndIdentity/running (0.00s)
+    --- PASS: TestCleanupRevalidatesInventoryAndIdentity/missing (0.19s)
+    --- PASS: TestCleanupRevalidatesInventoryAndIdentity/marker (0.06s)
+    --- PASS: TestCleanupRevalidatesInventoryAndIdentity/list-error (0.00s)
+=== RUN   TestCleanupRejectsChangedClaimBeforeMutation
+--- PASS: TestCleanupRejectsChangedClaimBeforeMutation (0.00s)
+=== RUN   TestCleanupRechecksMarkerAfterStop
+--- PASS: TestCleanupRechecksMarkerAfterStop (0.00s)
+=== RUN   TestCleanupPreservesOrphanClaimFromDifferentStore
+--- PASS: TestCleanupPreservesOrphanClaimFromDifferentStore (0.00s)
+=== RUN   TestTouchPreservesCleanupOwnershipThroughClaimUpdate
+--- PASS: TestTouchPreservesCleanupOwnershipThroughClaimUpdate (0.01s)
+=== RUN   TestTartOwnershipMarkerCannotAdoptOrFollowSymlinks
+--- PASS: TestTartOwnershipMarkerCannotAdoptOrFollowSymlinks (0.01s)
+=== RUN   TestCleanupFencesClaimThroughDeleteAndRetainsKey
+--- PASS: TestCleanupFencesClaimThroughDeleteAndRetainsKey (0.06s)
+=== RUN   TestCleanupPreservesClaimCreatedAfterInstanceSnapshot
+--- PASS: TestCleanupPreservesClaimCreatedAfterInstanceSnapshot (0.01s)
+=== RUN   TestCleanupPreservesReclaimedOrphanCandidate
+--- PASS: TestCleanupPreservesReclaimedOrphanCandidate (0.01s)
+=== RUN   TestInjectSSHKeyWaitsForGuestAgent
+--- PASS: TestInjectSSHKeyWaitsForGuestAgent (0.50s)
+=== RUN   TestInjectSSHKeyDoesNotRetryMutation
+--- PASS: TestInjectSSHKeyDoesNotRetryMutation (0.00s)
+=== RUN   TestGuestAgentWaitStopsOnCancellationAndPermanentError
+=== RUN   TestGuestAgentWaitStopsOnCancellationAndPermanentError/deadline
+=== RUN   TestGuestAgentWaitStopsOnCancellationAndPermanentError/canceled
+=== RUN   TestGuestAgentWaitStopsOnCancellationAndPermanentError/permanent
+--- PASS: TestGuestAgentWaitStopsOnCancellationAndPermanentError (0.02s)
+    --- PASS: TestGuestAgentWaitStopsOnCancellationAndPermanentError/deadline (0.02s)
+    --- PASS: TestGuestAgentWaitStopsOnCancellationAndPermanentError/canceled (0.00s)
+    --- PASS: TestGuestAgentWaitStopsOnCancellationAndPermanentError/permanent (0.00s)
+=== RUN   TestVerifyTartImageFiles
+=== RUN   TestVerifyTartImageFiles/matching_image
+=== RUN   TestVerifyTartImageFiles/native_regenerated_MAC
+=== RUN   TestVerifyTartImageFiles/changed_hardware
+=== RUN   TestVerifyTartImageFiles/extra_config_field
+=== RUN   TestVerifyTartImageFiles/trailing_config
+=== RUN   TestVerifyTartImageFiles/duplicate_root_key
+=== RUN   TestVerifyTartImageFiles/duplicate_escaped_key
+=== RUN   TestVerifyTartImageFiles/invalid_MAC
+=== RUN   TestVerifyTartImageFiles/multicast_MAC
+=== RUN   TestVerifyTartImageFiles/changed_firmware
+=== RUN   TestVerifyTartImageFiles/changed_first_chunk
+=== RUN   TestVerifyTartImageFiles/changed_last_chunk
+=== RUN   TestVerifyTartImageFiles/truncated_disk
+=== RUN   TestVerifyTartImageFiles/extended_disk
+--- PASS: TestVerifyTartImageFiles (0.03s)
+    --- PASS: TestVerifyTartImageFiles/matching_image (0.00s)
+    --- PASS: TestVerifyTartImageFiles/native_regenerated_MAC (0.00s)
+    --- PASS: TestVerifyTartImageFiles/changed_hardware (0.00s)
+    --- PASS: TestVerifyTartImageFiles/extra_config_field (0.00s)
+    --- PASS: TestVerifyTartImageFiles/trailing_config (0.00s)
+    --- PASS: TestVerifyTartImageFiles/duplicate_root_key (0.00s)
+    --- PASS: TestVerifyTartImageFiles/duplicate_escaped_key (0.00s)
+    --- PASS: TestVerifyTartImageFiles/invalid_MAC (0.02s)
+    --- PASS: TestVerifyTartImageFiles/multicast_MAC (0.00s)
+    --- PASS: TestVerifyTartImageFiles/changed_firmware (0.00s)
+    --- PASS: TestVerifyTartImageFiles/changed_first_chunk (0.00s)
+    --- PASS: TestVerifyTartImageFiles/changed_last_chunk (0.00s)
+    --- PASS: TestVerifyTartImageFiles/truncated_disk (0.00s)
+    --- PASS: TestVerifyTartImageFiles/extended_disk (0.00s)
+=== RUN   TestVerifyTartImageConfigRejectsNestedDuplicateKeys
+=== RUN   TestVerifyTartImageConfigRejectsNestedDuplicateKeys/nested_object
+=== RUN   TestVerifyTartImageConfigRejectsNestedDuplicateKeys/object_inside_array
+--- PASS: TestVerifyTartImageConfigRejectsNestedDuplicateKeys (0.00s)
+    --- PASS: TestVerifyTartImageConfigRejectsNestedDuplicateKeys/nested_object (0.00s)
+    --- PASS: TestVerifyTartImageConfigRejectsNestedDuplicateKeys/object_inside_array (0.00s)
+=== RUN   TestVerifyTartImageConfigBoundsNesting
+--- PASS: TestVerifyTartImageConfigBoundsNesting (0.00s)
+=== RUN   TestVerifyTartImageFilesRejectUnsafeFiles
+=== RUN   TestVerifyTartImageFilesRejectUnsafeFiles/missing_disk
+=== RUN   TestVerifyTartImageFilesRejectUnsafeFiles/symlink
+=== RUN   TestVerifyTartImageFilesRejectUnsafeFiles/suspended
+=== RUN   TestVerifyTartImageFilesRejectUnsafeFiles/canceled
+=== RUN   TestVerifyTartImageFilesRejectUnsafeFiles/unbound_metadata
+--- PASS: TestVerifyTartImageFilesRejectUnsafeFiles (0.00s)
+    --- PASS: TestVerifyTartImageFilesRejectUnsafeFiles/missing_disk (0.00s)
+    --- PASS: TestVerifyTartImageFilesRejectUnsafeFiles/symlink (0.00s)
+    --- PASS: TestVerifyTartImageFilesRejectUnsafeFiles/suspended (0.00s)
+    --- PASS: TestVerifyTartImageFilesRejectUnsafeFiles/canceled (0.00s)
+    --- PASS: TestVerifyTartImageFilesRejectUnsafeFiles/unbound_metadata (0.00s)
+=== RUN   TestDefaultTartImageMetadata
+--- PASS: TestDefaultTartImageMetadata (0.00s)
+=== RUN   TestTartLegacyInventoryDoesNotInventImageProvenance
+--- PASS: TestTartLegacyInventoryDoesNotInventImageProvenance (0.00s)
+=== RUN   TestAcquireRejectsUnverifiedDefaultBeforeConfigureOrBoot
+--- PASS: TestAcquireRejectsUnverifiedDefaultBeforeConfigureOrBoot (0.01s)
+=== RUN   TestTartProcessHelper
+--- PASS: TestTartProcessHelper (0.00s)
+=== RUN   TestDetachCommandCreatesSession
+--- PASS: TestDetachCommandCreatesSession (0.00s)
+=== RUN   TestStartupLateExit
+=== RUN   TestStartupLateExit/keep=false/code=42
+=== RUN   TestStartupLateExit/keep=false/code=0
+=== RUN   TestStartupLateExit/keep=true/code=42
+=== RUN   TestStartupLateExit/keep=true/code=0
+--- PASS: TestStartupLateExit (0.07s)
+    --- PASS: TestStartupLateExit/keep=false/code=42 (0.02s)
+    --- PASS: TestStartupLateExit/keep=false/code=0 (0.02s)
+    --- PASS: TestStartupLateExit/keep=true/code=42 (0.02s)
+    --- PASS: TestStartupLateExit/keep=true/code=0 (0.02s)
+=== RUN   TestStartupCancellation
+=== RUN   TestStartupCancellation/keep=false/before
+=== RUN   TestStartupCancellation/keep=false/during
+=== RUN   TestStartupCancellation/keep=false/after
+=== RUN   TestStartupCancellation/keep=true/before
+=== RUN   TestStartupCancellation/keep=true/during
+=== RUN   TestStartupCancellation/keep=true/after
+--- PASS: TestStartupCancellation (0.07s)
+    --- PASS: TestStartupCancellation/keep=false/before (0.00s)
+    --- PASS: TestStartupCancellation/keep=false/during (0.02s)
+    --- PASS: TestStartupCancellation/keep=false/after (0.02s)
+    --- PASS: TestStartupCancellation/keep=true/before (0.00s)
+    --- PASS: TestStartupCancellation/keep=true/during (0.02s)
+    --- PASS: TestStartupCancellation/keep=true/after (0.02s)
+=== RUN   TestStartupHandoffLifetime
+=== RUN   TestStartupHandoffLifetime/keep=false
+=== RUN   TestStartupHandoffLifetime/keep=true
+--- PASS: TestStartupHandoffLifetime (0.03s)
+    --- PASS: TestStartupHandoffLifetime/keep=false (0.02s)
+    --- PASS: TestStartupHandoffLifetime/keep=true (0.02s)
+=== RUN   TestStartupDiagnosticsAndReadinessFailure
+=== RUN   TestStartupDiagnosticsAndReadinessFailure/keep=false/readiness
+=== RUN   TestStartupDiagnosticsAndReadinessFailure/keep=false/cancel
+=== RUN   TestStartupDiagnosticsAndReadinessFailure/keep=false/exit
+=== RUN   TestStartupDiagnosticsAndReadinessFailure/keep=true/readiness
+=== RUN   TestStartupDiagnosticsAndReadinessFailure/keep=true/cancel
+=== RUN   TestStartupDiagnosticsAndReadinessFailure/keep=true/exit
+--- PASS: TestStartupDiagnosticsAndReadinessFailure (0.10s)
+    --- PASS: TestStartupDiagnosticsAndReadinessFailure/keep=false/readiness (0.02s)
+    --- PASS: TestStartupDiagnosticsAndReadinessFailure/keep=false/cancel (0.02s)
+    --- PASS: TestStartupDiagnosticsAndReadinessFailure/keep=false/exit (0.02s)
+    --- PASS: TestStartupDiagnosticsAndReadinessFailure/keep=true/readiness (0.02s)
+    --- PASS: TestStartupDiagnosticsAndReadinessFailure/keep=true/cancel (0.02s)
+    --- PASS: TestStartupDiagnosticsAndReadinessFailure/keep=true/exit (0.02s)
+=== RUN   TestStartupAbortReturnsStartupConfirmFailure
+--- PASS: TestStartupAbortReturnsStartupConfirmFailure (0.02s)
+=== RUN   TestStartupNaturalExitRefreshesSnapshot
+=== RUN   TestStartupNaturalExitRefreshesSnapshot/keep=false
+=== RUN   TestStartupNaturalExitRefreshesSnapshot/keep=true
+--- PASS: TestStartupNaturalExitRefreshesSnapshot (0.03s)
+    --- PASS: TestStartupNaturalExitRefreshesSnapshot/keep=false (0.02s)
+    --- PASS: TestStartupNaturalExitRefreshesSnapshot/keep=true (0.02s)
+=== RUN   TestStartupStartFailureRemovesLog
+--- PASS: TestStartupStartFailureRemovesLog (0.00s)
+=== RUN   TestAcquireStartupExitCancelsReadiness
+=== RUN   TestAcquireStartupExitCancelsReadiness/keep=false/ip
+=== RUN   TestAcquireStartupExitCancelsReadiness/keep=false/agent
+=== RUN   TestAcquireStartupExitCancelsReadiness/keep=false/key
+=== RUN   TestAcquireStartupExitCancelsReadiness/keep=false/desktop
+=== RUN   TestAcquireStartupExitCancelsReadiness/keep=false/ssh
+=== RUN   TestAcquireStartupExitCancelsReadiness/keep=true/ip
+=== RUN   TestAcquireStartupExitCancelsReadiness/keep=true/agent
+=== RUN   TestAcquireStartupExitCancelsReadiness/keep=true/key
+=== RUN   TestAcquireStartupExitCancelsReadiness/keep=true/desktop
+=== RUN   TestAcquireStartupExitCancelsReadiness/keep=true/ssh
+--- PASS: TestAcquireStartupExitCancelsReadiness (31.78s)
+    --- PASS: TestAcquireStartupExitCancelsReadiness/keep=false/ip (3.19s)
+    --- PASS: TestAcquireStartupExitCancelsReadiness/keep=false/agent (3.31s)
+    --- PASS: TestAcquireStartupExitCancelsReadiness/keep=false/key (3.15s)
+    --- PASS: TestAcquireStartupExitCancelsReadiness/keep=false/desktop (3.17s)
+    --- PASS: TestAcquireStartupExitCancelsReadiness/keep=false/ssh (3.18s)
+    --- PASS: TestAcquireStartupExitCancelsReadiness/keep=true/ip (3.12s)
+    --- PASS: TestAcquireStartupExitCancelsReadiness/keep=true/agent (3.15s)
+    --- PASS: TestAcquireStartupExitCancelsReadiness/keep=true/key (3.15s)
+    --- PASS: TestAcquireStartupExitCancelsReadiness/keep=true/desktop (3.17s)
+    --- PASS: TestAcquireStartupExitCancelsReadiness/keep=true/ssh (3.17s)
+=== RUN   TestAcquireStartupReadinessFailureAndCancellation
+=== RUN   TestAcquireStartupReadinessFailureAndCancellation/keep=false/readiness-error
+=== RUN   TestAcquireStartupReadinessFailureAndCancellation/keep=false/cancel
+=== RUN   TestAcquireStartupReadinessFailureAndCancellation/keep=false/claim-error
+=== RUN   TestAcquireStartupReadinessFailureAndCancellation/keep=true/readiness-error
+=== RUN   TestAcquireStartupReadinessFailureAndCancellation/keep=true/cancel
+=== RUN   TestAcquireStartupReadinessFailureAndCancellation/keep=true/claim-error
+--- PASS: TestAcquireStartupReadinessFailureAndCancellation (18.92s)
+    --- PASS: TestAcquireStartupReadinessFailureAndCancellation/keep=false/readiness-error (3.15s)
+    --- PASS: TestAcquireStartupReadinessFailureAndCancellation/keep=false/cancel (3.14s)
+    --- PASS: TestAcquireStartupReadinessFailureAndCancellation/keep=false/claim-error (3.17s)
+    --- PASS: TestAcquireStartupReadinessFailureAndCancellation/keep=true/readiness-error (3.14s)
+    --- PASS: TestAcquireStartupReadinessFailureAndCancellation/keep=true/cancel (3.14s)
+    --- PASS: TestAcquireStartupReadinessFailureAndCancellation/keep=true/claim-error (3.17s)
+=== RUN   TestAcquireStartupSuccessLifetime
+=== RUN   TestAcquireStartupSuccessLifetime/keep=false
+=== RUN   TestAcquireStartupSuccessLifetime/keep=true
+--- PASS: TestAcquireStartupSuccessLifetime (6.27s)
+    --- PASS: TestAcquireStartupSuccessLifetime/keep=false (3.14s)
+    --- PASS: TestAcquireStartupSuccessLifetime/keep=true (3.13s)
+=== RUN   TestStartupInitialExit
+=== RUN   TestStartupInitialExit/keep=false
+=== RUN   TestStartupInitialExit/keep=true
+--- PASS: TestStartupInitialExit (0.03s)
+    --- PASS: TestStartupInitialExit/keep=false (0.02s)
+    --- PASS: TestStartupInitialExit/keep=true (0.02s)
+=== RUN   TestStartupIndependentAcquisitions
+--- PASS: TestStartupIndependentAcquisitions (0.03s)
+=== RUN   TestStartupConcurrentHandoffExitAndCancellation
+=== RUN   TestStartupConcurrentHandoffExitAndCancellation/keep=false
+=== RUN   TestStartupConcurrentHandoffExitAndCancellation/keep=true
+--- PASS: TestStartupConcurrentHandoffExitAndCancellation (0.04s)
+    --- PASS: TestStartupConcurrentHandoffExitAndCancellation/keep=false (0.02s)
+    --- PASS: TestStartupConcurrentHandoffExitAndCancellation/keep=true (0.02s)
+=== RUN   TestAcquireStartupExitWhileClaimFenceHeld
+=== RUN   TestAcquireStartupExitWhileClaimFenceHeld/keep=false
+=== RUN   TestAcquireStartupExitWhileClaimFenceHeld/keep=true
+--- PASS: TestAcquireStartupExitWhileClaimFenceHeld (6.33s)
+    --- PASS: TestAcquireStartupExitWhileClaimFenceHeld/keep=false (3.16s)
+    --- PASS: TestAcquireStartupExitWhileClaimFenceHeld/keep=true (3.17s)
+=== RUN   TestAcquireStartupExitPreservesOwnershipFence
+--- PASS: TestAcquireStartupExitPreservesOwnershipFence (3.10s)
+=== RUN   TestAcquireStartupHandoffFailureRollsBackClaim
+--- PASS: TestAcquireStartupHandoffFailureRollsBackClaim (3.16s)
+=== RUN   TestStartupConfirmResultPopulatedOnSuccess
+--- PASS: TestStartupConfirmResultPopulatedOnSuccess (0.02s)
+=== RUN   TestStartupConfirmResultPopulatedOnEarlyExit
+--- PASS: TestStartupConfirmResultPopulatedOnEarlyExit (0.02s)
+=== RUN   TestAcquirePropagatesStartupConfirmEvidence
+--- PASS: TestAcquirePropagatesStartupConfirmEvidence (3.14s)
+=== RUN   TestAcquirePropagatesStartupConfirmEvidenceOnFailure
+--- PASS: TestAcquirePropagatesStartupConfirmEvidenceOnFailure (0.13s)
+=== RUN   TestStartupConfirmEvidenceProviderCapabilityInterface
+--- PASS: TestStartupConfirmEvidenceProviderCapabilityInterface (0.00s)
+=== RUN   TestProviderSpecAndAliases
+--- PASS: TestProviderSpecAndAliases (0.00s)
+=== RUN   TestConfigureRejectsExplicitNonMacOS
+--- PASS: TestConfigureRejectsExplicitNonMacOS (0.00s)
+=== RUN   TestConfigureDefaultsImplicitLinuxToMacOS
+--- PASS: TestConfigureDefaultsImplicitLinuxToMacOS (0.00s)
+=== RUN   TestConfigureRejectsTailscale
+--- PASS: TestConfigureRejectsTailscale (0.00s)
+=== RUN   TestConfigureAcceptsMacOS
+--- PASS: TestConfigureAcceptsMacOS (0.00s)
+=== RUN   TestConfigureAcceptsEmptyTarget
+--- PASS: TestConfigureAcceptsEmptyTarget (0.00s)
+=== RUN   TestApplyDefaults
+--- PASS: TestApplyDefaults (0.00s)
+=== RUN   TestPrepareLeaseSetsPublicHost
+--- PASS: TestPrepareLeaseSetsPublicHost (0.00s)
+=== RUN   TestPrepareLeaseUsesOpenSSHReadinessTarget
+--- PASS: TestPrepareLeaseUsesOpenSSHReadinessTarget (0.00s)
+=== RUN   TestListInstancesFiltersCrabboxPrefix
+--- PASS: TestListInstancesFiltersCrabboxPrefix (0.00s)
+=== RUN   TestListJSONDecode
+--- PASS: TestListJSONDecode (0.00s)
+=== RUN   TestDoctorReady
+--- PASS: TestDoctorReady (0.00s)
+=== RUN   TestInstanceScopeRoundTrip
+--- PASS: TestInstanceScopeRoundTrip (0.00s)
+=== RUN   TestShouldCleanupRespectsKeepLabel
+--- PASS: TestShouldCleanupRespectsKeepLabel (0.00s)
+=== RUN   TestShouldCleanupExpiredClaim
+--- PASS: TestShouldCleanupExpiredClaim (0.00s)
+=== RUN   TestShouldCleanupSkipsMissingClaim
+--- PASS: TestShouldCleanupSkipsMissingClaim (0.00s)
+=== RUN   TestApplyFlagsRejectsExplicitLinuxTarget
+--- PASS: TestApplyFlagsRejectsExplicitLinuxTarget (0.00s)
+=== RUN   TestApplyFlagsRejectsExplicitWindowsTarget
+--- PASS: TestApplyFlagsRejectsExplicitWindowsTarget (0.00s)
+=== RUN   TestApplyFlagsDefaultsLinuxToMacOS
+--- PASS: TestApplyFlagsDefaultsLinuxToMacOS (0.00s)
+=== RUN   TestApplyFlagsRejectsExplicitTargetFromEnv
+--- PASS: TestApplyFlagsRejectsExplicitTargetFromEnv (0.00s)
+=== RUN   TestApplyFlagsRejectsExplicitTargetFromYAML
+--- PASS: TestApplyFlagsRejectsExplicitTargetFromYAML (0.00s)
+=== RUN   TestApplyFlagsAcceptsExplicitMacOS
+--- PASS: TestApplyFlagsAcceptsExplicitMacOS (0.00s)
+=== RUN   TestInjectSSHKeyDoesNotCallTartIP
+--- PASS: TestInjectSSHKeyDoesNotCallTartIP (0.00s)
+=== RUN   TestInjectSSHKeyTargetsConfiguredUser
+--- PASS: TestInjectSSHKeyTargetsConfiguredUser (0.00s)
+=== RUN   TestInjectSSHKeyRejectsShellInjection
+--- PASS: TestInjectSSHKeyRejectsShellInjection (0.00s)
+=== RUN   TestSpecAdvertisesDesktop
+--- PASS: TestSpecAdvertisesDesktop (0.00s)
+=== RUN   TestDesktopCredentials
+--- PASS: TestDesktopCredentials (0.00s)
+=== RUN   TestEnableScreenSharingEnablesService
+--- PASS: TestEnableScreenSharingEnablesService (0.00s)
+=== RUN   TestInstanceNameFromScopeRequiresPrefix
+--- PASS: TestInstanceNameFromScopeRequiresPrefix (0.00s)
+=== RUN   TestGetIPFiltersDashDash
+--- PASS: TestGetIPFiltersDashDash (0.00s)
+=== RUN   TestGetIPReturnsValidIP
+--- PASS: TestGetIPReturnsValidIP (0.00s)
+=== RUN   TestPreparLeaseRejectsDashDashIP
+--- PASS: TestPreparLeaseRejectsDashDashIP (0.00s)
+=== RUN   TestResolveInstanceUsesRealState
+--- PASS: TestResolveInstanceUsesRealState (0.00s)
+=== RUN   TestWaitForIPDetectsStoppedVM
+--- PASS: TestWaitForIPDetectsStoppedVM (3.00s)
+=== RUN   TestConfigureVMSkipsImplicitDiskSize
+--- PASS: TestConfigureVMSkipsImplicitDiskSize (0.00s)
+=== RUN   TestConfigureVMAppliesExplicitDiskSize
+--- PASS: TestConfigureVMAppliesExplicitDiskSize (0.00s)
+=== RUN   TestServerFromInstanceDefaultsLabels
+--- PASS: TestServerFromInstanceDefaultsLabels (0.00s)
+=== RUN   TestServerFromInstanceClaimLabelsPreserved
+--- PASS: TestServerFromInstanceClaimLabelsPreserved (0.00s)
+=== RUN   TestServerFromInstancePromotesRunningReady
+--- PASS: TestServerFromInstancePromotesRunningReady (0.00s)
+=== RUN   TestServerFromInstanceDoesNotPromoteStoppedReady
+--- PASS: TestServerFromInstanceDoesNotPromoteStoppedReady (0.00s)
+=== RUN   TestPrepareLeaseSetsUserFromLabel
+--- PASS: TestPrepareLeaseSetsUserFromLabel (0.00s)
+=== RUN   TestPrepareLeaseDoesNotOverrideUserWithEmpty
+--- PASS: TestPrepareLeaseDoesNotOverrideUserWithEmpty (0.00s)
+=== RUN   TestPrepareLeaseSetsWorkRootFromLabel
+--- PASS: TestPrepareLeaseSetsWorkRootFromLabel (0.00s)
+=== RUN   TestPrepareLeaseDoesNotOverrideWorkRootWithEmpty
+--- PASS: TestPrepareLeaseDoesNotOverrideWorkRootWithEmpty (0.00s)
+=== RUN   TestApplyDefaultsPreservesTargetOS
+--- PASS: TestApplyDefaultsPreservesTargetOS (0.00s)
+=== RUN   TestApplyDefaultsPreservesWorkRoot
+--- PASS: TestApplyDefaultsPreservesWorkRoot (0.00s)
+=== RUN   TestApplyDefaultsInheritsExplicitSSHUser
+--- PASS: TestApplyDefaultsInheritsExplicitSSHUser (0.00s)
+=== RUN   TestApplyDefaultsIgnoresBaseSSHUser
+--- PASS: TestApplyDefaultsIgnoresBaseSSHUser (0.00s)
+=== RUN   TestConfigureVMAppliesCPUAndMemory
+--- PASS: TestConfigureVMAppliesCPUAndMemory (0.00s)
+=== RUN   TestConfigureVMSkipsZeroCPUAndMemory
+--- PASS: TestConfigureVMSkipsZeroCPUAndMemory (0.00s)
+=== RUN   TestShouldCleanupStoppedInstance
+--- PASS: TestShouldCleanupStoppedInstance (0.00s)
+=== RUN   TestShouldCleanupZeroIdleTimeout
+--- PASS: TestShouldCleanupZeroIdleTimeout (0.00s)
+=== RUN   TestFirstLineNewlineAtStart
+--- PASS: TestFirstLineNewlineAtStart (0.00s)
+=== RUN   TestConfigureVMSkipsExplicitZeroDisk
+--- PASS: TestConfigureVMSkipsExplicitZeroDisk (0.00s)
+=== RUN   TestShouldCleanupGracePeriodNotExpired
+--- PASS: TestShouldCleanupGracePeriodNotExpired (0.00s)
+=== RUN   TestResolveInstanceByLeaseID
+--- PASS: TestResolveInstanceByLeaseID (0.00s)
+=== RUN   TestResolveInstanceMissingVMReturnsClaim
+--- PASS: TestResolveInstanceMissingVMReturnsClaim (0.00s)
+=== RUN   TestResolveInstanceBySlug
+--- PASS: TestResolveInstanceBySlug (0.00s)
+=== RUN   TestApplyFlagsRejectsNonPositiveResources
+=== RUN   TestApplyFlagsRejectsNonPositiveResources/zero_cpu
+=== RUN   TestApplyFlagsRejectsNonPositiveResources/negative_cpu
+=== RUN   TestApplyFlagsRejectsNonPositiveResources/below_minimum_cpu
+=== RUN   TestApplyFlagsRejectsNonPositiveResources/zero_memory
+=== RUN   TestApplyFlagsRejectsNonPositiveResources/negative_memory
+=== RUN   TestApplyFlagsRejectsNonPositiveResources/below_minimum_memory
+=== RUN   TestApplyFlagsRejectsNonPositiveResources/negative_disk
+--- PASS: TestApplyFlagsRejectsNonPositiveResources (0.00s)
+    --- PASS: TestApplyFlagsRejectsNonPositiveResources/zero_cpu (0.00s)
+    --- PASS: TestApplyFlagsRejectsNonPositiveResources/negative_cpu (0.00s)
+    --- PASS: TestApplyFlagsRejectsNonPositiveResources/below_minimum_cpu (0.00s)
+    --- PASS: TestApplyFlagsRejectsNonPositiveResources/zero_memory (0.00s)
+    --- PASS: TestApplyFlagsRejectsNonPositiveResources/negative_memory (0.00s)
+    --- PASS: TestApplyFlagsRejectsNonPositiveResources/below_minimum_memory (0.00s)
+    --- PASS: TestApplyFlagsRejectsNonPositiveResources/negative_disk (0.00s)
+=== RUN   TestApplyFlagsAcceptsPositiveResources
+--- PASS: TestApplyFlagsAcceptsPositiveResources (0.00s)
+=== RUN   TestApplyFlagsDiskZeroUsesCloneDefault
+--- PASS: TestApplyFlagsDiskZeroUsesCloneDefault (0.00s)
+=== RUN   TestApplyFlagsNegativeFromConfigRejected
+--- PASS: TestApplyFlagsNegativeFromConfigRejected (0.00s)
+=== RUN   TestApplyFlagsRejectsInvalidEnvValues
+=== RUN   TestApplyFlagsRejectsInvalidEnvValues/zero_cpu_from_env
+=== RUN   TestApplyFlagsRejectsInvalidEnvValues/zero_memory_from_env
+=== RUN   TestApplyFlagsRejectsInvalidEnvValues/non-integer_cpu_from_env
+=== RUN   TestApplyFlagsRejectsInvalidEnvValues/non-integer_memory_from_env
+=== RUN   TestApplyFlagsRejectsInvalidEnvValues/non-integer_disk_from_env
+=== RUN   TestApplyFlagsRejectsInvalidEnvValues/below-floor_cpu_from_env
+=== RUN   TestApplyFlagsRejectsInvalidEnvValues/below-floor_memory_from_env
+=== RUN   TestApplyFlagsRejectsInvalidEnvValues/negative_disk_from_env
+--- PASS: TestApplyFlagsRejectsInvalidEnvValues (0.00s)
+    --- PASS: TestApplyFlagsRejectsInvalidEnvValues/zero_cpu_from_env (0.00s)
+    --- PASS: TestApplyFlagsRejectsInvalidEnvValues/zero_memory_from_env (0.00s)
+    --- PASS: TestApplyFlagsRejectsInvalidEnvValues/non-integer_cpu_from_env (0.00s)
+    --- PASS: TestApplyFlagsRejectsInvalidEnvValues/non-integer_memory_from_env (0.00s)
+    --- PASS: TestApplyFlagsRejectsInvalidEnvValues/non-integer_disk_from_env (0.00s)
+    --- PASS: TestApplyFlagsRejectsInvalidEnvValues/below-floor_cpu_from_env (0.00s)
+    --- PASS: TestApplyFlagsRejectsInvalidEnvValues/below-floor_memory_from_env (0.00s)
+    --- PASS: TestApplyFlagsRejectsInvalidEnvValues/negative_disk_from_env (0.00s)
+=== RUN   TestApplyFlagsAcceptsDiskEnvValues
+=== RUN   TestApplyFlagsAcceptsDiskEnvValues/zero_uses_clone_default
+=== RUN   TestApplyFlagsAcceptsDiskEnvValues/positive_is_explicit
+--- PASS: TestApplyFlagsAcceptsDiskEnvValues (0.00s)
+    --- PASS: TestApplyFlagsAcceptsDiskEnvValues/zero_uses_clone_default (0.00s)
+    --- PASS: TestApplyFlagsAcceptsDiskEnvValues/positive_is_explicit (0.00s)
+=== RUN   TestDoctorHappyPath
+--- PASS: TestDoctorHappyPath (0.00s)
+=== RUN   TestDoctorCountsOnlyCrabboxVMs
+--- PASS: TestDoctorCountsOnlyCrabboxVMs (0.00s)
+=== RUN   TestDoctorTartNotInstalled
+--- PASS: TestDoctorTartNotInstalled (0.00s)
+=== RUN   TestReleaseLease
+--- PASS: TestReleaseLease (0.00s)
+=== RUN   TestReleaseLeaseRequiresInstanceName
+--- PASS: TestReleaseLeaseRequiresInstanceName (0.00s)
+=== RUN   TestReleaseLeaseMessage
+--- PASS: TestReleaseLeaseMessage (0.00s)
+=== RUN   TestReleaseLeaseInfersLeaseIDFromLabels
+--- PASS: TestReleaseLeaseInfersLeaseIDFromLabels (0.00s)
+=== RUN   TestReleaseLeaseDeleteError
+--- PASS: TestReleaseLeaseDeleteError (0.00s)
+=== RUN   TestCleanupSkipsNonCrabboxVMs
+--- PASS: TestCleanupSkipsNonCrabboxVMs (0.00s)
+=== RUN   TestCleanupDeleteError
+--- PASS: TestCleanupDeleteError (0.00s)
+=== RUN   TestCleanupRemovesOrphanedClaimsWithoutDeletingStoredKey
+--- PASS: TestCleanupRemovesOrphanedClaimsWithoutDeletingStoredKey (0.00s)
+=== RUN   TestCleanupPreservesLegacyClaimsWithoutStorageBinding
+--- PASS: TestCleanupPreservesLegacyClaimsWithoutStorageBinding (0.00s)
+=== RUN   TestResolveInstanceByDirectName
+--- PASS: TestResolveInstanceByDirectName (0.00s)
+=== RUN   TestResolveInstanceNotFound
+--- PASS: TestResolveInstanceNotFound (0.00s)
+=== RUN   TestResolveInstanceEmptyIdentifier
+--- PASS: TestResolveInstanceEmptyIdentifier (0.00s)
+=== RUN   TestResolveRejectsStoppedVMForRun
+--- PASS: TestResolveRejectsStoppedVMForRun (0.00s)
+=== RUN   TestResolveAllowsStoppedVMForStatus
+--- PASS: TestResolveAllowsStoppedVMForStatus (0.00s)
+=== RUN   TestResolveRejectsStoppedVMForSSHTargetCommands
+--- PASS: TestResolveRejectsStoppedVMForSSHTargetCommands (0.00s)
+=== RUN   TestPrepareLeaseAppliesSSHUserFromLabel
+--- PASS: TestPrepareLeaseAppliesSSHUserFromLabel (0.00s)
+=== RUN   TestPrepareLeaseMissingIP
+--- PASS: TestPrepareLeaseMissingIP (0.00s)
+=== RUN   TestPrepareLeaseStoppedVMReturnsState
+--- PASS: TestPrepareLeaseStoppedVMReturnsState (0.00s)
+=== RUN   TestApplyDefaultsPreservesExplicitTarget
+--- PASS: TestApplyDefaultsPreservesExplicitTarget (0.00s)
+=== RUN   TestApplyDefaultsConvertsEmptyTarget
+--- PASS: TestApplyDefaultsConvertsEmptyTarget (0.00s)
+=== RUN   TestCleanupRemovesStoppedCrabboxVMs
+--- PASS: TestCleanupRemovesStoppedCrabboxVMs (0.00s)
+=== RUN   TestCleanupDryRunDoesNotDelete
+--- PASS: TestCleanupDryRunDoesNotDelete (0.00s)
+=== RUN   TestStopVMAndDeleteVM
+--- PASS: TestStopVMAndDeleteVM (0.00s)
+=== RUN   TestStopVMErrorPropagation
+--- PASS: TestStopVMErrorPropagation (0.00s)
+=== RUN   TestCloneVM
+--- PASS: TestCloneVM (0.00s)
+=== RUN   TestCloneVMErrorPropagation
+--- PASS: TestCloneVMErrorPropagation (0.00s)
+=== RUN   TestListInstances
+--- PASS: TestListInstances (0.00s)
+=== RUN   TestListInstancesInvalidJSONError
+--- PASS: TestListInstancesInvalidJSONError (0.00s)
+=== RUN   TestInstanceRunning
+--- PASS: TestInstanceRunning (0.00s)
+=== RUN   TestTartState
+--- PASS: TestTartState (0.00s)
+=== RUN   TestInstanceScope
+--- PASS: TestInstanceScope (0.00s)
+=== RUN   TestInstanceNameFromScope
+--- PASS: TestInstanceNameFromScope (0.00s)
+=== RUN   TestInstanceNameFromClaim
+--- PASS: TestInstanceNameFromClaim (0.00s)
+=== RUN   TestFirstNonBlank
+--- PASS: TestFirstNonBlank (0.00s)
+=== RUN   TestCommandError
+--- PASS: TestCommandError (0.00s)
+=== RUN   TestCommandErrorFallsBackToStdout
+--- PASS: TestCommandErrorFallsBackToStdout (0.00s)
+=== RUN   TestCommandErrorMinimalExitCode
+--- PASS: TestCommandErrorMinimalExitCode (0.00s)
+=== RUN   TestIsTartProviderName
+--- PASS: TestIsTartProviderName (0.00s)
+=== RUN   TestGetIPReturnsEmptyOnError
+--- PASS: TestGetIPReturnsEmptyOnError (0.00s)
+=== RUN   TestGetIPStripsDoubleDash
+--- PASS: TestGetIPStripsDoubleDash (0.00s)
+=== RUN   TestTouchPreservesProviderLabels
+--- PASS: TestTouchPreservesProviderLabels (0.00s)
+=== RUN   TestConfigureDoctor
+--- PASS: TestConfigureDoctor (0.00s)
+=== RUN   TestResolveReleaseOnlyRejectsUnclaimedVM
+--- PASS: TestResolveReleaseOnlyRejectsUnclaimedVM (0.00s)
+=== RUN   TestListPropagatesListInstancesError
+--- PASS: TestListPropagatesListInstancesError (0.00s)
+=== RUN   TestDoctorPropagatesVersionError
+--- PASS: TestDoctorPropagatesVersionError (0.00s)
+=== RUN   TestDoctorPropagatesListError
+--- PASS: TestDoctorPropagatesListError (0.00s)
+=== RUN   TestDoctorCountsCrabboxVMs
+--- PASS: TestDoctorCountsCrabboxVMs (0.00s)
+=== RUN   TestDoctorProbeSSHFlag
+--- PASS: TestDoctorProbeSSHFlag (0.00s)
+=== RUN   TestReleaseLeaseFallsBackToResolve
+--- PASS: TestReleaseLeaseFallsBackToResolve (0.00s)
+=== RUN   TestReleaseLeasePrunesMissingResolvedInstance
+--- PASS: TestReleaseLeasePrunesMissingResolvedInstance (0.00s)
+=== RUN   TestReleaseLeasePrunesAlreadyResolvedMissingInstance
+--- PASS: TestReleaseLeasePrunesAlreadyResolvedMissingInstance (0.00s)
+=== RUN   TestReleaseLeaseEmptyName
+--- PASS: TestReleaseLeaseEmptyName (0.00s)
+=== RUN   TestReleaseLeaseFromLabels
+--- PASS: TestReleaseLeaseFromLabels (0.00s)
+=== RUN   TestReleaseLeaseIDFromLabel
+--- PASS: TestReleaseLeaseIDFromLabel (0.00s)
+=== RUN   TestShouldCleanupEdgeCases
+=== RUN   TestShouldCleanupEdgeCases/keep=true_prevents_cleanup
+=== RUN   TestShouldCleanupEdgeCases/stopped_VM_without_claim
+=== RUN   TestShouldCleanupEdgeCases/running_VM_without_claim
+=== RUN   TestShouldCleanupEdgeCases/expired_claim
+=== RUN   TestShouldCleanupEdgeCases/active_claim_within_idle_window
+=== RUN   TestShouldCleanupEdgeCases/claim_with_zero_idle_timeout
+=== RUN   TestShouldCleanupEdgeCases/claim_with_unparseable_last_used_at
+--- PASS: TestShouldCleanupEdgeCases (0.00s)
+    --- PASS: TestShouldCleanupEdgeCases/keep=true_prevents_cleanup (0.00s)
+    --- PASS: TestShouldCleanupEdgeCases/stopped_VM_without_claim (0.00s)
+    --- PASS: TestShouldCleanupEdgeCases/running_VM_without_claim (0.00s)
+    --- PASS: TestShouldCleanupEdgeCases/expired_claim (0.00s)
+    --- PASS: TestShouldCleanupEdgeCases/active_claim_within_idle_window (0.00s)
+    --- PASS: TestShouldCleanupEdgeCases/claim_with_zero_idle_timeout (0.00s)
+    --- PASS: TestShouldCleanupEdgeCases/claim_with_unparseable_last_used_at (0.00s)
+=== RUN   TestInstanceRunningFunction
+=== RUN   TestInstanceRunningFunction/running
+=== RUN   TestInstanceRunningFunction/ready
+=== RUN   TestInstanceRunningFunction/stopped
+=== RUN   TestInstanceRunningFunction/#00
+=== RUN   TestInstanceRunningFunction/suspended
+=== RUN   TestInstanceRunningFunction/unknown
+--- PASS: TestInstanceRunningFunction (0.00s)
+    --- PASS: TestInstanceRunningFunction/running (0.00s)
+    --- PASS: TestInstanceRunningFunction/ready (0.00s)
+    --- PASS: TestInstanceRunningFunction/stopped (0.00s)
+    --- PASS: TestInstanceRunningFunction/#00 (0.00s)
+    --- PASS: TestInstanceRunningFunction/suspended (0.00s)
+    --- PASS: TestInstanceRunningFunction/unknown (0.00s)
+=== RUN   TestGetIPNormalizesEmpty
+--- PASS: TestGetIPNormalizesEmpty (0.00s)
+=== RUN   TestListFiltersNonCrabboxWithoutClaim
+--- PASS: TestListFiltersNonCrabboxWithoutClaim (0.00s)
+=== RUN   TestResolveStoppedVMForStatusOnly
+--- PASS: TestResolveStoppedVMForStatusOnly (0.00s)
+=== RUN   TestResolveStoppedVMWithoutStatusOnlyErrors
+--- PASS: TestResolveStoppedVMWithoutStatusOnlyErrors (0.00s)
+=== RUN   TestResolveRunningVMByStateNotBool
+--- PASS: TestResolveRunningVMByStateNotBool (0.00s)
+=== RUN   TestResolveRunningVMByStateEmptyIPErrors
+--- PASS: TestResolveRunningVMByStateEmptyIPErrors (0.00s)
+=== RUN   TestServerFromInstanceLabels
+--- PASS: TestServerFromInstanceLabels (0.00s)
+=== RUN   TestProviderClaimsFiltersByProvider
+--- PASS: TestProviderClaimsFiltersByProvider (0.00s)
+=== RUN   TestApplyDefaultsSetsAllFields
+--- PASS: TestApplyDefaultsSetsAllFields (0.00s)
+=== RUN   TestApplyDefaultsPreservesTartUser
+--- PASS: TestApplyDefaultsPreservesTartUser (0.00s)
+=== RUN   TestApplyFlagsTargetOSConversion
+--- PASS: TestApplyFlagsTargetOSConversion (0.00s)
+=== RUN   TestConfigureVMSkipsDiskWhenNotExplicit
+--- PASS: TestConfigureVMSkipsDiskWhenNotExplicit (0.00s)
+=== RUN   TestValidateTartEnvIntNonNegative
+--- PASS: TestValidateTartEnvIntNonNegative (0.00s)
+=== RUN   TestValidateTartEnvInt
+--- PASS: TestValidateTartEnvInt (0.00s)
+=== RUN   TestConfigureVMCPUSetError
+--- PASS: TestConfigureVMCPUSetError (0.00s)
+=== RUN   TestConfigureVMMemorySetError
+--- PASS: TestConfigureVMMemorySetError (0.00s)
+=== RUN   TestConfigureVMDiskSetError
+--- PASS: TestConfigureVMDiskSetError (0.00s)
+=== RUN   TestConfigureVMAllSettingsApplied
+--- PASS: TestConfigureVMAllSettingsApplied (0.00s)
+=== RUN   TestConfigureVMSkipsZeroValues
+--- PASS: TestConfigureVMSkipsZeroValues (0.00s)
+=== RUN   TestCloneVMErrorDetail
+--- PASS: TestCloneVMErrorDetail (0.00s)
+=== RUN   TestCloneVMSuccess
+--- PASS: TestCloneVMSuccess (0.00s)
+=== RUN   TestStopVMErrorMessage
+--- PASS: TestStopVMErrorMessage (0.00s)
+=== RUN   TestDeleteVMError
+--- PASS: TestDeleteVMError (0.00s)
+=== RUN   TestInjectSSHKeyInvalidUser
+--- PASS: TestInjectSSHKeyInvalidUser (0.00s)
+=== RUN   TestInjectSSHKeyValidUser
+--- PASS: TestInjectSSHKeyValidUser (0.00s)
+=== RUN   TestInjectSSHKeyExecError
+--- PASS: TestInjectSSHKeyExecError (0.00s)
+=== RUN   TestCommandErrorWithStderr
+--- PASS: TestCommandErrorWithStderr (0.00s)
+=== RUN   TestCommandErrorWithStdoutFallback
+--- PASS: TestCommandErrorWithStdoutFallback (0.00s)
+=== RUN   TestCommandErrorNoDetail
+--- PASS: TestCommandErrorNoDetail (0.00s)
+=== RUN   TestCommandErrorZeroExitCodeBecomesOne
+--- PASS: TestCommandErrorZeroExitCodeBecomesOne (0.00s)
+=== RUN   TestFirstLineEmpty
+--- PASS: TestFirstLineEmpty (0.00s)
+=== RUN   TestFirstLineSingleLine
+--- PASS: TestFirstLineSingleLine (0.00s)
+=== RUN   TestFirstLineMultiLine
+--- PASS: TestFirstLineMultiLine (0.00s)
+=== RUN   TestFirstNonBlankAllEmpty
+--- PASS: TestFirstNonBlankAllEmpty (0.00s)
+=== RUN   TestFirstNonBlankFindsFirst
+--- PASS: TestFirstNonBlankFindsFirst (0.00s)
+=== RUN   TestFirstNonBlankSingleValue
+--- PASS: TestFirstNonBlankSingleValue (0.00s)
+=== RUN   TestTartStateNormalization
+--- PASS: TestTartStateNormalization (0.00s)
+=== RUN   TestInstanceRunningVariousStates
+--- PASS: TestInstanceRunningVariousStates (0.00s)
+=== RUN   TestGetIPDashDashReturnsEmpty
+--- PASS: TestGetIPDashDashReturnsEmpty (0.00s)
+=== RUN   TestGetIPValidAddress
+--- PASS: TestGetIPValidAddress (0.00s)
+=== RUN   TestGetIPErrorReturnsEmpty
+--- PASS: TestGetIPErrorReturnsEmpty (0.00s)
+=== RUN   TestConfigureTailscaleRejected
+--- PASS: TestConfigureTailscaleRejected (0.00s)
+=== RUN   TestConfigureTailscaleNetwork
+--- PASS: TestConfigureTailscaleNetwork (0.00s)
+=== RUN   TestApplyFlagsCPUExact4Accepted
+--- PASS: TestApplyFlagsCPUExact4Accepted (0.00s)
+=== RUN   TestApplyFlagsMemoryExact4096Accepted
+--- PASS: TestApplyFlagsMemoryExact4096Accepted (0.00s)
+=== RUN   TestApplyFlagsCPU3Rejected
+--- PASS: TestApplyFlagsCPU3Rejected (0.00s)
+=== RUN   TestApplyFlagsMemory4095Rejected
+--- PASS: TestApplyFlagsMemory4095Rejected (0.00s)
+=== RUN   TestApplyFlagsWrongTypeIgnored
+--- PASS: TestApplyFlagsWrongTypeIgnored (0.00s)
+=== RUN   TestApplyFlagsImageExplicit
+--- PASS: TestApplyFlagsImageExplicit (0.00s)
+=== RUN   TestApplyDefaultsTargetOS
+--- PASS: TestApplyDefaultsTargetOS (0.00s)
+=== RUN   TestApplyDefaultsImageFallback
+--- PASS: TestApplyDefaultsImageFallback (0.00s)
+=== RUN   TestApplyDefaultsCPUFallback
+--- PASS: TestApplyDefaultsCPUFallback (0.00s)
+=== RUN   TestApplyDefaultsMemoryFallback
+--- PASS: TestApplyDefaultsMemoryFallback (0.00s)
+=== RUN   TestApplyDefaultsWorkRootFallback
+--- PASS: TestApplyDefaultsWorkRootFallback (0.00s)
+=== RUN   TestServerFromInstanceDefaultLabels
+--- PASS: TestServerFromInstanceDefaultLabels (0.00s)
+=== RUN   TestServerFromInstanceExistingLabelsRetained
+--- PASS: TestServerFromInstanceExistingLabelsRetained (0.00s)
+=== RUN   TestServerFromInstanceRunningReadyStatus
+--- PASS: TestServerFromInstanceRunningReadyStatus (0.00s)
+=== RUN   TestServerFromInstanceStoppedStatus
+--- PASS: TestServerFromInstanceStoppedStatus (0.00s)
+=== RUN   TestListInstancesBadJSONPropagatesError
+--- PASS: TestListInstancesBadJSONPropagatesError (0.00s)
+=== RUN   TestListInstancesCommandError
+--- PASS: TestListInstancesCommandError (0.00s)
+=== RUN   TestApplyFlagsConfigCPUZeroWithExplicit
+--- PASS: TestApplyFlagsConfigCPUZeroWithExplicit (0.00s)
+=== RUN   TestApplyFlagsConfigMemoryZeroWithExplicit
+--- PASS: TestApplyFlagsConfigMemoryZeroWithExplicit (0.00s)
+=== RUN   TestShouldCleanupUnparseableLastUsedAt
+--- PASS: TestShouldCleanupUnparseableLastUsedAt (0.00s)
+=== RUN   TestShouldCleanupZeroLastUsedAt
+--- PASS: TestShouldCleanupZeroLastUsedAt (0.00s)
+=== RUN   TestConfigureDoctorError
+--- PASS: TestConfigureDoctorError (0.00s)
+=== RUN   TestReleaseLeaseMessageFormat
+--- PASS: TestReleaseLeaseMessageFormat (0.00s)
+=== RUN   TestReleaseLeaseMessageNoCloudID
+--- PASS: TestReleaseLeaseMessageNoCloudID (0.00s)
+=== RUN   TestReleaseLeaseMessageEmptyBoth
+--- PASS: TestReleaseLeaseMessageEmptyBoth (0.00s)
+=== RUN   TestValidPOSIXUserRegex
+--- PASS: TestValidPOSIXUserRegex (0.00s)
+=== RUN   TestApplyDefaultsKeepsCustomTargetOS
+--- PASS: TestApplyDefaultsKeepsCustomTargetOS (0.00s)
+=== RUN   TestApplyDefaultsWorkRootInheritsNonDefault
+--- PASS: TestApplyDefaultsWorkRootInheritsNonDefault (0.00s)
+=== RUN   TestApplyDefaultsWorkRootUsesHardcodedDefault
+--- PASS: TestApplyDefaultsWorkRootUsesHardcodedDefault (0.00s)
+=== RUN   TestApplyDefaultsKeepsExplicitWorkRoot
+--- PASS: TestApplyDefaultsKeepsExplicitWorkRoot (0.00s)
+=== RUN   TestApplyDefaultsKeepsPositiveCPUs
+--- PASS: TestApplyDefaultsKeepsPositiveCPUs (0.00s)
+=== RUN   TestApplyDefaultsKeepsPositiveMemory
+--- PASS: TestApplyDefaultsKeepsPositiveMemory (0.00s)
+=== RUN   TestApplyDefaultsSyncsSSHUserFromTart
+--- PASS: TestApplyDefaultsSyncsSSHUserFromTart (0.00s)
+=== RUN   TestApplyDefaultsSyncsSSHPort
+--- PASS: TestApplyDefaultsSyncsSSHPort (0.00s)
+=== RUN   TestApplyDefaultsSyncsServerType
+--- PASS: TestApplyDefaultsSyncsServerType (0.00s)
+=== RUN   TestApplyDefaultsResetsWindowsMode
+--- PASS: TestApplyDefaultsResetsWindowsMode (0.00s)
+=== RUN   TestApplyDefaultsResetsFallbackPorts
+--- PASS: TestApplyDefaultsResetsFallbackPorts (0.00s)
+=== RUN   TestApplyFlagsConfigCPU1Rejected
+--- PASS: TestApplyFlagsConfigCPU1Rejected (0.00s)
+=== RUN   TestApplyFlagsConfigMemory2048Rejected
+--- PASS: TestApplyFlagsConfigMemory2048Rejected (0.00s)
+=== RUN   TestApplyFlagsConfigDiskNegativeRejected
+--- PASS: TestApplyFlagsConfigDiskNegativeRejected (0.00s)
+=== RUN   TestServerFromInstanceNilClaimLabels
+--- PASS: TestServerFromInstanceNilClaimLabels (0.00s)
+=== RUN   TestServerFromInstanceSourceFallback
+--- PASS: TestServerFromInstanceSourceFallback (0.00s)
+=== RUN   TestServerFromInstanceSourcePreferred
+--- PASS: TestServerFromInstanceSourcePreferred (0.00s)
+=== RUN   TestShouldCleanupNegativeIdleTimeout
+--- PASS: TestShouldCleanupNegativeIdleTimeout (0.00s)
+=== RUN   TestShouldCleanupNotRunningNotReady
+--- PASS: TestShouldCleanupNotRunningNotReady (0.00s)
+=== RUN   TestShouldCleanupEmptyStatus
+--- PASS: TestShouldCleanupEmptyStatus (0.00s)
+=== RUN   TestBlankHelper
+--- PASS: TestBlankHelper (0.00s)
+=== RUN   TestInstanceScopeBlankInput
+--- PASS: TestInstanceScopeBlankInput (0.00s)
+=== RUN   TestInstanceScopePrefixAdded
+--- PASS: TestInstanceScopePrefixAdded (0.00s)
+=== RUN   TestInstanceNameFromScopeRejectsNonInstance
+--- PASS: TestInstanceNameFromScopeRejectsNonInstance (0.00s)
+=== RUN   TestInstanceNameFromScopeExtractsName
+--- PASS: TestInstanceNameFromScopeExtractsName (0.00s)
+=== RUN   TestInstanceNameFromClaimPrefersLabel
+--- PASS: TestInstanceNameFromClaimPrefersLabel (0.00s)
+=== RUN   TestInstanceNameFromClaimUsesScope
+--- PASS: TestInstanceNameFromClaimUsesScope (0.00s)
+=== RUN   TestInstanceNameFromClaimReturnsEmptyForMissing
+--- PASS: TestInstanceNameFromClaimReturnsEmptyForMissing (0.00s)
+=== RUN   TestNormalizeLeaseSlugEmpty
+--- PASS: TestNormalizeLeaseSlugEmpty (0.00s)
+=== RUN   TestNormalizeLeaseSlugWithPrefix
+--- PASS: TestNormalizeLeaseSlugWithPrefix (0.00s)
+=== RUN   TestNewBackendWithSupervisorInjectsFake
+--- PASS: TestNewBackendWithSupervisorInjectsFake (0.00s)
+=== RUN   TestStartSupervisedVMUsesInjectedSupervisor
+--- PASS: TestStartSupervisedVMUsesInjectedSupervisor (0.00s)
+=== RUN   TestStartupProcessSatisfiesFullProcessHandle
+--- PASS: TestStartupProcessSatisfiesFullProcessHandle (0.00s)
+=== RUN   TestStartupProcessImplementsExitObservable
+--- PASS: TestStartupProcessImplementsExitObservable (0.00s)
+=== RUN   TestStartupProcessImplementsLifecycleContextProvider
+--- PASS: TestStartupProcessImplementsLifecycleContextProvider (0.00s)
+=== RUN   TestStartupProcessDoesNotImplementDetachedProcess
+--- PASS: TestStartupProcessDoesNotImplementDetachedProcess (0.00s)
+=== RUN   TestStartupProcessContextReturnsLifecycleContext
+--- PASS: TestStartupProcessContextReturnsLifecycleContext (0.00s)
+=== RUN   TestStartSupervisedVMReturnsProcessHandle
+--- PASS: TestStartSupervisedVMReturnsProcessHandle (0.00s)
+=== RUN   TestTartSupervisorReturnsTimeoutWindowConfirm
+--- PASS: TestTartSupervisorReturnsTimeoutWindowConfirm (0.00s)
+=== RUN   TestConfirmStartupUsesSharedStrategy
+--- PASS: TestConfirmStartupUsesSharedStrategy (0.00s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/providers/tart	77.490s
+---
+finished_at=2026-10-19T10:37:42Z
+exit=0

@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "record_type": "gate",
+  "gate_id": "exact-toolchain",
+  "gate_type": "BUILD",
+  "mandatory": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "tests_executed": 0,
+  "tests_failed": 0,
+  "duration_ms": 25,
+  "evidence": {
+    "file": "gate-results/exact-toolchain.log",
+    "sha256": "326a4aedabb1030328c7992b7b20be66016d7cf21a95ba292a3a509febe5b1a2"
+  }
+}

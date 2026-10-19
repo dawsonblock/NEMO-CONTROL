@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "record_type": "gate",
+  "gate_id": "worker-lint",
+  "gate_type": "STATIC_ANALYSIS",
+  "mandatory": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "tests_executed": 0,
+  "tests_failed": 0,
+  "duration_ms": 345,
+  "evidence": {
+    "file": "gate-results/worker-lint.log",
+    "sha256": "19b2174b53d9a03757b6bf5c151932f8e17163a747aeb4e2e3db23381edb1933"
+  }
+}

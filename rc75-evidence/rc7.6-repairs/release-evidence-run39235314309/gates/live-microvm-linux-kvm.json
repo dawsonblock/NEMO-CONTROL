@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "record_type": "gate",
+  "gate_id": "live-microvm-linux-kvm",
+  "gate_type": "TEST",
+  "mandatory": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "tests_executed": 15,
+  "tests_failed": 0,
+  "duration_ms": 68,
+  "evidence": {
+    "file": "gate-results/live-microvm-linux-kvm.log",
+    "sha256": "3830be96eea8c4f4257056b7c7aed927fa2a13a8af5f03875d9fc006eda42187"
+  },
+  "test_suite": {
+    "suite": "live-microvm",
+    "lane": "linux-kvm",
+    "inventory": {
+      "file": "required-tests.json",
+      "sha256": "a95bb062a1185cf2e587412fa275bf433eb48612e8844bbc10bf041cf1b2ae8f"
+    },
+    "results": {
+      "file": "gate-results/live-microvm-linux-kvm.cases.json",
+      "sha256": "1b3179ef0c2b479989c4a74899db2eb05468c6f4a9286461083f8690e59207e4"
+    },
+    "raw": {
+      "file": "gate-results/live-microvm-linux-kvm.test.json",
+      "sha256": "77665aaec732022553392d21beb3cbb0fc883b986e2a199bee9fc993ba3dab84"
+    }
+  }
+}

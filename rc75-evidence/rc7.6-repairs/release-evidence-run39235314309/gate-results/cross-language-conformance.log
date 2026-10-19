@@ -1,0 +1,216 @@
+command=go test -v -count=1 -timeout=60s -run TestRunEvidenceConformanceCorpus|TestReceiptContractConformance ./internal/cli/
+started_at=2026-10-19T11:01:46Z
+---
+=== RUN   TestReceiptContractConformance
+=== RUN   TestReceiptContractConformance/v2-no-evidence-pass
+=== RUN   TestReceiptContractConformance/v2-evidence-present-fail
+=== RUN   TestReceiptContractConformance/v2-malformed-evidence-fail
+=== RUN   TestReceiptContractConformance/v3-no-evidence-fail
+=== RUN   TestReceiptContractConformance/v3-malformed-evidence-fail
+=== RUN   TestReceiptContractConformance/v3-valid-evidence-pass
+=== RUN   TestReceiptContractConformance/v3-empty-string-evidence-fail
+=== RUN   TestReceiptContractConformance/v3-uppercase-evidence-fail
+=== RUN   TestReceiptContractConformance/v3-short-evidence-fail
+--- PASS: TestReceiptContractConformance (0.00s)
+    --- PASS: TestReceiptContractConformance/v2-no-evidence-pass (0.00s)
+    --- PASS: TestReceiptContractConformance/v2-evidence-present-fail (0.00s)
+    --- PASS: TestReceiptContractConformance/v2-malformed-evidence-fail (0.00s)
+    --- PASS: TestReceiptContractConformance/v3-no-evidence-fail (0.00s)
+    --- PASS: TestReceiptContractConformance/v3-malformed-evidence-fail (0.00s)
+    --- PASS: TestReceiptContractConformance/v3-valid-evidence-pass (0.00s)
+    --- PASS: TestReceiptContractConformance/v3-empty-string-evidence-fail (0.00s)
+    --- PASS: TestReceiptContractConformance/v3-uppercase-evidence-fail (0.00s)
+    --- PASS: TestReceiptContractConformance/v3-short-evidence-fail (0.00s)
+=== RUN   TestRunEvidenceConformanceCorpus
+=== RUN   TestRunEvidenceConformanceCorpus/minimal-success
+=== RUN   TestRunEvidenceConformanceCorpus/ordinary-failure
+=== RUN   TestRunEvidenceConformanceCorpus/timeout-with-error-kind
+=== RUN   TestRunEvidenceConformanceCorpus/cancellation-with-error-kind
+=== RUN   TestRunEvidenceConformanceCorpus/startup-confirm-timeout-window
+=== RUN   TestRunEvidenceConformanceCorpus/startup-confirm-file-handoff-with-exit
+=== RUN   TestRunEvidenceConformanceCorpus/skipped-sync-phase-without-ms
+=== RUN   TestRunEvidenceConformanceCorpus/runner-phases-with-snake-case
+=== RUN   TestRunEvidenceConformanceCorpus/all-optional-fields
+=== RUN   TestRunEvidenceConformanceCorpus/multiple-artifacts
+=== RUN   TestRunEvidenceConformanceCorpus/empty-arrays
+=== RUN   TestRunEvidenceConformanceCorpus/unicode-command-text
+=== RUN   TestRunEvidenceConformanceCorpus/unicode-line-separator
+=== RUN   TestRunEvidenceConformanceCorpus/unicode-paragraph-separator
+=== RUN   TestRunEvidenceConformanceCorpus/max-safe-integer-timing
+=== RUN   TestRunEvidenceConformanceCorpus/unknown-top-level-field
+=== RUN   TestRunEvidenceConformanceCorpus/unknown-nested-phase-field
+=== RUN   TestRunEvidenceConformanceCorpus/unknown-startup-field
+=== RUN   TestRunEvidenceConformanceCorpus/unsafe-integer-timing
+=== RUN   TestRunEvidenceConformanceCorpus/negative-timing
+=== RUN   TestRunEvidenceConformanceCorpus/uppercase-digest
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-schema-version
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-evidence-type
+=== RUN   TestRunEvidenceConformanceCorpus/timeout-without-error-kind
+=== RUN   TestRunEvidenceConformanceCorpus/canceled-without-error-kind
+=== RUN   TestRunEvidenceConformanceCorpus/success-with-nonzero-exit
+=== RUN   TestRunEvidenceConformanceCorpus/failure-with-zero-exit
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-startup-stage
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-startup-ready-type
+=== RUN   TestRunEvidenceConformanceCorpus/runner-phase-camel-case
+=== RUN   TestRunEvidenceConformanceCorpus/negative-startup-duration
+=== RUN   TestRunEvidenceConformanceCorpus/golden-basic
+=== RUN   TestRunEvidenceConformanceCorpus/golden-html-chars
+=== RUN   TestRunEvidenceConformanceCorpus/golden-unicode
+=== RUN   TestRunEvidenceConformanceCorpus/golden-nested-phases-artifacts
+=== RUN   TestRunEvidenceConformanceCorpus/golden-large-ints
+=== RUN   TestRunEvidenceConformanceCorpus/golden-minimal
+=== RUN   TestRunEvidenceConformanceCorpus/golden-line-separator
+=== RUN   TestRunEvidenceConformanceCorpus/golden-paragraph-separator
+=== RUN   TestRunEvidenceConformanceCorpus/golden-combined-separators
+=== RUN   TestRunEvidenceConformanceCorpus/golden-unicode-escaping
+=== RUN   TestRunEvidenceConformanceCorpus/tampered-digest
+=== RUN   TestRunEvidenceConformanceCorpus/too-many-runner-phases
+=== RUN   TestRunEvidenceConformanceCorpus/too-many-artifacts
+=== RUN   TestRunEvidenceConformanceCorpus/missing-evidence-type
+=== RUN   TestRunEvidenceConformanceCorpus/missing-schema-version
+=== RUN   TestRunEvidenceConformanceCorpus/missing-run-status
+=== RUN   TestRunEvidenceConformanceCorpus/missing-digest
+=== RUN   TestRunEvidenceConformanceCorpus/exit-code-unsafe-integer
+=== RUN   TestRunEvidenceConformanceCorpus/negative-sync-transfer-bytes
+=== RUN   TestRunEvidenceConformanceCorpus/negative-sync-transfer-files
+=== RUN   TestRunEvidenceConformanceCorpus/runner-phase-missing-ms
+=== RUN   TestRunEvidenceConformanceCorpus/sync-phase-unknown-field
+=== RUN   TestRunEvidenceConformanceCorpus/command-phase-unknown-field
+=== RUN   TestRunEvidenceConformanceCorpus/artifact-missing-kind
+=== RUN   TestRunEvidenceConformanceCorpus/artifact-negative-bytes
+=== RUN   TestRunEvidenceConformanceCorpus/artifact-unknown-field
+=== RUN   TestRunEvidenceConformanceCorpus/startup-confirm-missing-stage
+=== RUN   TestRunEvidenceConformanceCorpus/startup-confirm-missing-ready
+=== RUN   TestRunEvidenceConformanceCorpus/startup-confirm-negative-duration
+=== RUN   TestRunEvidenceConformanceCorpus/invalid-status-unknown
+=== RUN   TestRunEvidenceConformanceCorpus/timed-out-with-zero-exit
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-run-id-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-lease-id-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-slug-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-label-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-machine-type-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-command-text-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-sync-mode-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-sync-fallback-reason-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-blocked-stage-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-resource-exhaustion-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-retry-likely-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-failure-hint-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-started-at-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-ended-at-number
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-sync-delegated-string
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-sync-skipped-string
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-type-error-kind-number
+=== RUN   TestRunEvidenceConformanceCorpus/empty-provider
+=== RUN   TestRunEvidenceConformanceCorpus/unpaired-high-surrogate
+=== RUN   TestRunEvidenceConformanceCorpus/unpaired-low-surrogate
+=== RUN   TestRunEvidenceConformanceCorpus/fractional-timestamp-milliseconds
+=== RUN   TestRunEvidenceConformanceCorpus/fractional-timestamp-microseconds
+=== RUN   TestRunEvidenceConformanceCorpus/startup-confirm-full
+=== RUN   TestRunEvidenceConformanceCorpus/startup-confirm-failed
+=== RUN   TestRunEvidenceConformanceCorpus/empty-command-text
+=== RUN   TestRunEvidenceConformanceCorpus/multiple-runner-phases
+=== RUN   TestRunEvidenceConformanceCorpus/artifacts-full
+=== RUN   TestRunEvidenceConformanceCorpus/negative-sync-ms
+=== RUN   TestRunEvidenceConformanceCorpus/negative-command-ms
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-schema-version#01
+=== RUN   TestRunEvidenceConformanceCorpus/wrong-evidence-type#01
+--- PASS: TestRunEvidenceConformanceCorpus (0.01s)
+    --- PASS: TestRunEvidenceConformanceCorpus/minimal-success (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/ordinary-failure (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/timeout-with-error-kind (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/cancellation-with-error-kind (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/startup-confirm-timeout-window (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/startup-confirm-file-handoff-with-exit (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/skipped-sync-phase-without-ms (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/runner-phases-with-snake-case (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/all-optional-fields (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/multiple-artifacts (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/empty-arrays (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/unicode-command-text (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/unicode-line-separator (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/unicode-paragraph-separator (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/max-safe-integer-timing (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/unknown-top-level-field (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/unknown-nested-phase-field (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/unknown-startup-field (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/unsafe-integer-timing (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/negative-timing (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/uppercase-digest (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-schema-version (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-evidence-type (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/timeout-without-error-kind (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/canceled-without-error-kind (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/success-with-nonzero-exit (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/failure-with-zero-exit (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-startup-stage (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-startup-ready-type (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/runner-phase-camel-case (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/negative-startup-duration (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/golden-basic (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/golden-html-chars (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/golden-unicode (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/golden-nested-phases-artifacts (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/golden-large-ints (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/golden-minimal (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/golden-line-separator (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/golden-paragraph-separator (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/golden-combined-separators (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/golden-unicode-escaping (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/tampered-digest (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/too-many-runner-phases (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/too-many-artifacts (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/missing-evidence-type (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/missing-schema-version (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/missing-run-status (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/missing-digest (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/exit-code-unsafe-integer (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/negative-sync-transfer-bytes (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/negative-sync-transfer-files (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/runner-phase-missing-ms (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/sync-phase-unknown-field (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/command-phase-unknown-field (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/artifact-missing-kind (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/artifact-negative-bytes (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/artifact-unknown-field (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/startup-confirm-missing-stage (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/startup-confirm-missing-ready (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/startup-confirm-negative-duration (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/invalid-status-unknown (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/timed-out-with-zero-exit (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-run-id-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-lease-id-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-slug-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-label-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-machine-type-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-command-text-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-sync-mode-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-sync-fallback-reason-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-blocked-stage-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-resource-exhaustion-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-retry-likely-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-failure-hint-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-started-at-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-ended-at-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-sync-delegated-string (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-sync-skipped-string (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-type-error-kind-number (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/empty-provider (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/unpaired-high-surrogate (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/unpaired-low-surrogate (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/fractional-timestamp-milliseconds (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/fractional-timestamp-microseconds (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/startup-confirm-full (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/startup-confirm-failed (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/empty-command-text (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/multiple-runner-phases (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/artifacts-full (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/negative-sync-ms (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/negative-command-ms (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-schema-version#01 (0.00s)
+    --- PASS: TestRunEvidenceConformanceCorpus/wrong-evidence-type#01 (0.00s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/cli	0.051s
+---
+finished_at=2026-10-19T11:01:50Z
+exit=0

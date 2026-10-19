@@ -1,0 +1,70 @@
+command=go test -v -count=1 -timeout=60s -run TestState|TestLeaseConfig|TestAcquireResult|TestTerminalReceipt|TestRecovery|TestLeaseError|TestMigrateState|TestDefaultLeaseConfig|TestFixedClock|TestSystemClock ./internal/idempotency/
+started_at=2026-10-19T10:56:58Z
+---
+=== RUN   TestLeaseConfigValidate
+=== RUN   TestLeaseConfigValidate/valid
+=== RUN   TestLeaseConfigValidate/zero
+=== RUN   TestLeaseConfigValidate/negative
+=== RUN   TestLeaseConfigValidate/exceeds_max
+=== RUN   TestLeaseConfigValidate/at_max
+=== RUN   TestLeaseConfigValidate/short
+--- PASS: TestLeaseConfigValidate (0.00s)
+    --- PASS: TestLeaseConfigValidate/valid (0.00s)
+    --- PASS: TestLeaseConfigValidate/zero (0.00s)
+    --- PASS: TestLeaseConfigValidate/negative (0.00s)
+    --- PASS: TestLeaseConfigValidate/exceeds_max (0.00s)
+    --- PASS: TestLeaseConfigValidate/at_max (0.00s)
+    --- PASS: TestLeaseConfigValidate/short (0.00s)
+=== RUN   TestLeaseConfigValidateNoMaxDuration
+--- PASS: TestLeaseConfigValidateNoMaxDuration (0.00s)
+=== RUN   TestAcquireResultAcquired
+--- PASS: TestAcquireResultAcquired (0.00s)
+=== RUN   TestTerminalReceiptDigestDeterminism
+--- PASS: TestTerminalReceiptDigestDeterminism (0.00s)
+=== RUN   TestTerminalReceiptDigestExcludesFinalizedAt
+--- PASS: TestTerminalReceiptDigestExcludesFinalizedAt (0.00s)
+=== RUN   TestTerminalReceiptDigestDifferentResults
+--- PASS: TestTerminalReceiptDigestDifferentResults (0.00s)
+=== RUN   TestTerminalReceiptDigestDifferentProviderRunID
+--- PASS: TestTerminalReceiptDigestDifferentProviderRunID (0.00s)
+=== RUN   TestTerminalReceiptDigestDifferentReceiptVersion
+--- PASS: TestTerminalReceiptDigestDifferentReceiptVersion (0.00s)
+=== RUN   TestRecoveryDecisionValues
+--- PASS: TestRecoveryDecisionValues (0.00s)
+=== RUN   TestLeaseErrorValues
+--- PASS: TestLeaseErrorValues (0.00s)
+=== RUN   TestAcquireResultKindValues
+--- PASS: TestAcquireResultKindValues (0.00s)
+=== RUN   TestFixedClock
+--- PASS: TestFixedClock (0.00s)
+=== RUN   TestSystemClock
+--- PASS: TestSystemClock (0.00s)
+=== RUN   TestRecoveryRetryableExists
+--- PASS: TestRecoveryRetryableExists (0.00s)
+=== RUN   TestTerminalReceiptIdentityFields
+--- PASS: TestTerminalReceiptIdentityFields (0.00s)
+=== RUN   TestTerminalReceiptDigestIsSHA256
+--- PASS: TestTerminalReceiptDigestIsSHA256 (0.00s)
+=== RUN   TestDefaultLeaseConfig
+--- PASS: TestDefaultLeaseConfig (0.00s)
+=== RUN   TestMigrateState
+--- PASS: TestMigrateState (0.00s)
+=== RUN   TestRecoveryResultJSON
+--- PASS: TestRecoveryResultJSON (0.00s)
+=== RUN   TestTerminalReceiptDigestFrozenVector
+--- PASS: TestTerminalReceiptDigestFrozenVector (0.00s)
+=== RUN   TestStateIsTerminal
+--- PASS: TestStateIsTerminal (0.00s)
+=== RUN   TestStateCallerTerminal
+--- PASS: TestStateCallerTerminal (0.00s)
+=== RUN   TestStateDurablyFinal
+--- PASS: TestStateDurablyFinal (0.00s)
+=== RUN   TestStateMachinePropertySequences
+--- PASS: TestStateMachinePropertySequences (1.46s)
+=== RUN   TestStateTransitionMatrixIsExhaustive
+--- PASS: TestStateTransitionMatrixIsExhaustive (0.00s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/idempotency	1.464s
+---
+finished_at=2026-10-19T10:57:01Z
+exit=0

@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "record_type": "gate",
+  "gate_id": "go-lume-tests",
+  "gate_type": "TEST",
+  "mandatory": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "tests_executed": 74,
+  "tests_failed": 0,
+  "duration_ms": 3003,
+  "evidence": {
+    "file": "gate-results/go-lume-tests.log",
+    "sha256": "8d3af9f3dc5d25519d5e9d98c7e62c50895ac95d74b6d5c88ccb723b03602978"
+  }
+}

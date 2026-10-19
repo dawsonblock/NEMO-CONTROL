@@ -1,0 +1,15 @@
+command=bash /home/runner/work/nemo-rc75-qualification/nemo-rc75-qualification/scripts/verify-source-manifest.sh /home/runner/work/nemo-rc75-qualification/nemo-rc75-qualification/dist/release-evidence/source-tree-sha256.txt /home/runner/work/nemo-rc75-qualification/nemo-rc75-qualification
+started_at=2026-10-19T10:29:10Z
+---
+
+files_manifested=4261
+files_actual=4261
+missing=0
+mismatched=0
+unexpected=0
+malformed=0
+status=PASS
+---
+exit=0
+status=PASS
+finished_at=2026-10-19T10:30:27Z

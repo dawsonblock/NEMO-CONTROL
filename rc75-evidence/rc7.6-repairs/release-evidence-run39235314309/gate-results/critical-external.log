@@ -1,0 +1,41 @@
+command=env CRABBOX_TEST_DATABASE_URL=<redacted> go test -v -count=1 -timeout=300s -run TestLiveCriticalQualification(Commit|AmbiguityThenReconcile|DefinitiveRejection|EvidenceIntegrity|AuthorityMatrix|ClosedAuthoritySemantics|TimeoutThenReconcile|LookupOutageThenRecovery|CorruptedArtifact|RegistryExtensionBinding|CrashThenRecover)$ ./internal/execution/
+started_at=2026-10-19T11:01:10Z
+---
+=== RUN   TestLiveCriticalQualificationCommit
+--- PASS: TestLiveCriticalQualificationCommit (0.07s)
+=== RUN   TestLiveCriticalQualificationAmbiguityThenReconcile
+--- PASS: TestLiveCriticalQualificationAmbiguityThenReconcile (0.11s)
+=== RUN   TestLiveCriticalQualificationDefinitiveRejection
+--- PASS: TestLiveCriticalQualificationDefinitiveRejection (0.06s)
+=== RUN   TestLiveCriticalQualificationEvidenceIntegrity
+--- PASS: TestLiveCriticalQualificationEvidenceIntegrity (0.06s)
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix/expired
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix/revoked
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix/unknown-grant
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix/wrong-principal
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix/wrong-capability
+--- PASS: TestLiveCriticalQualificationAuthorityMatrix (0.24s)
+    --- PASS: TestLiveCriticalQualificationAuthorityMatrix/expired (0.05s)
+    --- PASS: TestLiveCriticalQualificationAuthorityMatrix/revoked (0.05s)
+    --- PASS: TestLiveCriticalQualificationAuthorityMatrix/unknown-grant (0.04s)
+    --- PASS: TestLiveCriticalQualificationAuthorityMatrix/wrong-principal (0.05s)
+    --- PASS: TestLiveCriticalQualificationAuthorityMatrix/wrong-capability (0.05s)
+=== RUN   TestLiveCriticalQualificationClosedAuthoritySemantics
+--- PASS: TestLiveCriticalQualificationClosedAuthoritySemantics (0.05s)
+=== RUN   TestLiveCriticalQualificationTimeoutThenReconcile
+--- PASS: TestLiveCriticalQualificationTimeoutThenReconcile (2.08s)
+=== RUN   TestLiveCriticalQualificationLookupOutageThenRecovery
+--- PASS: TestLiveCriticalQualificationLookupOutageThenRecovery (31.18s)
+=== RUN   TestLiveCriticalQualificationCorruptedArtifact
+--- PASS: TestLiveCriticalQualificationCorruptedArtifact (0.07s)
+=== RUN   TestLiveCriticalQualificationRegistryExtensionBinding
+--- PASS: TestLiveCriticalQualificationRegistryExtensionBinding (0.05s)
+=== RUN   TestLiveCriticalQualificationCrashThenRecover
+crash recovery: execution 69c48798-7dca-498d-806a-712d733b6285 crashed in IN_FLIGHT (post-dispatch, marked UNKNOWN for reconciliation)
+--- PASS: TestLiveCriticalQualificationCrashThenRecover (0.69s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/execution	34.658s
+---
+finished_at=2026-10-19T11:01:45Z
+exit=0

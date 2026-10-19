@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "record_type": "gate",
+  "gate_id": "nemo-typecheck",
+  "gate_type": "STATIC_ANALYSIS",
+  "mandatory": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "tests_executed": 0,
+  "tests_failed": 0,
+  "duration_ms": 418,
+  "evidence": {
+    "file": "gate-results/nemo-typecheck.log",
+    "sha256": "b84e2326fc9882e7ced6e36815648792f8e29d1c92671f351fddebfb7d1ae284"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "nemo_runtime_sha256": "f6229bb342d31fc1fa3224fd24b53490ceb507e4489f305605bb274947c16d0f",
+  "runtime_version": "0.9.1-rc.4",
+  "tree": "runtimes/nemo-relay",
+  "file_count": 1466,
+  "symlink_count": 10,
+  "format_version": 2,
+  "excluded": [
+    "target",
+    ".git",
+    "node_modules",
+    ".venv",
+    ".uv-cache",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".scannerwork",
+    "dist",
+    "build",
+    ".test-dist",
+    ".tox",
+    ".nox"
+  ]
+}

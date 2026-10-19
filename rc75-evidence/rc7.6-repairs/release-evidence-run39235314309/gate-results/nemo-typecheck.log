@@ -1,0 +1,6 @@
+command=sh -c cd nemo && npx tsc --noEmit
+started_at=2026-10-19T11:02:28Z
+---
+---
+finished_at=2026-10-19T11:02:28Z
+exit=0

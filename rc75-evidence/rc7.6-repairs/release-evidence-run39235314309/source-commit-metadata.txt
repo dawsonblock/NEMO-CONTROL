@@ -1,0 +1,4 @@
+commit 6ceabf8e5411b0090fbfc5c5ad224a3dd8024711
+Author: dawsonblock <dawsonblock@users.noreply.github.com>
+Date: Mon Oct 19 04:08:32 2026 -0600
+Subject: ci: make evidence attestation conditional on repo attestation support

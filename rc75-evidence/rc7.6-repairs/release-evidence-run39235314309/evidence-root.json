@@ -1,0 +1,227 @@
+{
+ "schema_version": 1,
+ "document": "evidence-root",
+ "release_name": "crabedence-v0.54.0-rc.7.5-dev",
+ "generated_at": "2026-10-19T10:27:54Z",
+ "source": {
+  "commit": "6ceabf8e5411b0090fbfc5c5ad224a3dd8024711",
+  "tree": "a142df756e0e36c0a06f0ddcb9fb6d05d8388f28",
+  "branch": "HEAD",
+  "source_manifest": {
+   "file": "source-tree-sha256.txt",
+   "sha256": "b3aeece89a0a3d4a2b0f737a4d37e48420100c2472ab4c8254620b7e50b15bc9"
+  },
+  "git_blob_manifest": {
+   "file": "source-tree-git-blobs.txt",
+   "sha256": "d1c7abc42d8b3c04174c684d3d8b2593f42f8bafe4964897841f163c643ef542"
+  }
+ },
+ "components": {
+  "capability_registry": {
+   "file": "registry.json",
+   "sha256": "56d1173136380e9c8e1a4a9884526afd1c7f6416957574a83b2c2a7f3bded2ce"
+  },
+  "qualification_registry": {
+   "file": "qualification-registry.json",
+   "sha256": "cb3d244b2b0b4420b39f9ac73ff2fe62a9f7135a4bfa2d16d4abf045b6b56c20"
+  },
+  "nemo_runtime_record": {
+   "file": "nemo-runtime.json",
+   "sha256": "30561f60dcb523b18059f38d7690ca155876b970cb6554826388a2a7b3febc3b"
+  },
+  "sbom": {
+   "file": "sbom.spdx.json",
+   "sha256": "890b67104cfcbeaa9ba73ab64c24ec1975f8a25c246748d72dbf875ecf8c45bf"
+  },
+  "nemo_transfer_manifest": {
+   "file": "nemo-transfer-manifest.json",
+   "sha256": "43d8f6e69be3ad504359815bbd1ee7b44e405132c086cf8b608f850da7d57519",
+   "shipped_tree_sha256": "f6229bb342d31fc1fa3224fd24b53490ceb507e4489f305605bb274947c16d0f",
+   "baseline_source_sha256": "05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957"
+  },
+  "nemo_runtime_digest": "f6229bb342d31fc1fa3224fd24b53490ceb507e4489f305605bb274947c16d0f"
+ },
+ "qualification": {
+  "file": "qualification.json",
+  "sha256": "b24d78141dbb5cbd4a95ade3d9a23a51287b7b9e675b140a98564f6607dfc958",
+  "release_status": "PASS",
+  "gate_count": 34,
+  "gates": [
+   {
+    "gate_id": "authority-postgres",
+    "status": "PASS",
+    "log_sha256": "4cee44409e1078cdf824fc308524fbb14d60cd58c13331ac27d5147573bd9a03"
+   },
+   {
+    "gate_id": "critical-external",
+    "status": "PASS",
+    "log_sha256": "5519036e6ce67ecff97b4bb6e85f2efeff395298cbfc1941ad58345c3f14c3f4"
+   },
+   {
+    "gate_id": "critical-faults",
+    "status": "PASS",
+    "log_sha256": "73f6488d5d5b71508678effa27b45bf0bfac866ebd348c7f79da2597c588eebe"
+   },
+   {
+    "gate_id": "cross-language-conformance",
+    "status": "PASS",
+    "log_sha256": "a474d99049304abb874849d2d131a8cc5c390c21525c6080f488bf89944a1fbb"
+   },
+   {
+    "gate_id": "effect-fabric-contract",
+    "status": "PASS",
+    "log_sha256": "f258c0955a926ab7feae6726d768f9052dfae2e642eeeac7049916f5e09bc993"
+   },
+   {
+    "gate_id": "effect-fabric-evidence",
+    "status": "PASS",
+    "log_sha256": "c789827f605a9190ec00fb36109a2935f9943bf86bf3178eeb8b145cbde5c11f"
+   },
+   {
+    "gate_id": "effect-fabric-post-dispatch-timeout",
+    "status": "PASS",
+    "log_sha256": "cf740f5a8cb08e3256bf5aac7c1601b73c5ceffa2abf8c6a9dc7ff239e9390cf"
+   },
+   {
+    "gate_id": "effect-fabric-postgres",
+    "status": "PASS",
+    "log_sha256": "f1ae6c72bfeadd34043c6da64369f2430f70abe5a54ede472add7f3e261d2e02"
+   },
+   {
+    "gate_id": "effect-fabric-race",
+    "status": "PASS",
+    "log_sha256": "bae7c59f4934875456f8c4a72bf2c923e643d1c9fd8dd705dec7d2c397868919"
+   },
+   {
+    "gate_id": "effect-fabric-reconciliation",
+    "status": "PASS",
+    "log_sha256": "f27486afb4dde0add34619a24a3a9525ef7ed6b979232f4ac9eda1527b971c8d"
+   },
+   {
+    "gate_id": "evidence-secret-scan",
+    "status": "PASS",
+    "log_sha256": "a01ddcf79a09b3b1731c0463745737a242ce487d9437851e659dc579dc0e5b35"
+   },
+   {
+    "gate_id": "exact-toolchain",
+    "status": "PASS",
+    "log_sha256": "326a4aedabb1030328c7992b7b20be66016d7cf21a95ba292a3a509febe5b1a2"
+   },
+   {
+    "gate_id": "go-evidence-tests",
+    "status": "PASS",
+    "log_sha256": "27d857204e9a016585853777744464629a07ad12c4995ec51f3b6d7839bfcd68"
+   },
+   {
+    "gate_id": "go-lume-tests",
+    "status": "PASS",
+    "log_sha256": "8d3af9f3dc5d25519d5e9d98c7e62c50895ac95d74b6d5c88ccb723b03602978"
+   },
+   {
+    "gate_id": "go-race-evidence",
+    "status": "PASS",
+    "log_sha256": "58e3c384a1d6fcdc8ef431ecdef1586e6d24443348f598c549b983e867a046a2"
+   },
+   {
+    "gate_id": "go-race-providers",
+    "status": "PASS",
+    "log_sha256": "5535c3835eabb2aad8b1e7be5d699a2a7130551a6e1b10d6694e672da82080a0"
+   },
+   {
+    "gate_id": "go-race-sandboxexecutor",
+    "status": "PASS",
+    "log_sha256": "c11c40ad33d05c84fffc87b4456e12fd89bfd62d4edcfe579b4d363d7e00c51c"
+   },
+   {
+    "gate_id": "go-shared-tests",
+    "status": "PASS",
+    "log_sha256": "62466e78d8a58d1d4bf1666af900e732915a8c9fe89a7c9c5192d0d001598c3b"
+   },
+   {
+    "gate_id": "go-tart-tests",
+    "status": "PASS",
+    "log_sha256": "d8344ad24c96c3a8d604e4b20c5cd46427cfe0c95c201faa98bf21baac836684"
+   },
+   {
+    "gate_id": "go-vet",
+    "status": "PASS",
+    "log_sha256": "35f47103dba00febf5c66cc98ea39841a0e2784f2592b32bdd65f7f85669be56"
+   },
+   {
+    "gate_id": "live-microvm-linux-kvm",
+    "status": "PASS",
+    "log_sha256": "3830be96eea8c4f4257056b7c7aed927fa2a13a8af5f03875d9fc006eda42187"
+   },
+   {
+    "gate_id": "nemo-tests",
+    "status": "PASS",
+    "log_sha256": "ec2cfd453a679409271a04ed6fd634ce2f9f1e2a1059b1b8a3868b33f5d49d29"
+   },
+   {
+    "gate_id": "nemo-transfer-provenance",
+    "status": "PASS",
+    "log_sha256": "cba1df2d23204a964bd15510c721d8ee212378e35f78da8a16e2522a14318ebf"
+   },
+   {
+    "gate_id": "nemo-typecheck",
+    "status": "PASS",
+    "log_sha256": "b84e2326fc9882e7ced6e36815648792f8e29d1c92671f351fddebfb7d1ae284"
+   },
+   {
+    "gate_id": "postgres-fencing",
+    "status": "PASS",
+    "log_sha256": "c8513814193372770915fa0d668185957121d3058e6a26fa1a9227d7142ac29d"
+   },
+   {
+    "gate_id": "postgres-parity",
+    "status": "PASS",
+    "log_sha256": "aa746c958f3cea7d433546d022f6b240fdb55f52d51dd2d5a952275cf9488b7f"
+   },
+   {
+    "gate_id": "provider-github-faults",
+    "status": "PASS",
+    "log_sha256": "aaeb938ac67959fde3798f5c04d7453903ccc8c03655f64282e456933fc233ad"
+   },
+   {
+    "gate_id": "registry-digest",
+    "status": "PASS",
+    "log_sha256": "7f2d1572f56efdea175659641d19729745e0bc96fd9f5c20252e565902d772f1"
+   },
+   {
+    "gate_id": "source_manifest",
+    "status": "PASS",
+    "log_sha256": "c0989438c3345d21eb4c79b55a2df9aca23614445983f8ea9178a605fe00655e"
+   },
+   {
+    "gate_id": "worker-build",
+    "status": "PASS",
+    "log_sha256": "f6f5b4df107557ef01aea885fcb2fcb481bc5457dab2f0066771ecf77772721d"
+   },
+   {
+    "gate_id": "worker-format",
+    "status": "PASS",
+    "log_sha256": "774d5df19129e46cc120d08340b206a663f475b6f7e15ef3ccd13a2b34be8b9c"
+   },
+   {
+    "gate_id": "worker-lint",
+    "status": "PASS",
+    "log_sha256": "19b2174b53d9a03757b6bf5c151932f8e17163a747aeb4e2e3db23381edb1933"
+   },
+   {
+    "gate_id": "worker-tests",
+    "status": "PASS",
+    "log_sha256": "2471289c4bb39de3fc25df2936ec04ed2b8f69e0695304826f701bd83b3d64a9"
+   },
+   {
+    "gate_id": "worker-typecheck",
+    "status": "PASS",
+    "log_sha256": "da7a7c3490beca1765d98536c7caad928ce7324561b01012c46e9b5b7114702c"
+   }
+  ]
+ },
+ "artifacts": {
+  "status": "pending",
+  "entries": []
+ },
+ "root_sha256": "c499aabb1a8205e69ca2de9ac09506f0c8f465ce5482983b142b6b136bf06d1d"
+}

@@ -1,0 +1,35 @@
+command=bash /home/runner/work/nemo-rc75-qualification/nemo-rc75-qualification/scripts/verify-nemo-provenance.sh --require-source
+started_at=2026-10-19T10:59:51Z
+---
+ok: policy runtimes/nemo-provenance-policy.json 0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1
+ok: runtimes/nemo-relay f6229bb342d31fc1fa3224fd24b53490ceb507e4489f305605bb274947c16d0f (1466 files, 10 symlinks, 0.9.1-rc.4, format 2)
+ok: 4 declared binaries have sources and declarations
+ok: TRANSFER-PROVENANCE.md's generated blocks match the manifest
+ok: source ../NEMO-feat-native-plugin-isolation 05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957 (1438 files, 10 symlinks)
+ok: delta 80 modified, 29 added files, 1 removed files, 0 added links, 0 removed links, 0 retargeted, 0 retyped, 0 mode changes — all declared
+ok: policy runtimes/nemo-provenance-policy.json 0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1
+ok: runtimes/nemo-relay f6229bb342d31fc1fa3224fd24b53490ceb507e4489f305605bb274947c16d0f (1466 files, 10 symlinks, 0.9.1-rc.4, format 2)
+ok: 4 declared binaries have sources and declarations
+ok: TRANSFER-PROVENANCE.md's generated blocks match the manifest
+ok: source ../NEMO-feat-native-plugin-isolation 05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957 (1438 files, 10 symlinks)
+ok: delta 80 modified, 29 added files, 1 removed files, 0 added links, 0 removed links, 0 retargeted, 0 retyped, 0 mode changes — all declared
+note: ../PROVENANCE.md absent — skipped
+note: ../PROVENANCE.md absent — skipped
+note: ../PROVENANCE.md absent — skipped
+note: ../PROVENANCE.md absent — skipped
+note: ../PROVENANCE.md absent — skipped
+note: ../PROVENANCE.md absent — skipped
+note: ../PROVENANCE.md absent — skipped
+note: ../PROVENANCE.md absent — skipped
+note: ../README.md absent — skipped
+note: ../FINAL_QUALIFICATION_REPORT.md absent — skipped
+note: ../FINAL_QUALIFICATION_REPORT.md absent — skipped
+note: ../FINAL_QUALIFICATION_REPORT.md absent — skipped
+note: ../FINAL_QUALIFICATION_REPORT.md absent — skipped
+note: ../FINAL_QUALIFICATION_REPORT.md absent — skipped
+note: ../FINAL_QUALIFICATION_REPORT.md absent — skipped
+note: ../FINAL_QUALIFICATION_REPORT.md absent — skipped
+ok: provenance statistics in dependent docs match runtimes/nemo-transfer-manifest.json
+---
+finished_at=2026-10-19T10:59:54Z
+exit=0

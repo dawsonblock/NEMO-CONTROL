@@ -1,0 +1,130 @@
+command=go test -v -race -count=1 -timeout=60s ./internal/evidence/
+started_at=2026-10-19T10:57:04Z
+---
+=== RUN   TestGoldenCheckpointChainDigestV2
+--- PASS: TestGoldenCheckpointChainDigestV2 (0.00s)
+=== RUN   TestGoldenCheckpointChainDigestV1
+--- PASS: TestGoldenCheckpointChainDigestV1 (0.00s)
+=== RUN   TestGoldenCheckpointSigningPayload
+--- PASS: TestGoldenCheckpointSigningPayload (0.00s)
+=== RUN   TestGoldenCheckpointSignature
+--- PASS: TestGoldenCheckpointSignature (0.00s)
+=== RUN   TestVerifyCheckpointHistoryAcceptsHealthyStream
+--- PASS: TestVerifyCheckpointHistoryAcceptsHealthyStream (0.00s)
+=== RUN   TestVerifyCheckpointHistoryAcceptsEmptyStream
+--- PASS: TestVerifyCheckpointHistoryAcceptsEmptyStream (0.00s)
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/reordered_entries
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/duplicated_tail
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/truncated_final_line
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/unterminated_tail
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/empty_line_inside
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/signer_substitution
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/timestamp_regression
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/deleted_middle_entry
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/unparseable_entry
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/coverage_regression
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/corrupt_middle_entry
+--- PASS: TestVerifyCheckpointHistoryRefusesTampering (0.02s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/reordered_entries (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/duplicated_tail (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/truncated_final_line (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/unterminated_tail (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/empty_line_inside (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/signer_substitution (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/timestamp_regression (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/deleted_middle_entry (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/unparseable_entry (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/coverage_regression (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/corrupt_middle_entry (0.00s)
+=== RUN   TestVerifyCheckpointHistoryRefusesMidStreamSignerSwitch
+--- PASS: TestVerifyCheckpointHistoryRefusesMidStreamSignerSwitch (0.00s)
+=== RUN   TestVerifyCheckpointHistoryRefusesForeignStream
+--- PASS: TestVerifyCheckpointHistoryRefusesForeignStream (0.00s)
+=== RUN   TestVerifyCheckpointHistoryContinuation
+--- PASS: TestVerifyCheckpointHistoryContinuation (0.00s)
+=== RUN   TestVerifyCheckpointHistoryWithStore
+--- PASS: TestVerifyCheckpointHistoryWithStore (0.00s)
+=== RUN   TestVerifyCheckpointHistoryLongStream
+--- PASS: TestVerifyCheckpointHistoryLongStream (4.40s)
+=== RUN   TestVerifyCheckpointHistoryLineBound
+--- PASS: TestVerifyCheckpointHistoryLineBound (0.00s)
+=== RUN   TestVerifyCheckpointHistoryLineBoundStopsReading
+--- PASS: TestVerifyCheckpointHistoryLineBoundStopsReading (0.02s)
+=== RUN   TestCheckpointSignVerifyRoundtrip
+--- PASS: TestCheckpointSignVerifyRoundtrip (0.00s)
+=== RUN   TestCheckpointEmptyEnumeration
+--- PASS: TestCheckpointEmptyEnumeration (0.00s)
+=== RUN   TestCheckpointDetectsRewrittenRecord
+--- PASS: TestCheckpointDetectsRewrittenRecord (0.00s)
+=== RUN   TestCheckpointDetectsTruncation
+--- PASS: TestCheckpointDetectsTruncation (0.00s)
+=== RUN   TestCheckpointDetectsReordering
+--- PASS: TestCheckpointDetectsReordering (0.00s)
+=== RUN   TestCheckpointToleratesGrowth
+--- PASS: TestCheckpointToleratesGrowth (0.00s)
+=== RUN   TestCheckpointRejectsUntrustedSigner
+--- PASS: TestCheckpointRejectsUntrustedSigner (0.00s)
+=== RUN   TestCheckpointRejectsTamperedSignedFields
+--- PASS: TestCheckpointRejectsTamperedSignedFields (0.00s)
+=== RUN   TestCheckpointRejectsMismatchedSignerField
+--- PASS: TestCheckpointRejectsMismatchedSignerField (0.00s)
+=== RUN   TestCheckpointRejectsMalformed
+=== RUN   TestCheckpointRejectsMalformed/bad_issued_at
+=== RUN   TestCheckpointRejectsMalformed/empty_issued_at
+=== RUN   TestCheckpointRejectsMalformed/bad_chain
+=== RUN   TestCheckpointRejectsMalformed/bad_signature
+=== RUN   TestCheckpointRejectsMalformed/bad_type
+=== RUN   TestCheckpointRejectsMalformed/bad_schema
+=== RUN   TestCheckpointRejectsMalformed/negative_seq
+=== RUN   TestCheckpointRejectsMalformed/negative_count
+=== RUN   TestCheckpointRejectsMalformed/bad_pubkey
+--- PASS: TestCheckpointRejectsMalformed (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_issued_at (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/empty_issued_at (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_chain (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_signature (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_type (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_schema (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/negative_seq (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/negative_count (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_pubkey (0.00s)
+=== RUN   TestCheckpointDetectsLedgerRenumber
+--- PASS: TestCheckpointDetectsLedgerRenumber (0.00s)
+=== RUN   TestCheckpointRejectsUnsortedEnumeration
+--- PASS: TestCheckpointRejectsUnsortedEnumeration (0.00s)
+=== RUN   TestCheckpointV1LegacyVerification
+--- PASS: TestCheckpointV1LegacyVerification (0.00s)
+=== RUN   TestSignVerifyRoundtrip
+--- PASS: TestSignVerifyRoundtrip (0.00s)
+=== RUN   TestNoEffectAllowsEmptyProviderRunID
+--- PASS: TestNoEffectAllowsEmptyProviderRunID (0.00s)
+=== RUN   TestCompletedRequiresProviderRunID
+--- PASS: TestCompletedRequiresProviderRunID (0.00s)
+=== RUN   TestVerifyRejectsTamperedSignature
+--- PASS: TestVerifyRejectsTamperedSignature (0.00s)
+=== RUN   TestVerifyRejectsUntrustedSigner
+--- PASS: TestVerifyRejectsUntrustedSigner (0.00s)
+=== RUN   TestVerifyRejectsBindingMismatch
+--- PASS: TestVerifyRejectsBindingMismatch (0.00s)
+=== RUN   TestVerifyRejectsMissingReceipt
+--- PASS: TestVerifyRejectsMissingReceipt (0.00s)
+=== RUN   TestParseRejectsUnknownAndDuplicateFields
+--- PASS: TestParseRejectsUnknownAndDuplicateFields (0.00s)
+=== RUN   TestLoadOrCreateSignerRoundtrip
+--- PASS: TestLoadOrCreateSignerRoundtrip (0.04s)
+=== RUN   TestGenerateSignerProducesValidKey
+--- PASS: TestGenerateSignerProducesValidKey (0.00s)
+=== RUN   TestVerifyReceiptKeyRingRotation
+--- PASS: TestVerifyReceiptKeyRingRotation (0.00s)
+=== RUN   TestGoldenSigningPayload
+--- PASS: TestGoldenSigningPayload (0.00s)
+=== RUN   TestGoldenSignature
+--- PASS: TestGoldenSignature (0.00s)
+=== RUN   TestGoldenReceiptRoundTrip
+--- PASS: TestGoldenReceiptRoundTrip (0.00s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/evidence	5.556s
+---
+finished_at=2026-10-19T10:57:10Z
+exit=0

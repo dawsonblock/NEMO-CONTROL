@@ -1,0 +1,7 @@
+command=go run ./cmd/registry-digest
+started_at=2026-10-19T10:59:50Z
+---
+ae1ab7adab4b5bb8e2b02e6c4fa8b2c241bf40b5ecc710d8744780ab49fe1057
+---
+finished_at=2026-10-19T10:59:51Z
+exit=0

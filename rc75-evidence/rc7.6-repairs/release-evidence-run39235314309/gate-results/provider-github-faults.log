@@ -1,0 +1,48 @@
+command=go test -json -count=1 -timeout=120s -run TestLiveGitHub ./internal/execution/
+started_at=2026-10-19T11:01:08Z
+---
+{"Time":"2026-10-19T11:01:08.73064909Z","Action":"start","Package":"github.com/openclaw/crabbox/internal/execution"}
+{"Time":"2026-10-19T11:01:08.733713817Z","Action":"run","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce"}
+{"Time":"2026-10-19T11:01:08.733753686Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce","Output":"=== RUN   TestLiveGitHubIssueAtMostOnce\n"}
+{"Time":"2026-10-19T11:01:08.733764011Z","Action":"run","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/normal_dispatch_commits_once"}
+{"Time":"2026-10-19T11:01:08.733768437Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/normal_dispatch_commits_once","Output":"=== RUN   TestLiveGitHubIssueAtMostOnce/normal_dispatch_commits_once\n"}
+{"Time":"2026-10-19T11:01:08.761708713Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/normal_dispatch_commits_once","Output":"--- PASS: TestLiveGitHubIssueAtMostOnce/normal_dispatch_commits_once (0.03s)\n"}
+{"Time":"2026-10-19T11:01:08.761745668Z","Action":"pass","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/normal_dispatch_commits_once","Elapsed":0.03}
+{"Time":"2026-10-19T11:01:08.761761141Z","Action":"run","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/timeout_after_request_commits_once"}
+{"Time":"2026-10-19T11:01:08.761767961Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/timeout_after_request_commits_once","Output":"=== RUN   TestLiveGitHubIssueAtMostOnce/timeout_after_request_commits_once\n"}
+{"Time":"2026-10-19T11:01:09.095740055Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/timeout_after_request_commits_once","Output":"--- PASS: TestLiveGitHubIssueAtMostOnce/timeout_after_request_commits_once (0.33s)\n"}
+{"Time":"2026-10-19T11:01:09.095783759Z","Action":"pass","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/timeout_after_request_commits_once","Elapsed":0.33}
+{"Time":"2026-10-19T11:01:09.095793133Z","Action":"run","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/response_dropped_commits_once"}
+{"Time":"2026-10-19T11:01:09.095797299Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/response_dropped_commits_once","Output":"=== RUN   TestLiveGitHubIssueAtMostOnce/response_dropped_commits_once\n"}
+{"Time":"2026-10-19T11:01:09.158040169Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/response_dropped_commits_once","Output":"--- PASS: TestLiveGitHubIssueAtMostOnce/response_dropped_commits_once (0.06s)\n"}
+{"Time":"2026-10-19T11:01:09.158076673Z","Action":"pass","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/response_dropped_commits_once","Elapsed":0.06}
+{"Time":"2026-10-19T11:01:09.158402685Z","Action":"run","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_before_observation_recovers"}
+{"Time":"2026-10-19T11:01:09.15841341Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_before_observation_recovers","Output":"=== RUN   TestLiveGitHubIssueAtMostOnce/crash_before_observation_recovers\n"}
+{"Time":"2026-10-19T11:01:09.178613575Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_before_observation_recovers","Output":"2026/10/19 11:01:09 dispatch executor: provider observation not persisted: sql: database is closed\n"}
+{"Time":"2026-10-19T11:01:09.180245235Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_before_observation_recovers","Output":"2026/10/19 11:01:09 dispatch executor: recovery transition failed: recovery entry failed (lookup error: sql: database is closed); provider observation may not be persisted\n"}
+{"Time":"2026-10-19T11:01:09.198296094Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_before_observation_recovers","Output":"crash recovery: execution 34bad139-ec70-45ab-96a9-8f72f25cb351 crashed in IN_FLIGHT (post-dispatch, marked UNKNOWN for reconciliation)\n"}
+{"Time":"2026-10-19T11:01:09.204447249Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_before_observation_recovers","Output":"--- PASS: TestLiveGitHubIssueAtMostOnce/crash_before_observation_recovers (0.05s)\n"}
+{"Time":"2026-10-19T11:01:09.204464214Z","Action":"pass","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_before_observation_recovers","Elapsed":0.05}
+{"Time":"2026-10-19T11:01:09.204473438Z","Action":"run","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_during_finalize_recovers"}
+{"Time":"2026-10-19T11:01:09.204478866Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_during_finalize_recovers","Output":"=== RUN   TestLiveGitHubIssueAtMostOnce/crash_during_finalize_recovers\n"}
+{"Time":"2026-10-19T11:01:09.228473514Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_during_finalize_recovers","Output":"2026/10/19 11:01:09 dispatch executor: failed to finalize execution after dispatch: finalize lookup failed: sql: database is closed\n"}
+{"Time":"2026-10-19T11:01:09.22855162Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_during_finalize_recovers","Output":"2026/10/19 11:01:09 dispatch executor: recovery transition failed: recovery entry failed (lookup error: sql: database is closed); provider observation may not be persisted\n"}
+{"Time":"2026-10-19T11:01:09.247680893Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_during_finalize_recovers","Output":"crash recovery: execution a0ef57ec-febc-4e03-b93e-db50738988d4 crashed in IN_FLIGHT (post-dispatch, marked UNKNOWN for reconciliation)\n"}
+{"Time":"2026-10-19T11:01:09.483429588Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_during_finalize_recovers","Output":"--- PASS: TestLiveGitHubIssueAtMostOnce/crash_during_finalize_recovers (0.28s)\n"}
+{"Time":"2026-10-19T11:01:09.483461475Z","Action":"pass","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/crash_during_finalize_recovers","Elapsed":0.28}
+{"Time":"2026-10-19T11:01:09.483468956Z","Action":"run","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/refused_before_request_no_effect"}
+{"Time":"2026-10-19T11:01:09.483472732Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/refused_before_request_no_effect","Output":"=== RUN   TestLiveGitHubIssueAtMostOnce/refused_before_request_no_effect\n"}
+{"Time":"2026-10-19T11:01:09.509719106Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/refused_before_request_no_effect","Output":"--- PASS: TestLiveGitHubIssueAtMostOnce/refused_before_request_no_effect (0.03s)\n"}
+{"Time":"2026-10-19T11:01:09.509739857Z","Action":"pass","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce/refused_before_request_no_effect","Elapsed":0.03}
+{"Time":"2026-10-19T11:01:09.509796981Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce","Output":"--- PASS: TestLiveGitHubIssueAtMostOnce (0.78s)\n"}
+{"Time":"2026-10-19T11:01:09.509807777Z","Action":"pass","Package":"github.com/openclaw/crabbox/internal/execution","Test":"TestLiveGitHubIssueAtMostOnce","Elapsed":0.78}
+{"Time":"2026-10-19T11:01:09.509814427Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Output":"PASS\n"}
+{"Time":"2026-10-19T11:01:09.510809131Z","Action":"output","Package":"github.com/openclaw/crabbox/internal/execution","Output":"ok  \tgithub.com/openclaw/crabbox/internal/execution\t0.780s\n"}
+{"Time":"2026-10-19T11:01:09.510827548Z","Action":"pass","Package":"github.com/openclaw/crabbox/internal/execution","Elapsed":0.78}
+---
+finished_at=2026-10-19T11:01:09Z
+exit=0
+tests_discovered=7
+tests_passed=7
+tests_failed=0
+tests_skipped=0

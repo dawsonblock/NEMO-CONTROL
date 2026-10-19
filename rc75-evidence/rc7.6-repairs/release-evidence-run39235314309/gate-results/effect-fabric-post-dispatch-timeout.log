@@ -1,0 +1,13 @@
+command=env CRABBOX_QUALIFICATION_POST_DISPATCH=1 go test -v -count=1 -timeout=240s -run TestPostDispatchTimeoutQualification|TestLateResponseAfterConnectionLifetime ./internal/execution/
+started_at=2026-10-19T10:57:10Z
+---
+=== RUN   TestLateResponseAfterConnectionLifetime
+--- PASS: TestLateResponseAfterConnectionLifetime (65.00s)
+=== RUN   TestPostDispatchTimeoutQualification
+2026/10/19 10:58:50 execution service: write frame header: write unix /tmp/cbx-sock-2095262916/execution.sock->@: write: broken pipe
+--- PASS: TestPostDispatchTimeoutQualification (32.06s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/execution	97.072s
+---
+finished_at=2026-10-19T10:58:50Z
+exit=0

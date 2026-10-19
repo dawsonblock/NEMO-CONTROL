@@ -1,0 +1,14 @@
+command=npm run format:check --prefix worker
+started_at=2026-10-19T11:02:24Z
+---
+
+> @openclaw/crabbox-worker@0.54.0-rc.7.5-dev format:check
+> oxfmt --check .
+
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 223ms on 164 files using 2 threads.
+---
+finished_at=2026-10-19T11:02:24Z
+exit=0

@@ -1,0 +1,13 @@
+command=env CRABBOX_TEST_DATABASE_URL=<redacted> go test -v -count=1 -timeout=300s -run TestLiveCriticalQualification(FailBeforeAccept|TokenPayloadCollision)$ ./internal/execution/
+started_at=2026-10-19T11:01:45Z
+---
+=== RUN   TestLiveCriticalQualificationFailBeforeAccept
+reconciliation failed for aeee861a-ffcf-4f85-a533-e337df7e3fdc: no evidence artifact supplied — cannot attest CRITICAL recovery
+--- PASS: TestLiveCriticalQualificationFailBeforeAccept (0.06s)
+=== RUN   TestLiveCriticalQualificationTokenPayloadCollision
+--- PASS: TestLiveCriticalQualificationTokenPayloadCollision (0.06s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/execution	0.132s
+---
+finished_at=2026-10-19T11:01:46Z
+exit=0

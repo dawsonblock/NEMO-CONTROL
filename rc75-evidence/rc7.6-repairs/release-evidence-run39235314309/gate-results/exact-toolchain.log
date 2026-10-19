@@ -1,0 +1,12 @@
+command=bash /home/runner/work/nemo-rc75-qualification/nemo-rc75-qualification/scripts/verify-go-toolchain.sh /home/runner/work/nemo-rc75-qualification/nemo-rc75-qualification
+started_at=2026-10-19T10:30:27Z
+---
+go_mod=/home/runner/work/nemo-rc75-qualification/nemo-rc75-qualification/go.mod
+declared_toolchain=go1.26.5
+go_version=go version go1.26.5 linux/amd64
+goversion=go1.26.5
+gotoolchain=local
+toolchain=go1.26.5 verified (declared = installed = runtime, GOTOOLCHAIN=local)
+---
+finished_at=2026-10-19T10:30:27Z
+exit=0

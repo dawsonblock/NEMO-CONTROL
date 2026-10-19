@@ -1,0 +1,30 @@
+command=go test -v -count=1 -timeout=120s -run TestLiveAuthority ./internal/authority/
+started_at=2026-10-19T11:01:09Z
+---
+=== RUN   TestLiveAuthorityGrantLookup
+--- PASS: TestLiveAuthorityGrantLookup (0.03s)
+=== RUN   TestLiveAuthorityPrincipalMismatch
+--- PASS: TestLiveAuthorityPrincipalMismatch (0.02s)
+=== RUN   TestLiveAuthorityCapabilityMismatch
+--- PASS: TestLiveAuthorityCapabilityMismatch (0.02s)
+=== RUN   TestLiveAuthorityExpiry
+--- PASS: TestLiveAuthorityExpiry (0.02s)
+=== RUN   TestLiveAuthorityRevocation
+--- PASS: TestLiveAuthorityRevocation (0.02s)
+=== RUN   TestLiveAuthorityDatabaseError
+--- PASS: TestLiveAuthorityDatabaseError (0.02s)
+=== RUN   TestLiveAuthorityIssueConcurrentSerialized
+--- PASS: TestLiveAuthorityIssueConcurrentSerialized (0.14s)
+=== RUN   TestLiveAuthorityRevokeGeneration
+--- PASS: TestLiveAuthorityRevokeGeneration (0.04s)
+=== RUN   TestLiveAuthorityCloseRef
+--- PASS: TestLiveAuthorityCloseRef (0.02s)
+=== RUN   TestLiveAuthorityResolvedDigestRecomputable
+--- PASS: TestLiveAuthorityResolvedDigestRecomputable (0.05s)
+=== RUN   TestLiveAuthorityGrantsForPrincipal
+--- PASS: TestLiveAuthorityGrantsForPrincipal (0.04s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/authority	0.414s
+---
+finished_at=2026-10-19T11:01:10Z
+exit=0

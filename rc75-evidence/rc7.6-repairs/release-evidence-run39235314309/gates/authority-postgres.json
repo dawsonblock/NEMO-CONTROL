@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "record_type": "gate",
+  "gate_id": "authority-postgres",
+  "gate_type": "INTEGRATION",
+  "mandatory": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "tests_executed": 11,
+  "tests_failed": 0,
+  "duration_ms": 1142,
+  "evidence": {
+    "file": "gate-results/authority-postgres.log",
+    "sha256": "4cee44409e1078cdf824fc308524fbb14d60cd58c13331ac27d5147573bd9a03"
+  }
+}

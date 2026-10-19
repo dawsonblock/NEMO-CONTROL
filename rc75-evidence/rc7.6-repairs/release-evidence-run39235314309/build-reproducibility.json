@@ -1,0 +1,8 @@
+{
+  "source_commit": "6ceabf8e5411b0090fbfc5c5ad224a3dd8024711",
+  "source_tree": "a142df756e0e36c0a06f0ddcb9fb6d05d8388f28",
+  "go_sum_sha256": "10a34a63278ec2cc0b460d1956e569c1e665be79912327dbbae83eca951b5b34",
+  "package_lock_sha256": "5c4a42cd0cd284c96ef790967fd40d99f37b5696223ae10c8902a6f6f42759a2",
+  "build_timestamp": "2026-10-19T10:27:54Z",
+  "platform": "Linux/x86_64"
+}

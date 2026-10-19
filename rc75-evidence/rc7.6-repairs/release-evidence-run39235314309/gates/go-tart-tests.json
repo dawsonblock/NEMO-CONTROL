@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "record_type": "gate",
+  "gate_id": "go-tart-tests",
+  "gate_type": "TEST",
+  "mandatory": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "tests_executed": 391,
+  "tests_failed": 0,
+  "duration_ms": 81229,
+  "evidence": {
+    "file": "gate-results/go-tart-tests.log",
+    "sha256": "d8344ad24c96c3a8d604e4b20c5cd46427cfe0c95c201faa98bf21baac836684"
+  }
+}

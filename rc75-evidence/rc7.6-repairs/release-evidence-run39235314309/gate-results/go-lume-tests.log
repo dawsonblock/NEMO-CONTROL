@@ -1,0 +1,156 @@
+command=go test -v -count=1 -timeout=60s ./internal/providers/lume/
+started_at=2026-10-19T10:37:42Z
+---
+=== RUN   TestDeleteRespectsResize
+--- PASS: TestDeleteRespectsResize (0.00s)
+=== RUN   TestDeleteKeepsReplacement
+--- PASS: TestDeleteKeepsReplacement (0.00s)
+=== RUN   TestDeleteRestoresPartial
+--- PASS: TestDeleteRestoresPartial (0.00s)
+=== RUN   TestCapacityLockSerializes
+--- PASS: TestCapacityLockSerializes (0.10s)
+=== RUN   TestStartReapsOnFailure
+--- PASS: TestStartReapsOnFailure (0.01s)
+=== RUN   TestStartDetachesOwner
+--- PASS: TestStartDetachesOwner (0.09s)
+=== RUN   TestRecoverPendingOwner
+--- PASS: TestRecoverPendingOwner (0.07s)
+=== RUN   TestStopInterruptsExactOwner
+--- PASS: TestStopInterruptsExactOwner (0.10s)
+=== RUN   TestSignalRejectsWrongOwner
+--- PASS: TestSignalRejectsWrongOwner (0.00s)
+=== RUN   TestSpecAndAliases
+--- PASS: TestSpecAndAliases (0.00s)
+=== RUN   TestCleanupExpiry
+--- PASS: TestCleanupExpiry (0.00s)
+=== RUN   TestCleanupKeepsStartup
+--- PASS: TestCleanupKeepsStartup (0.00s)
+=== RUN   TestDefaults
+--- PASS: TestDefaults (0.00s)
+=== RUN   TestRejectsNonMacOS
+--- PASS: TestRejectsNonMacOS (0.00s)
+=== RUN   TestFlags
+--- PASS: TestFlags (0.00s)
+=== RUN   TestDoctorStoppedBase
+--- PASS: TestDoctorStoppedBase (0.00s)
+=== RUN   TestHostGuestCount
+--- PASS: TestHostGuestCount (0.00s)
+=== RUN   TestAcquireGuestLimit
+--- PASS: TestAcquireGuestLimit (0.00s)
+=== RUN   TestAmbiguousCloneRetainsVM
+--- PASS: TestAmbiguousCloneRetainsVM (0.16s)
+=== RUN   TestAcquireControllerAcceptancePrecedesNormalClaimPublication
+--- PASS: TestAcquireControllerAcceptancePrecedesNormalClaimPublication (0.01s)
+=== RUN   TestAmbiguousCloneRetainsPendingClaimWhenStorageChanges
+--- PASS: TestAmbiguousCloneRetainsPendingClaimWhenStorageChanges (0.01s)
+=== RUN   TestAmbiguousCloneRetainsPendingClaimUntilIdentityAvailable
+--- PASS: TestAmbiguousCloneRetainsPendingClaimUntilIdentityAvailable (0.01s)
+=== RUN   TestParseSkipsLogs
+--- PASS: TestParseSkipsLogs (0.00s)
+=== RUN   TestRejectsWorkRootTraversal
+--- PASS: TestRejectsWorkRootTraversal (0.00s)
+=== RUN   TestKeepStoragePath
+--- PASS: TestKeepStoragePath (0.00s)
+=== RUN   TestRejectsStoragePath
+--- PASS: TestRejectsStoragePath (0.00s)
+=== RUN   TestStorageExactGet
+--- PASS: TestStorageExactGet (0.00s)
+=== RUN   TestStorageMustExist
+--- PASS: TestStorageMustExist (0.00s)
+=== RUN   TestStorageIdentityConcurrentInitialization
+--- PASS: TestStorageIdentityConcurrentInitialization (0.00s)
+=== RUN   TestCleanupRetainsClaimWhenStorageMountVanishes
+--- PASS: TestCleanupRetainsClaimWhenStorageMountVanishes (0.01s)
+=== RUN   TestCleanupBindsPendingCloneIdentityBeforeDelete
+--- PASS: TestCleanupBindsPendingCloneIdentityBeforeDelete (0.01s)
+=== RUN   TestCleanupRetainsPendingCloneWhenStorageChangesDuringIdentityBind
+--- PASS: TestCleanupRetainsPendingCloneWhenStorageChangesDuringIdentityBind (0.01s)
+=== RUN   TestCleanupRetainsMissingPendingCloneRegardlessOfAge
+--- PASS: TestCleanupRetainsMissingPendingCloneRegardlessOfAge (0.01s)
+=== RUN   TestCleanupRetainsClaimWhenStorageChangesAfterMissingObservation
+--- PASS: TestCleanupRetainsClaimWhenStorageChangesAfterMissingObservation (0.01s)
+=== RUN   TestDeleteVMRevalidatesStorageIdentityImmediatelyBeforeDelete
+--- PASS: TestDeleteVMRevalidatesStorageIdentityImmediatelyBeforeDelete (0.00s)
+=== RUN   TestListUsesClaimStorage
+--- PASS: TestListUsesClaimStorage (0.00s)
+=== RUN   TestLumeNotFoundIsSpecific
+--- PASS: TestLumeNotFoundIsSpecific (0.00s)
+=== RUN   TestRejectsUnresolvedOwner
+--- PASS: TestRejectsUnresolvedOwner (0.00s)
+=== RUN   TestRecoversPendingOwner
+--- PASS: TestRecoversPendingOwner (0.01s)
+=== RUN   TestClaimPinsLifecycle
+--- PASS: TestClaimPinsLifecycle (0.00s)
+=== RUN   TestClaimConfigPinsStorage
+--- PASS: TestClaimConfigPinsStorage (0.00s)
+=== RUN   TestTouchKeepsRouting
+--- PASS: TestTouchKeepsRouting (0.00s)
+=== RUN   TestStopRequiresExactOwner
+--- PASS: TestStopRequiresExactOwner (0.00s)
+=== RUN   TestReleaseClaim
+--- PASS: TestReleaseClaim (0.00s)
+=== RUN   TestPrepareLeaseUsesKnownHosts
+--- PASS: TestPrepareLeaseUsesKnownHosts (0.00s)
+=== RUN   TestRebindHostAlias
+--- PASS: TestRebindHostAlias (0.00s)
+=== RUN   TestRebindHostPin
+--- PASS: TestRebindHostPin (0.00s)
+=== RUN   TestImmutableID
+--- PASS: TestImmutableID (0.00s)
+=== RUN   TestImmutableIDStorage
+--- PASS: TestImmutableIDStorage (0.00s)
+=== RUN   TestImmutableIDHome
+--- PASS: TestImmutableIDHome (0.00s)
+=== RUN   TestEphemeralStorageRejected
+--- PASS: TestEphemeralStorageRejected (0.00s)
+=== RUN   TestCloneUsesStorage
+--- PASS: TestCloneUsesStorage (0.00s)
+=== RUN   TestBootstrapKeyOnly
+--- PASS: TestBootstrapKeyOnly (0.00s)
+=== RUN   TestGuestIdentityPin
+--- PASS: TestGuestIdentityPin (0.00s)
+=== RUN   TestWaitSSHFalseNegative
+--- PASS: TestWaitSSHFalseNegative (0.00s)
+=== RUN   TestWaitOwnerExit
+--- PASS: TestWaitOwnerExit (0.00s)
+=== RUN   TestNewBackendWithSupervisorInjectsFake
+--- PASS: TestNewBackendWithSupervisorInjectsFake (0.00s)
+=== RUN   TestLumeProcessHandleSatisfiesProcessHandle
+--- PASS: TestLumeProcessHandleSatisfiesProcessHandle (0.00s)
+=== RUN   TestLumeSupervisorReturnsFileHandoffConfirm
+--- PASS: TestLumeSupervisorReturnsFileHandoffConfirm (0.00s)
+=== RUN   TestLumeProcessHandleDoesNotImplementLifecycleContextProvider
+--- PASS: TestLumeProcessHandleDoesNotImplementLifecycleContextProvider (0.00s)
+=== RUN   TestLumeProcessHandleDoesNotImplementExitObservable
+--- PASS: TestLumeProcessHandleDoesNotImplementExitObservable (0.00s)
+=== RUN   TestLumeProcessHandleImplementsDetachedProcess
+--- PASS: TestLumeProcessHandleImplementsDetachedProcess (0.00s)
+=== RUN   TestLumeSupervisorStartPassesLaunchContext
+--- PASS: TestLumeSupervisorStartPassesLaunchContext (0.00s)
+=== RUN   TestLumeSupervisorStartWithoutDataUsesDefaults
+--- PASS: TestLumeSupervisorStartWithoutDataUsesDefaults (0.00s)
+=== RUN   TestLumeSupervisorStartupConfirmTimeout
+--- PASS: TestLumeSupervisorStartupConfirmTimeout (0.00s)
+=== RUN   TestLumeProcessHandleAbortIsIdempotent
+--- PASS: TestLumeProcessHandleAbortIsIdempotent (0.00s)
+=== RUN   TestLumeProcessHandleKillOnInvalidPID
+--- PASS: TestLumeProcessHandleKillOnInvalidPID (0.00s)
+=== RUN   TestLumeProcessHandleStderrEmptyLogPath
+--- PASS: TestLumeProcessHandleStderrEmptyLogPath (0.00s)
+=== RUN   TestLumeProcessHandleHandoffIsNil
+--- PASS: TestLumeProcessHandleHandoffIsNil (0.00s)
+=== RUN   TestLumeStartupConfirmStagesDocumented
+--- PASS: TestLumeStartupConfirmStagesDocumented (0.00s)
+=== RUN   TestLumeStartupConfirmFailureStageNames
+=== RUN   TestLumeStartupConfirmFailureStageNames/owner-handoff
+=== RUN   TestLumeStartupConfirmFailureStageNames/gate-ack
+=== RUN   TestLumeStartupConfirmFailureStageNames/survival-window
+--- PASS: TestLumeStartupConfirmFailureStageNames (0.00s)
+    --- PASS: TestLumeStartupConfirmFailureStageNames/owner-handoff (0.00s)
+    --- PASS: TestLumeStartupConfirmFailureStageNames/gate-ack (0.00s)
+    --- PASS: TestLumeStartupConfirmFailureStageNames/survival-window (0.00s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/providers/lume	0.635s
+---
+finished_at=2026-10-19T10:37:45Z
+exit=0

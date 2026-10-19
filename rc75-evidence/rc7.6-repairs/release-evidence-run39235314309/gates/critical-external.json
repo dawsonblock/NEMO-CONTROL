@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "record_type": "gate",
+  "gate_id": "critical-external",
+  "gate_type": "INTEGRATION",
+  "mandatory": true,
+  "status": "PASS",
+  "exit_code": 0,
+  "tests_executed": 16,
+  "tests_failed": 0,
+  "duration_ms": 35194,
+  "evidence": {
+    "file": "gate-results/critical-external.log",
+    "sha256": "5519036e6ce67ecff97b4bb6e85f2efeff395298cbfc1941ad58345c3f14c3f4"
+  }
+}

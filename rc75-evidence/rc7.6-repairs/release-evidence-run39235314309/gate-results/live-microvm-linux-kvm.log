@@ -1,0 +1,10 @@
+command=imported live microVM lane evidence (linux-kvm) from dist/lane-evidence
+started_at=2026-10-19T10:56:57Z
+---
+imported_from=dist/lane-evidence
+imported_commit=6ceabf8e5411b0090fbfc5c5ad224a3dd8024711
+tests_passed=15
+tests_failed=0
+---
+finished_at=2026-10-19T10:56:57Z
+exit=0

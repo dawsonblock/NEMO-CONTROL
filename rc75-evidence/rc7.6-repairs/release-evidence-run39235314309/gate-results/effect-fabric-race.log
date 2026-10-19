@@ -1,0 +1,2924 @@
+command=env -u CRABBOX_TEST_DATABASE_URL go test -v -race -count=1 -timeout=120s ./internal/capability/ ./internal/execution/ ./internal/evidence/ ./internal/idempotency/ ./internal/reconcile/
+started_at=2026-10-19T10:58:50Z
+---
+=== RUN   TestDescriptorDigestBindsPolicy
+=== RUN   TestDescriptorDigestBindsPolicy/schema_change
+=== RUN   TestDescriptorDigestBindsPolicy/declared_version
+=== RUN   TestDescriptorDigestBindsPolicy/policy_revision
+=== RUN   TestDescriptorDigestBindsPolicy/authority_policy_change
+=== RUN   TestDescriptorDigestBindsPolicy/adapter_change
+=== RUN   TestDescriptorDigestBindsPolicy/route_change
+--- PASS: TestDescriptorDigestBindsPolicy (0.00s)
+    --- PASS: TestDescriptorDigestBindsPolicy/schema_change (0.00s)
+    --- PASS: TestDescriptorDigestBindsPolicy/declared_version (0.00s)
+    --- PASS: TestDescriptorDigestBindsPolicy/policy_revision (0.00s)
+    --- PASS: TestDescriptorDigestBindsPolicy/authority_policy_change (0.00s)
+    --- PASS: TestDescriptorDigestBindsPolicy/adapter_change (0.00s)
+    --- PASS: TestDescriptorDigestBindsPolicy/route_change (0.00s)
+=== RUN   TestRegistrySnapshotRoundTrips
+--- PASS: TestRegistrySnapshotRoundTrips (0.00s)
+=== RUN   TestResolveDefaultsAndValidatesDescriptorVersion
+--- PASS: TestResolveDefaultsAndValidatesDescriptorVersion (0.00s)
+=== RUN   TestVerifyGrantDigest
+--- PASS: TestVerifyGrantDigest (0.00s)
+=== RUN   TestComputeGrantDigestIsCanonicalOverConstraints
+--- PASS: TestComputeGrantDigestIsCanonicalOverConstraints (0.00s)
+=== RUN   TestINV013LocalCannotRequireAGrant
+--- PASS: TestINV013LocalCannotRequireAGrant (0.00s)
+=== RUN   TestINV014AvailabilityCannotModifyPolicy
+--- PASS: TestINV014AvailabilityCannotModifyPolicy (0.00s)
+=== RUN   TestINV001MutationCannotUseLocalRoute
+--- PASS: TestINV001MutationCannotUseLocalRoute (0.00s)
+=== RUN   TestINV002CriticalRequiresHighAssurance
+--- PASS: TestINV002CriticalRequiresHighAssurance (0.00s)
+=== RUN   TestINV003UnknownCapabilityIsDeniedAtAdmission
+--- PASS: TestINV003UnknownCapabilityIsDeniedAtAdmission (0.00s)
+=== RUN   TestINV004CallerClassAssertionCannotDowngrade
+--- PASS: TestINV004CallerClassAssertionCannotDowngrade (0.00s)
+=== RUN   TestRequiredResourceDimensionsUnionsTheSelection
+--- PASS: TestRequiredResourceDimensionsUnionsTheSelection (0.00s)
+=== RUN   TestRequiredResourceDimensionsWildcardCoversTheWholeCatalog
+--- PASS: TestRequiredResourceDimensionsWildcardCoversTheWholeCatalog (0.00s)
+=== RUN   TestValidateIssuanceScopeOmittedDimensionIsRejection
+--- PASS: TestValidateIssuanceScopeOmittedDimensionIsRejection (0.00s)
+=== RUN   TestValidateIssuanceScopeConcreteAndAcknowledged
+--- PASS: TestValidateIssuanceScopeConcreteAndAcknowledged (0.00s)
+=== RUN   TestValidateIssuanceScopeMultipleDimensionsAllEnforced
+--- PASS: TestValidateIssuanceScopeMultipleDimensionsAllEnforced (0.00s)
+=== RUN   TestValidateIssuanceScopeRejections
+=== RUN   TestValidateIssuanceScopeRejections/conflicting_constrained_and_unconstrained
+=== RUN   TestValidateIssuanceScopeRejections/unknown_constrained_dimension
+=== RUN   TestValidateIssuanceScopeRejections/unknown_acknowledged_dimension
+=== RUN   TestValidateIssuanceScopeRejections/wildcard_value_smuggled_through_a_constraint
+=== RUN   TestValidateIssuanceScopeRejections/duplicate_constraint_value
+=== RUN   TestValidateIssuanceScopeRejections/duplicate_acknowledgement
+=== RUN   TestValidateIssuanceScopeRejections/empty_constraint_value
+=== RUN   TestValidateIssuanceScopeRejections/empty_constraint_list
+=== RUN   TestValidateIssuanceScopeRejections/unknown_capability
+=== RUN   TestValidateIssuanceScopeRejections/wildcard_mixed_with_named_capabilities
+=== RUN   TestValidateIssuanceScopeRejections/dimension_a_capability_does_not_declare
+=== RUN   TestValidateIssuanceScopeRejections/empty_capability_list
+--- PASS: TestValidateIssuanceScopeRejections (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/conflicting_constrained_and_unconstrained (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/unknown_constrained_dimension (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/unknown_acknowledged_dimension (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/wildcard_value_smuggled_through_a_constraint (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/duplicate_constraint_value (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/duplicate_acknowledgement (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/empty_constraint_value (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/empty_constraint_list (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/unknown_capability (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/wildcard_mixed_with_named_capabilities (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/dimension_a_capability_does_not_declare (0.00s)
+    --- PASS: TestValidateIssuanceScopeRejections/empty_capability_list (0.00s)
+=== RUN   TestValidateIssuanceScopeWildcardAllRequiresExplicitScope
+--- PASS: TestValidateIssuanceScopeWildcardAllRequiresExplicitScope (0.00s)
+=== RUN   TestAcknowledgedUnconstrainedGrantEvaluatesUnchanged
+--- PASS: TestAcknowledgedUnconstrainedGrantEvaluatesUnchanged (0.00s)
+=== RUN   TestRegistryDigestIsStableAndPolicySensitive
+--- PASS: TestRegistryDigestIsStableAndPolicySensitive (0.00s)
+=== RUN   TestRegistryReportCounts
+--- PASS: TestRegistryReportCounts (0.00s)
+=== RUN   TestRegistryValidateRejectsMalformedSchema
+--- PASS: TestRegistryValidateRejectsMalformedSchema (0.00s)
+=== RUN   TestRegistryValidateRejectsUnsupportedSchemaKeyword
+--- PASS: TestRegistryValidateRejectsUnsupportedSchemaKeyword (0.00s)
+=== RUN   TestRegistryValidateRejectsMissingAdapterBinding
+--- PASS: TestRegistryValidateRejectsMissingAdapterBinding (0.00s)
+=== RUN   TestRegistryValidateAcceptsSupportedSchemaShapes
+--- PASS: TestRegistryValidateAcceptsSupportedSchemaShapes (0.00s)
+=== RUN   TestCheckAdapterAvailabilityReportsUnwiredAdapter
+--- PASS: TestCheckAdapterAvailabilityReportsUnwiredAdapter (0.00s)
+=== RUN   TestRegistryRegisterAndLookup
+--- PASS: TestRegistryRegisterAndLookup (0.00s)
+=== RUN   TestRegistryDuplicateRegister
+--- PASS: TestRegistryDuplicateRegister (0.00s)
+=== RUN   TestRegistryLookupMissing
+--- PASS: TestRegistryLookupMissing (0.00s)
+=== RUN   TestRegistryList
+--- PASS: TestRegistryList (0.00s)
+=== RUN   TestExecutionClassValid
+--- PASS: TestExecutionClassValid (0.00s)
+=== RUN   TestExecutionClassRequiresIdempotencyKey
+--- PASS: TestExecutionClassRequiresIdempotencyKey (0.00s)
+=== RUN   TestExecutionClassRequiresEvidence
+--- PASS: TestExecutionClassRequiresEvidence (0.00s)
+=== RUN   TestAdmitCapabilityNotFound
+--- PASS: TestAdmitCapabilityNotFound (0.00s)
+=== RUN   TestAdmitCapabilityUnimplemented
+--- PASS: TestAdmitCapabilityUnimplemented (0.00s)
+=== RUN   TestAdmitExecutionClassMismatch
+--- PASS: TestAdmitExecutionClassMismatch (0.00s)
+=== RUN   TestAdmitMissingPrincipal
+--- PASS: TestAdmitMissingPrincipal (0.00s)
+=== RUN   TestAdmitMissingGrantID
+--- PASS: TestAdmitMissingGrantID (0.00s)
+=== RUN   TestAdmitMissingIdempotencyKey
+--- PASS: TestAdmitMissingIdempotencyKey (0.00s)
+=== RUN   TestAdmitValid
+--- PASS: TestAdmitValid (0.00s)
+=== RUN   TestThreeDimensionalRouting
+=== RUN   TestThreeDimensionalRouting/PURE_defaults_to_NONE/LOCAL
+=== RUN   TestThreeDimensionalRouting/READ_defaults_to_STANDARD/DIRECT
+=== RUN   TestThreeDimensionalRouting/MUTATION_defaults_to_DURABLE/CRABEDENCE
+=== RUN   TestThreeDimensionalRouting/CRITICAL_defaults_to_HIGH_ASSURANCE/CRABEDENCE
+=== RUN   TestThreeDimensionalRouting/READ_with_HIGH_ASSURANCE_overrides_to_CRABEDENCE
+=== RUN   TestThreeDimensionalRouting/READ_with_explicit_DIRECT_route
+=== RUN   TestThreeDimensionalRouting/PURE_with_explicit_CRABEDENCE_route_(unusual_but_allowed)
+--- PASS: TestThreeDimensionalRouting (0.00s)
+    --- PASS: TestThreeDimensionalRouting/PURE_defaults_to_NONE/LOCAL (0.00s)
+    --- PASS: TestThreeDimensionalRouting/READ_defaults_to_STANDARD/DIRECT (0.00s)
+    --- PASS: TestThreeDimensionalRouting/MUTATION_defaults_to_DURABLE/CRABEDENCE (0.00s)
+    --- PASS: TestThreeDimensionalRouting/CRITICAL_defaults_to_HIGH_ASSURANCE/CRABEDENCE (0.00s)
+    --- PASS: TestThreeDimensionalRouting/READ_with_HIGH_ASSURANCE_overrides_to_CRABEDENCE (0.00s)
+    --- PASS: TestThreeDimensionalRouting/READ_with_explicit_DIRECT_route (0.00s)
+    --- PASS: TestThreeDimensionalRouting/PURE_with_explicit_CRABEDENCE_route_(unusual_but_allowed) (0.00s)
+=== RUN   TestExecutionRouteValid
+--- PASS: TestExecutionRouteValid (0.00s)
+=== RUN   TestDefaultExecutionRoute
+--- PASS: TestDefaultExecutionRoute (0.00s)
+=== RUN   TestGrantAllowsResource
+--- PASS: TestGrantAllowsResource (0.00s)
+=== RUN   TestGrantAllowsResourceUnconstrainedGrant
+--- PASS: TestGrantAllowsResourceUnconstrainedGrant (0.00s)
+=== RUN   TestGrantDigestBindsConstraints
+--- PASS: TestGrantDigestBindsConstraints (0.00s)
+=== RUN   TestVerifyAuthorityResourceConstraints
+--- PASS: TestVerifyAuthorityResourceConstraints (0.00s)
+=== RUN   TestVerifyAuthorityBrokered
+--- PASS: TestVerifyAuthorityBrokered (0.00s)
+=== RUN   TestVerifyAuthorityBrokeredRequiresEnumeration
+--- PASS: TestVerifyAuthorityBrokeredRequiresEnumeration (0.00s)
+=== RUN   TestRegistryRejectsResourceArgumentsWithoutGrant
+--- PASS: TestRegistryRejectsResourceArgumentsWithoutGrant (0.00s)
+=== RUN   TestRoutingConformance
+=== RUN   TestRoutingConformance/PURE/NONE/LOCAL_never_reaches_Crabedence
+=== RUN   TestRoutingConformance/READ/STANDARD/DIRECT_executes_through_direct_adapter
+=== RUN   TestRoutingConformance/READ/HIGH_ASSURANCE/CRABEDENCE_cannot_be_downgraded_to_DIRECT
+=== RUN   TestRoutingConformance/MUTATION/DURABLE/CRABEDENCE_routes_to_durable_execution
+=== RUN   TestRoutingConformance/CRITICAL/HIGH_ASSURANCE/CRABEDENCE_requires_authority+evidence
+=== RUN   TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry
+=== RUN   TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/CRITICAL/HIGH_ASSURANCE/LOCAL
+=== RUN   TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/MUTATION/DURABLE/DIRECT
+=== RUN   TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/READ/HIGH_ASSURANCE/DIRECT
+=== RUN   TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/PURE/HIGH_ASSURANCE/LOCAL
+=== RUN   TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/PURE/STANDARD/LOCAL
+=== RUN   TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/MUTATION/HIGH_ASSURANCE/DIRECT
+--- PASS: TestRoutingConformance (0.00s)
+    --- PASS: TestRoutingConformance/PURE/NONE/LOCAL_never_reaches_Crabedence (0.00s)
+    --- PASS: TestRoutingConformance/READ/STANDARD/DIRECT_executes_through_direct_adapter (0.00s)
+    --- PASS: TestRoutingConformance/READ/HIGH_ASSURANCE/CRABEDENCE_cannot_be_downgraded_to_DIRECT (0.00s)
+    --- PASS: TestRoutingConformance/MUTATION/DURABLE/CRABEDENCE_routes_to_durable_execution (0.00s)
+    --- PASS: TestRoutingConformance/CRITICAL/HIGH_ASSURANCE/CRABEDENCE_requires_authority+evidence (0.00s)
+    --- PASS: TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry (0.00s)
+        --- PASS: TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/CRITICAL/HIGH_ASSURANCE/LOCAL (0.00s)
+        --- PASS: TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/MUTATION/DURABLE/DIRECT (0.00s)
+        --- PASS: TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/READ/HIGH_ASSURANCE/DIRECT (0.00s)
+        --- PASS: TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/PURE/HIGH_ASSURANCE/LOCAL (0.00s)
+        --- PASS: TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/PURE/STANDARD/LOCAL (0.00s)
+        --- PASS: TestRoutingConformance/invalid_descriptor_combinations_cannot_enter_active_registry/MUTATION/HIGH_ASSURANCE/DIRECT (0.00s)
+=== RUN   TestValidateArgumentsExactNumberBounds
+=== RUN   TestValidateArgumentsExactNumberBounds/2^53+1_in_range
+=== RUN   TestValidateArgumentsExactNumberBounds/2^53+2_at_max
+=== RUN   TestValidateArgumentsExactNumberBounds/2^53+3_above_max
+=== RUN   TestValidateArgumentsExactNumberBounds/2^53+1_below_min_variant
+--- PASS: TestValidateArgumentsExactNumberBounds (0.00s)
+    --- PASS: TestValidateArgumentsExactNumberBounds/2^53+1_in_range (0.00s)
+    --- PASS: TestValidateArgumentsExactNumberBounds/2^53+2_at_max (0.00s)
+    --- PASS: TestValidateArgumentsExactNumberBounds/2^53+3_above_max (0.00s)
+    --- PASS: TestValidateArgumentsExactNumberBounds/2^53+1_below_min_variant (0.00s)
+=== RUN   TestValidateArgumentsExactInteger
+=== RUN   TestValidateArgumentsExactInteger/2^53-1
+=== RUN   TestValidateArgumentsExactInteger/2^53
+=== RUN   TestValidateArgumentsExactInteger/2^53+1
+=== RUN   TestValidateArgumentsExactInteger/int64_max
+=== RUN   TestValidateArgumentsExactInteger/int64_max+1
+=== RUN   TestValidateArgumentsExactInteger/1e100_whole
+=== RUN   TestValidateArgumentsExactInteger/integral_decimal
+=== RUN   TestValidateArgumentsExactInteger/non-integer
+=== RUN   TestValidateArgumentsExactInteger/non-integer_big
+=== RUN   TestValidateArgumentsExactInteger/scientific_non-integer
+=== RUN   TestValidateArgumentsExactInteger/scientific_fraction
+--- PASS: TestValidateArgumentsExactInteger (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/2^53-1 (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/2^53 (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/2^53+1 (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/int64_max (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/int64_max+1 (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/1e100_whole (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/integral_decimal (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/non-integer (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/non-integer_big (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/scientific_non-integer (0.00s)
+    --- PASS: TestValidateArgumentsExactInteger/scientific_fraction (0.00s)
+=== RUN   TestValidateArgumentsMultipleOf
+--- PASS: TestValidateArgumentsMultipleOf (0.00s)
+=== RUN   TestValidateArgumentsEnumNumericEquality
+--- PASS: TestValidateArgumentsEnumNumericEquality (0.00s)
+=== RUN   TestValidateArgumentsDecimalPrecision
+--- PASS: TestValidateArgumentsDecimalPrecision (0.00s)
+=== RUN   TestSchemaMaxLengthUnicode
+--- PASS: TestSchemaMaxLengthUnicode (0.00s)
+=== RUN   TestSchemaMinLengthUnicode
+--- PASS: TestSchemaMinLengthUnicode (0.00s)
+=== RUN   TestSchemaAdditionalPropertiesFalse
+--- PASS: TestSchemaAdditionalPropertiesFalse (0.00s)
+=== RUN   TestSchemaAdditionalPropertiesDefault
+--- PASS: TestSchemaAdditionalPropertiesDefault (0.00s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/capability	1.032s
+=== RUN   TestAdmissionLimitSlots
+--- PASS: TestAdmissionLimitSlots (0.00s)
+=== RUN   TestConnectionCeilingRefusesBeforeDispatch
+--- PASS: TestConnectionCeilingRefusesBeforeDispatch (0.00s)
+=== RUN   TestHandshakeCeilingRefusesBeforeAuthentication
+--- PASS: TestHandshakeCeilingRefusesBeforeAuthentication (0.00s)
+=== RUN   TestHeaderTimeoutDropsSilentConnections
+--- PASS: TestHeaderTimeoutDropsSilentConnections (5.00s)
+=== RUN   TestStopDrainsInFlightHandlers
+--- PASS: TestStopDrainsInFlightHandlers (0.25s)
+=== RUN   TestAdmissionLimitsFromConfig
+--- PASS: TestAdmissionLimitsFromConfig (0.00s)
+=== RUN   TestConcurrentIdenticalMutations
+--- PASS: TestConcurrentIdenticalMutations (0.02s)
+=== RUN   TestUnicodePayload
+--- PASS: TestUnicodePayload (0.00s)
+=== RUN   TestMaxFrameSize
+--- PASS: TestMaxFrameSize (1.61s)
+=== RUN   TestSocketCloseBeforeResponse
+--- PASS: TestSocketCloseBeforeResponse (0.10s)
+=== RUN   TestExpiredDeadline
+--- PASS: TestExpiredDeadline (0.00s)
+=== RUN   TestInvalidDeadline
+--- PASS: TestInvalidDeadline (0.00s)
+=== RUN   TestMalformedJSON
+--- PASS: TestMalformedJSON (0.00s)
+=== RUN   TestWireStoreErrorSanitization
+2026/10/19 10:59:02 dispatch executor: idempotency acquire failed: SQLSTATE 42703: column "secret_dsn" does not exist in pg_catalog.pg_attribute
+--- PASS: TestWireStoreErrorSanitization (0.00s)
+=== RUN   TestAttestationHandshakeSucceeds
+--- PASS: TestAttestationHandshakeSucceeds (0.01s)
+=== RUN   TestAttestationRejectsBadSignature
+--- PASS: TestAttestationRejectsBadSignature (0.00s)
+=== RUN   TestAttestationRejectsUnknownAndSpentChallenges
+--- PASS: TestAttestationRejectsUnknownAndSpentChallenges (0.00s)
+=== RUN   TestAttestationChallengeExpiry
+--- PASS: TestAttestationChallengeExpiry (0.00s)
+=== RUN   TestAttestationUnapprovedKeyDenied
+--- PASS: TestAttestationUnapprovedKeyDenied (0.00s)
+=== RUN   TestAttestationIdentityAllowlists
+--- PASS: TestAttestationIdentityAllowlists (0.01s)
+=== RUN   TestAttestationRelaxedAdmitsAnyKey
+--- PASS: TestAttestationRelaxedAdmitsAnyKey (0.00s)
+=== RUN   TestSessionProofVerification
+--- PASS: TestSessionProofVerification (0.01s)
+=== RUN   TestSessionProofBindsThisRequest
+--- PASS: TestSessionProofBindsThisRequest (0.00s)
+=== RUN   TestSessionRequiredDeniesUnattested
+--- PASS: TestSessionRequiredDeniesUnattested (0.00s)
+=== RUN   TestSessionOptionalAdmitsUnattested
+--- PASS: TestSessionOptionalAdmitsUnattested (0.00s)
+=== RUN   TestSessionExpiryDenies
+--- PASS: TestSessionExpiryDenies (0.00s)
+=== RUN   TestSessionUnknownDenied
+--- PASS: TestSessionUnknownDenied (0.00s)
+=== RUN   TestParseApprovedRuntimeKeys
+--- PASS: TestParseApprovedRuntimeKeys (0.00s)
+=== RUN   TestServiceAttestationEndToEnd
+--- PASS: TestServiceAttestationEndToEnd (0.01s)
+=== RUN   TestServiceAttestationForgedProofDenied
+--- PASS: TestServiceAttestationForgedProofDenied (0.00s)
+=== RUN   TestClientAttestAndInvoke
+--- PASS: TestClientAttestAndInvoke (0.01s)
+=== RUN   TestAttestationRefusedWhenUnconfigured
+--- PASS: TestAttestationRefusedWhenUnconfigured (0.00s)
+=== RUN   TestSessionPeerBinding
+--- PASS: TestSessionPeerBinding (0.01s)
+=== RUN   TestSessionUIDOnlyBinding
+--- PASS: TestSessionUIDOnlyBinding (0.00s)
+=== RUN   TestServiceBindsResolvedAuthorityIntoRequestDigest
+--- PASS: TestServiceBindsResolvedAuthorityIntoRequestDigest (0.21s)
+=== RUN   TestCallerCannotForgeAuthorityBinding
+--- PASS: TestCallerCannotForgeAuthorityBinding (0.21s)
+=== RUN   TestBrokeredAuthorityBindsResolvedGrant
+--- PASS: TestBrokeredAuthorityBindsResolvedGrant (0.12s)
+=== RUN   TestBrokeredAuthorityRequiresPeerAuthentication
+--- PASS: TestBrokeredAuthorityRequiresPeerAuthentication (0.00s)
+=== RUN   TestEmitCheckpointRefusesTamperedRetainedHistory
+=== RUN   TestEmitCheckpointRefusesTamperedRetainedHistory/truncated_tail
+evidence checkpoint: retained checkpoint log at /tmp/TestEmitCheckpointRefusesTamperedRetainedHistorytruncated_tail139910970/002/evidence-checkpoint.json.jsonl is corrupt — refusing to extend possible evidence: entry 5 at byte 1839 is not newline-terminated — torn write or truncated log
+=== RUN   TestEmitCheckpointRefusesTamperedRetainedHistory/foreign-signed_splice
+evidence checkpoint: retained checkpoint log at /tmp/TestEmitCheckpointRefusesTamperedRetainedHistoryforeign-signed_845437478/002/evidence-checkpoint.json.jsonl is corrupt — refusing to extend possible evidence: entry 3 (sequence 3): signer ae4482175492ee74bd3045b239801f531d9ef02a833c9534a981d32748193f90 not trusted
+=== RUN   TestEmitCheckpointRefusesTamperedRetainedHistory/sequence_gap
+evidence checkpoint: latest checkpoint /tmp/TestEmitCheckpointRefusesTamperedRetainedHistorysequence_gap2876021717/002/evidence-checkpoint.json is at sequence 5 but the retained log ends at 3 — a checkpoint exists with no retained entry
+=== RUN   TestEmitCheckpointRefusesTamperedRetainedHistory/corrupt_middle_entry
+evidence checkpoint: retained checkpoint log at /tmp/TestEmitCheckpointRefusesTamperedRetainedHistorycorrupt_middle_42557293/002/evidence-checkpoint.json.jsonl is corrupt — refusing to extend possible evidence: entry 2 is not in canonical emitter form — a byte-level rewrite of signed evidence
+=== RUN   TestEmitCheckpointRefusesTamperedRetainedHistory/deleted_middle_entry
+evidence checkpoint: retained checkpoint log at /tmp/TestEmitCheckpointRefusesTamperedRetainedHistorydeleted_middle_3393279023/002/evidence-checkpoint.json.jsonl is corrupt — refusing to extend possible evidence: entry 2 carries sequence 3, expected 2 — a deleted, duplicated or reordered entry
+=== RUN   TestEmitCheckpointRefusesTamperedRetainedHistory/reordered_entries
+evidence checkpoint: retained checkpoint log at /tmp/TestEmitCheckpointRefusesTamperedRetainedHistoryreordered_entri1658440544/002/evidence-checkpoint.json.jsonl is corrupt — refusing to extend possible evidence: entry 2 carries sequence 3, expected 2 — a deleted, duplicated or reordered entry
+=== RUN   TestEmitCheckpointRefusesTamperedRetainedHistory/duplicated_tail_entry
+evidence checkpoint: retained checkpoint log at /tmp/TestEmitCheckpointRefusesTamperedRetainedHistoryduplicated_tail3935667993/002/evidence-checkpoint.json.jsonl is corrupt — refusing to extend possible evidence: entry 6 carries sequence 5, expected 6 — a deleted, duplicated or reordered entry
+--- PASS: TestEmitCheckpointRefusesTamperedRetainedHistory (1.20s)
+    --- PASS: TestEmitCheckpointRefusesTamperedRetainedHistory/truncated_tail (0.11s)
+    --- PASS: TestEmitCheckpointRefusesTamperedRetainedHistory/foreign-signed_splice (0.15s)
+    --- PASS: TestEmitCheckpointRefusesTamperedRetainedHistory/sequence_gap (0.13s)
+    --- PASS: TestEmitCheckpointRefusesTamperedRetainedHistory/corrupt_middle_entry (0.19s)
+    --- PASS: TestEmitCheckpointRefusesTamperedRetainedHistory/deleted_middle_entry (0.21s)
+    --- PASS: TestEmitCheckpointRefusesTamperedRetainedHistory/reordered_entries (0.28s)
+    --- PASS: TestEmitCheckpointRefusesTamperedRetainedHistory/duplicated_tail_entry (0.11s)
+=== RUN   TestEmitCheckpointIntactCursorStillCatchesTamper
+evidence checkpoint: retained checkpoint log at /tmp/TestEmitCheckpointIntactCursorStillCatchesTamper134115939/002/evidence-checkpoint.json.jsonl is corrupt — refusing to extend possible evidence: entry 2 is not in canonical emitter form — a byte-level rewrite of signed evidence
+--- PASS: TestEmitCheckpointIntactCursorStillCatchesTamper (0.14s)
+=== RUN   TestEmitCheckpointRefusesLatestAheadOfJournal
+evidence checkpoint: latest checkpoint /tmp/TestEmitCheckpointRefusesLatestAheadOfJournal2671657199/002/evidence-checkpoint.json is at sequence 5 but the retained log ends at 3 — a checkpoint exists with no retained entry
+--- PASS: TestEmitCheckpointRefusesLatestAheadOfJournal (0.14s)
+=== RUN   TestEmitCheckpointRefusesForkedLatest
+evidence checkpoint: latest checkpoint /tmp/TestEmitCheckpointRefusesForkedLatest4259878868/002/evidence-checkpoint.json and the retained log carry different bytes at sequence 3 — a forked chain
+--- PASS: TestEmitCheckpointRefusesForkedLatest (0.13s)
+=== RUN   TestEmitCheckpointHealsTornLatestPointer
+--- PASS: TestEmitCheckpointHealsTornLatestPointer (0.13s)
+=== RUN   TestEmitCheckpointConcurrentWriters
+--- PASS: TestEmitCheckpointConcurrentWriters (0.22s)
+=== RUN   TestEmitCheckpointRefusesCursorBeyondLogEnd
+evidence checkpoint: retained checkpoint log at /tmp/TestEmitCheckpointRefusesCursorBeyondLogEnd3020422315/002/evidence-checkpoint.json.jsonl is 1379 bytes but 5475 were previously verified — history was truncated
+--- PASS: TestEmitCheckpointRefusesCursorBeyondLogEnd (0.16s)
+=== RUN   TestEmitCheckpointCursorAnchorFallsBackToFullScan
+evidence checkpoint: retained checkpoint log at /tmp/TestEmitCheckpointCursorAnchorFallsBackToFullScan654352911/002/evidence-checkpoint.json.jsonl is corrupt — refusing to extend possible evidence: entry 1 is not in canonical emitter form — a byte-level rewrite of signed evidence
+--- PASS: TestEmitCheckpointCursorAnchorFallsBackToFullScan (0.13s)
+=== RUN   TestEmitCheckpointCursorTracksGrowth
+--- PASS: TestEmitCheckpointCursorTracksGrowth (0.10s)
+=== RUN   TestEmitCheckpointBackfillsLaggingCustody
+--- PASS: TestEmitCheckpointBackfillsLaggingCustody (0.20s)
+=== RUN   TestEmitCheckpointRefusesDivergentCustody
+evidence checkpoint: custody log /tmp/TestEmitCheckpointRefusesDivergentCustody812737308/003/evidence-checkpoint.json.jsonl is at sequence 3, emission 1 not appended — divergent custody needs an operator
+--- PASS: TestEmitCheckpointRefusesDivergentCustody (0.14s)
+=== RUN   TestEmitCheckpointJournalIsContiguousAndComplete
+--- PASS: TestEmitCheckpointJournalIsContiguousAndComplete (0.27s)
+=== RUN   TestEmitCheckpointRefusalIsObservable
+--- PASS: TestEmitCheckpointRefusalIsObservable (0.14s)
+=== RUN   TestEmitCheckpointWritesVerifiableFile
+--- PASS: TestEmitCheckpointWritesVerifiableFile (0.13s)
+=== RUN   TestEmitCheckpointRefusesUnreadableExisting
+evidence checkpoint: existing checkpoint at /tmp/TestEmitCheckpointRefusesUnreadableExisting1284195108/002/evidence-checkpoint.json is unreadable — refusing to overwrite possible evidence: invalid character 'o' in literal null (expecting 'u')
+--- PASS: TestEmitCheckpointRefusesUnreadableExisting (0.12s)
+=== RUN   TestEmitCheckpointRetainsSequenceLog
+--- PASS: TestEmitCheckpointRetainsSequenceLog (0.19s)
+=== RUN   TestEmitCheckpointSequenceSurvivesLatestLoss
+--- PASS: TestEmitCheckpointSequenceSurvivesLatestLoss (0.14s)
+=== RUN   TestEmitCheckpointRefusesCorruptRetainedLog
+evidence checkpoint: retained checkpoint log at /tmp/TestEmitCheckpointRefusesCorruptRetainedLog1192516271/002/evidence-checkpoint.json.jsonl is corrupt — refusing to extend possible evidence: entry 1 is not parseable: invalid character 'c' looking for beginning of value
+--- PASS: TestEmitCheckpointRefusesCorruptRetainedLog (0.11s)
+=== RUN   TestEmitCheckpointMirrorsCustodyPath
+--- PASS: TestEmitCheckpointMirrorsCustodyPath (0.27s)
+=== RUN   TestEmitCheckpointCustodyRefusesCorruptHistory
+evidence checkpoint: custody log /tmp/TestEmitCheckpointCustodyRefusesCorruptHistory1495605826/003/evidence-checkpoint.json.jsonl failed verification — refusing to extend possible divergent custody: retained checkpoint log at /tmp/TestEmitCheckpointCustodyRefusesCorruptHistory1495605826/003/evidence-checkpoint.json.jsonl is corrupt — refusing to extend possible evidence: entry 2 (sequence 2): invalid signature
+--- PASS: TestEmitCheckpointCustodyRefusesCorruptHistory (0.14s)
+=== RUN   TestEmitCheckpointCustodyBackfillsLag
+--- PASS: TestEmitCheckpointCustodyBackfillsLag (0.12s)
+=== RUN   TestEmitCheckpointCustodyRefusesOrphanLatest
+evidence checkpoint: custody checkpoint /tmp/TestEmitCheckpointCustodyRefusesOrphanLatest480077382/003/evidence-checkpoint.json exists but retained log /tmp/TestEmitCheckpointCustodyRefusesOrphanLatest480077382/003/evidence-checkpoint.json.jsonl is missing or empty — divergent custody needs an operator
+--- PASS: TestEmitCheckpointCustodyRefusesOrphanLatest (0.13s)
+=== RUN   TestClientInvokeSucceeds
+--- PASS: TestClientInvokeSucceeds (0.00s)
+=== RUN   TestClientDialFailureIsPreDispatch
+--- PASS: TestClientDialFailureIsPreDispatch (0.00s)
+=== RUN   TestClientConnectionLostAfterTransmissionIsPostDispatch
+--- PASS: TestClientConnectionLostAfterTransmissionIsPostDispatch (0.00s)
+=== RUN   TestClientWaitExpiryAfterTransmissionIsPostDispatch
+--- PASS: TestClientWaitExpiryAfterTransmissionIsPostDispatch (0.10s)
+=== RUN   TestClientMalformedResponseIsProtocol
+--- PASS: TestClientMalformedResponseIsProtocol (0.00s)
+=== RUN   TestClientOversizedResponseFrameIsProtocol
+--- PASS: TestClientOversizedResponseFrameIsProtocol (0.00s)
+=== RUN   TestClientUnknownWireStatusIsProtocol
+--- PASS: TestClientUnknownWireStatusIsProtocol (0.00s)
+=== RUN   TestClientOversizedRequestIsPreDispatch
+--- PASS: TestClientOversizedRequestIsPreDispatch (0.91s)
+=== RUN   TestWriteFrameReportsExactWriteBoundary
+=== RUN   TestWriteFrameReportsExactWriteBoundary/nothing_accepted
+=== RUN   TestWriteFrameReportsExactWriteBoundary/partially_accepted
+=== RUN   TestWriteFrameReportsExactWriteBoundary/fully_accepted
+--- PASS: TestWriteFrameReportsExactWriteBoundary (0.00s)
+    --- PASS: TestWriteFrameReportsExactWriteBoundary/nothing_accepted (0.00s)
+    --- PASS: TestWriteFrameReportsExactWriteBoundary/partially_accepted (0.00s)
+    --- PASS: TestWriteFrameReportsExactWriteBoundary/fully_accepted (0.00s)
+=== RUN   TestClientRequestMarshalFailureIsPreDispatch
+--- PASS: TestClientRequestMarshalFailureIsPreDispatch (0.00s)
+=== RUN   TestClientWaitExpiryLeavesTheMutationCommitting
+2026/10/19 10:59:09 execution service: write frame header: write unix /tmp/cbx-sock-1598198929/execution.sock->@: write: broken pipe
+--- PASS: TestClientWaitExpiryLeavesTheMutationCommitting (0.95s)
+=== RUN   TestLateResponseAfterConnectionLifetime
+    client_test.go:369: set CRABBOX_QUALIFICATION_POST_DISPATCH=1 to run the late-response qualification
+--- SKIP: TestLateResponseAfterConnectionLifetime (0.00s)
+=== RUN   TestPostDispatchTimeoutQualification
+    client_test.go:409: set CRABBOX_QUALIFICATION_POST_DISPATCH=1 to run the >30s post-dispatch qualification
+--- SKIP: TestPostDispatchTimeoutQualification (0.00s)
+=== RUN   TestClientCancellationIsClassifiedNotSwallowed
+--- PASS: TestClientCancellationIsClassifiedNotSwallowed (0.05s)
+=== RUN   TestConcurrencyTortureSingleDispatch
+=== RUN   TestConcurrencyTortureSingleDispatch/workers-10
+    concurrency_torture_test.go:84: statuses: succeeded=8 in_flight=2 unknown=0 other=0
+=== RUN   TestConcurrencyTortureSingleDispatch/workers-50
+    concurrency_torture_test.go:84: statuses: succeeded=10 in_flight=40 unknown=0 other=0
+--- PASS: TestConcurrencyTortureSingleDispatch (1.71s)
+    --- PASS: TestConcurrencyTortureSingleDispatch/workers-10 (0.37s)
+    --- PASS: TestConcurrencyTortureSingleDispatch/workers-50 (1.34s)
+=== RUN   TestConcurrencyDistinctKeys
+--- PASS: TestConcurrencyDistinctKeys (1.88s)
+=== RUN   TestLiveConcurrentIdenticalMutationSingleDispatch
+    concurrent_live_test.go:42: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveConcurrentIdenticalMutationSingleDispatch (0.00s)
+=== RUN   TestLoadServiceConfigDevelopmentDefaults
+--- PASS: TestLoadServiceConfigDevelopmentDefaults (0.00s)
+=== RUN   TestLoadServiceConfigResolvesOverrides
+--- PASS: TestLoadServiceConfigResolvesOverrides (0.00s)
+=== RUN   TestLoadServiceConfigFailsClosed
+=== RUN   TestLoadServiceConfigFailsClosed/mode_undeclared
+=== RUN   TestLoadServiceConfigFailsClosed/unknown_mode
+=== RUN   TestLoadServiceConfigFailsClosed/unknown_backend
+=== RUN   TestLoadServiceConfigFailsClosed/malformed_replica_count
+=== RUN   TestLoadServiceConfigFailsClosed/unknown_topology
+=== RUN   TestLoadServiceConfigFailsClosed/production_without_topology
+=== RUN   TestLoadServiceConfigFailsClosed/production_without_peer_authentication
+=== RUN   TestLoadServiceConfigFailsClosed/cluster_with_sqlite
+=== RUN   TestLoadServiceConfigFailsClosed/single_with_replicas
+=== RUN   TestLoadServiceConfigFailsClosed/malformed_executor_ceiling
+=== RUN   TestLoadServiceConfigFailsClosed/malformed_checkpoint_interval
+=== RUN   TestLoadServiceConfigFailsClosed/malformed_max_concurrent
+=== RUN   TestLoadServiceConfigFailsClosed/contradictory_gate_thresholds
+=== RUN   TestLoadServiceConfigFailsClosed/malformed_trusted_signer
+=== RUN   TestLoadServiceConfigFailsClosed/malformed_peer_principals
+=== RUN   TestLoadServiceConfigFailsClosed/malformed_trusted_proxies
+=== RUN   TestLoadServiceConfigFailsClosed/production_wildcard_without_trusted_proxy
+=== RUN   TestLoadServiceConfigFailsClosed/github_enabled_without_token
+=== RUN   TestLoadServiceConfigFailsClosed/production_without_attestation
+=== RUN   TestLoadServiceConfigFailsClosed/production_with_relaxed_attestation
+=== RUN   TestLoadServiceConfigFailsClosed/required_attestation_without_keys
+=== RUN   TestLoadServiceConfigFailsClosed/identity_allowlist_without_keys
+=== RUN   TestLoadServiceConfigFailsClosed/malformed_runtime_key
+=== RUN   TestLoadServiceConfigFailsClosed/malformed_session_ttl
+--- PASS: TestLoadServiceConfigFailsClosed (0.01s)
+    --- PASS: TestLoadServiceConfigFailsClosed/mode_undeclared (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/unknown_mode (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/unknown_backend (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/malformed_replica_count (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/unknown_topology (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/production_without_topology (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/production_without_peer_authentication (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/cluster_with_sqlite (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/single_with_replicas (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/malformed_executor_ceiling (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/malformed_checkpoint_interval (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/malformed_max_concurrent (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/contradictory_gate_thresholds (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/malformed_trusted_signer (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/malformed_peer_principals (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/malformed_trusted_proxies (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/production_wildcard_without_trusted_proxy (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/github_enabled_without_token (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/production_without_attestation (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/production_with_relaxed_attestation (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/required_attestation_without_keys (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/identity_allowlist_without_keys (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/malformed_runtime_key (0.00s)
+    --- PASS: TestLoadServiceConfigFailsClosed/malformed_session_ttl (0.00s)
+=== RUN   TestProductionRequiresAuthenticatedPrincipals
+--- PASS: TestProductionRequiresAuthenticatedPrincipals (0.00s)
+=== RUN   TestServiceConfigReportExcludesSecrets
+--- PASS: TestServiceConfigReportExcludesSecrets (0.00s)
+=== RUN   TestLoadServiceConfigAmbientGitHubTokenDoesNotEnable
+--- PASS: TestLoadServiceConfigAmbientGitHubTokenDoesNotEnable (0.00s)
+=== RUN   TestCounterResolverCrossPrincipal
+--- PASS: TestCounterResolverCrossPrincipal (0.00s)
+=== RUN   TestCounterResolverCrossCapability
+--- PASS: TestCounterResolverCrossCapability (0.00s)
+=== RUN   TestCounterResolverTokenGraft
+--- PASS: TestCounterResolverTokenGraft (0.00s)
+=== RUN   TestCounterResolverAmountMismatch
+--- PASS: TestCounterResolverAmountMismatch (0.00s)
+=== RUN   TestCounterPrepareRecovery
+--- PASS: TestCounterPrepareRecovery (0.00s)
+=== RUN   TestCounterPrepareRecoveryEquivalence
+--- PASS: TestCounterPrepareRecoveryEquivalence (0.00s)
+=== RUN   TestGenericRecoveryLocatorMinimization
+--- PASS: TestGenericRecoveryLocatorMinimization (0.00s)
+=== RUN   TestCounterResolverReturnsExecutionValue
+--- PASS: TestCounterResolverReturnsExecutionValue (0.00s)
+=== RUN   TestLiveCriticalQualificationCommit
+    critical_qualification_live_test.go:296: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- SKIP: TestLiveCriticalQualificationCommit (0.00s)
+=== RUN   TestLiveCriticalQualificationAmbiguityThenReconcile
+    critical_qualification_live_test.go:359: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- SKIP: TestLiveCriticalQualificationAmbiguityThenReconcile (0.00s)
+=== RUN   TestLiveCriticalQualificationDefinitiveRejection
+    critical_qualification_live_test.go:404: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- SKIP: TestLiveCriticalQualificationDefinitiveRejection (0.00s)
+=== RUN   TestLiveCriticalQualificationEvidenceIntegrity
+    critical_qualification_live_test.go:435: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- SKIP: TestLiveCriticalQualificationEvidenceIntegrity (0.00s)
+=== RUN   TestLiveCriticalQualificationFailBeforeAccept
+    critical_qualification_live_test.go:488: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- SKIP: TestLiveCriticalQualificationFailBeforeAccept (0.00s)
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix/expired
+    critical_qualification_live_test.go:580: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix/revoked
+    critical_qualification_live_test.go:580: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix/unknown-grant
+    critical_qualification_live_test.go:580: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix/wrong-principal
+    critical_qualification_live_test.go:580: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+=== RUN   TestLiveCriticalQualificationAuthorityMatrix/wrong-capability
+    critical_qualification_live_test.go:580: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- PASS: TestLiveCriticalQualificationAuthorityMatrix (0.00s)
+    --- SKIP: TestLiveCriticalQualificationAuthorityMatrix/expired (0.00s)
+    --- SKIP: TestLiveCriticalQualificationAuthorityMatrix/revoked (0.00s)
+    --- SKIP: TestLiveCriticalQualificationAuthorityMatrix/unknown-grant (0.00s)
+    --- SKIP: TestLiveCriticalQualificationAuthorityMatrix/wrong-principal (0.00s)
+    --- SKIP: TestLiveCriticalQualificationAuthorityMatrix/wrong-capability (0.00s)
+=== RUN   TestLiveCriticalQualificationClosedAuthoritySemantics
+    critical_qualification_live_test.go:609: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- SKIP: TestLiveCriticalQualificationClosedAuthoritySemantics (0.00s)
+=== RUN   TestLiveCriticalQualificationTimeoutThenReconcile
+    critical_qualification_live_test.go:652: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- SKIP: TestLiveCriticalQualificationTimeoutThenReconcile (0.00s)
+=== RUN   TestLiveCriticalQualificationLookupOutageThenRecovery
+    critical_qualification_live_test.go:689: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- SKIP: TestLiveCriticalQualificationLookupOutageThenRecovery (0.00s)
+=== RUN   TestLiveCriticalQualificationTokenPayloadCollision
+--- PASS: TestLiveCriticalQualificationTokenPayloadCollision (0.06s)
+=== RUN   TestLiveCriticalQualificationCorruptedArtifact
+    critical_qualification_live_test.go:830: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- SKIP: TestLiveCriticalQualificationCorruptedArtifact (0.00s)
+=== RUN   TestLiveCriticalQualificationRegistryExtensionBinding
+    critical_qualification_live_test.go:881: CRABBOX_TEST_DATABASE_URL not set; skipping live external CRITICAL qualification
+--- SKIP: TestLiveCriticalQualificationRegistryExtensionBinding (0.00s)
+=== RUN   TestCriticalCrashHelperProcess
+--- PASS: TestCriticalCrashHelperProcess (0.00s)
+=== RUN   TestLiveCriticalQualificationCrashThenRecover
+    critical_qualification_live_test.go:987: CRABBOX_TEST_DATABASE_URL not set; skipping live CRITICAL crash qualification
+--- SKIP: TestLiveCriticalQualificationCrashThenRecover (0.00s)
+=== RUN   TestLegacyDigestRecordsRemainReplayable
+--- PASS: TestLegacyDigestRecordsRemainReplayable (0.25s)
+=== RUN   TestLegacyRecordHeldLeaseIsNotMigrated
+--- PASS: TestLegacyRecordHeldLeaseIsNotMigrated (0.29s)
+=== RUN   TestLegacyRecordExpiredLeaseMigratesThenDispatches
+--- PASS: TestLegacyRecordExpiredLeaseMigratesThenDispatches (0.29s)
+=== RUN   TestLegacyRecordMediationMismatchStaysConflict
+--- PASS: TestLegacyRecordMediationMismatchStaysConflict (0.20s)
+=== RUN   TestDescriptorIdentityFailsClosedOnRealConflict
+--- PASS: TestDescriptorIdentityFailsClosedOnRealConflict (0.26s)
+=== RUN   TestDescriptorVersionBumpIsANewIdentity
+--- PASS: TestDescriptorVersionBumpIsANewIdentity (0.31s)
+=== RUN   TestGitHubIssueGetDirectRead
+2026/10/19 10:59:15 execution audit: route=DIRECT capability=github.issue.get principal=alice@example.com outcome=SUCCEEDED duration_ms=1
+--- PASS: TestGitHubIssueGetDirectRead (0.00s)
+=== RUN   TestGitHubIssueListDirectRead
+2026/10/19 10:59:15 execution audit: route=DIRECT capability=github.issue.list principal=alice@example.com outcome=SUCCEEDED duration_ms=2
+--- PASS: TestGitHubIssueListDirectRead (0.00s)
+=== RUN   TestGitHubIssueListDefaultsAndBounds
+2026/10/19 10:59:15 execution audit: route=DIRECT capability=github.issue.list principal= outcome=SUCCEEDED duration_ms=1
+--- PASS: TestGitHubIssueListDefaultsAndBounds (0.00s)
+=== RUN   TestGitHubIssueGetFailuresAreSafe
+2026/10/19 10:59:15 execution audit: route=DIRECT capability=github.issue.get principal=alice@example.com outcome=FAILED duration_ms=0
+--- PASS: TestGitHubIssueGetFailuresAreSafe (0.00s)
+=== RUN   TestGitHubIssueGetBoundsResponseBody
+2026/10/19 10:59:15 execution audit: route=DIRECT capability=github.issue.get principal=alice@example.com outcome=FAILED duration_ms=22
+--- PASS: TestGitHubIssueGetBoundsResponseBody (0.02s)
+=== RUN   TestDirectRegistryEnforcesRouteAndClass
+--- PASS: TestDirectRegistryEnforcesRouteAndClass (0.00s)
+=== RUN   TestSystemInfoDirectReadThroughDispatcher
+2026/10/19 10:59:15 execution audit: route=DIRECT capability=system.info principal=alice@example.com outcome=SUCCEEDED duration_ms=0
+--- PASS: TestSystemInfoDirectReadThroughDispatcher (0.00s)
+=== RUN   TestDirectReadEndToEndOverSocket
+2026/10/19 10:59:15 execution audit: route=DIRECT capability=github.issue.get principal=alice@example.com outcome=SUCCEEDED duration_ms=3
+--- PASS: TestDirectReadEndToEndOverSocket (0.01s)
+=== RUN   TestExhaustedObservationBudgetStillRecovers
+2026/10/19 10:59:15 dispatch executor: provider observation not persisted: context deadline exceeded
+--- PASS: TestExhaustedObservationBudgetStillRecovers (0.52s)
+=== RUN   TestExhaustedTerminalizationBudgetStillRecovers
+2026/10/19 10:59:16 dispatch executor: failed to finalize execution after dispatch: context deadline exceeded
+--- PASS: TestExhaustedTerminalizationBudgetStillRecovers (0.45s)
+=== RUN   TestSufficientTerminalizationBudgetCommits
+--- PASS: TestSufficientTerminalizationBudgetCommits (0.35s)
+=== RUN   TestLeaseRenewalToleratesStorageLatency
+--- PASS: TestLeaseRenewalToleratesStorageLatency (6.29s)
+=== RUN   TestHeartbeatRenewalsAreBounded
+--- PASS: TestHeartbeatRenewalsAreBounded (2.16s)
+=== RUN   TestSetTimeoutsFillsZeroFields
+--- PASS: TestSetTimeoutsFillsZeroFields (0.00s)
+=== RUN   TestProviderCeilingBoundsHungHandler
+--- PASS: TestProviderCeilingBoundsHungHandler (0.29s)
+=== RUN   TestProviderCeilingKeepsCooperativeAnswer
+--- PASS: TestProviderCeilingKeepsCooperativeAnswer (0.36s)
+=== RUN   TestProviderCeilingPureReadFailsSafely
+--- PASS: TestProviderCeilingPureReadFailsSafely (0.06s)
+=== RUN   TestObservationFailureRecoverySurvivesCallerCancel
+2026/10/19 10:59:25 dispatch executor: provider observation not persisted: injected observation write failure
+--- PASS: TestObservationFailureRecoverySurvivesCallerCancel (0.22s)
+=== RUN   TestHeartbeatSurvivesCallerCancelThroughFinalize
+--- PASS: TestHeartbeatSurvivesCallerCancelThroughFinalize (1.42s)
+=== RUN   TestCrashPointMatrix
+=== RUN   TestCrashPointMatrix/after_acquire
+=== RUN   TestCrashPointMatrix/after_begin_execution
+=== RUN   TestCrashPointMatrix/after_mark_in_flight
+=== RUN   TestCrashPointMatrix/before_provider
+=== RUN   TestCrashPointMatrix/after_provider
+=== RUN   TestCrashPointMatrix/before_observation
+=== RUN   TestCrashPointMatrix/after_observation
+=== RUN   TestCrashPointMatrix/before_finalize
+=== RUN   TestCrashPointMatrix/after_finalize
+=== RUN   TestCrashPointMatrix/before_recovery
+=== RUN   TestCrashPointMatrix/after_recovery
+--- PASS: TestCrashPointMatrix (2.15s)
+    --- PASS: TestCrashPointMatrix/after_acquire (0.18s)
+    --- PASS: TestCrashPointMatrix/after_begin_execution (0.14s)
+    --- PASS: TestCrashPointMatrix/after_mark_in_flight (0.15s)
+    --- PASS: TestCrashPointMatrix/before_provider (0.14s)
+    --- PASS: TestCrashPointMatrix/after_provider (0.13s)
+    --- PASS: TestCrashPointMatrix/before_observation (0.14s)
+    --- PASS: TestCrashPointMatrix/after_observation (0.16s)
+    --- PASS: TestCrashPointMatrix/before_finalize (0.39s)
+    --- PASS: TestCrashPointMatrix/after_finalize (0.19s)
+    --- PASS: TestCrashPointMatrix/before_recovery (0.15s)
+    --- PASS: TestCrashPointMatrix/after_recovery (0.39s)
+=== RUN   TestCrashPointsAreOrdered
+--- PASS: TestCrashPointsAreOrdered (0.18s)
+=== RUN   TestCrashPointsRecoveryOrder
+--- PASS: TestCrashPointsRecoveryOrder (0.15s)
+=== RUN   TestAdversarialCancellation
+=== RUN   TestAdversarialCancellation/after_acquire
+2026/10/19 10:59:29 dispatch executor: failed to begin execution (lease lost or state changed): context canceled
+    dispatch_crash_test.go:313: cancel@after_acquire → wire=FAILED durable=PREPARED
+=== RUN   TestAdversarialCancellation/after_begin_execution
+2026/10/19 10:59:30 dispatch executor: failed to transition to IN_FLIGHT (lease lost or state changed): context canceled
+    dispatch_crash_test.go:313: cancel@after_begin_execution → wire=FAILED durable=PREPARED
+=== RUN   TestAdversarialCancellation/after_mark_in_flight
+    dispatch_crash_test.go:313: cancel@after_mark_in_flight → wire=UNKNOWN durable=UNKNOWN
+=== RUN   TestAdversarialCancellation/before_provider
+    dispatch_crash_test.go:313: cancel@before_provider → wire=UNKNOWN durable=UNKNOWN
+=== RUN   TestAdversarialCancellation/after_provider
+    dispatch_crash_test.go:313: cancel@after_provider → wire=SUCCEEDED durable=COMMITTED
+=== RUN   TestAdversarialCancellation/before_observation
+    dispatch_crash_test.go:313: cancel@before_observation → wire=SUCCEEDED durable=COMMITTED
+=== RUN   TestAdversarialCancellation/after_observation
+    dispatch_crash_test.go:313: cancel@after_observation → wire=SUCCEEDED durable=COMMITTED
+=== RUN   TestAdversarialCancellation/before_finalize
+    dispatch_crash_test.go:313: cancel@before_finalize → wire=SUCCEEDED durable=COMMITTED
+=== RUN   TestAdversarialCancellation/after_finalize
+    dispatch_crash_test.go:313: cancel@after_finalize → wire=SUCCEEDED durable=COMMITTED
+--- PASS: TestAdversarialCancellation (2.48s)
+    --- PASS: TestAdversarialCancellation/after_acquire (0.19s)
+    --- PASS: TestAdversarialCancellation/after_begin_execution (0.20s)
+    --- PASS: TestAdversarialCancellation/after_mark_in_flight (0.19s)
+    --- PASS: TestAdversarialCancellation/before_provider (0.41s)
+    --- PASS: TestAdversarialCancellation/after_provider (0.33s)
+    --- PASS: TestAdversarialCancellation/before_observation (0.27s)
+    --- PASS: TestAdversarialCancellation/after_observation (0.19s)
+    --- PASS: TestAdversarialCancellation/before_finalize (0.26s)
+    --- PASS: TestAdversarialCancellation/after_finalize (0.45s)
+=== RUN   TestCrashHelperProcess
+--- PASS: TestCrashHelperProcess (0.00s)
+=== RUN   TestProcessCrashMatrix
+=== RUN   TestProcessCrashMatrix/after_acquire
+=== RUN   TestProcessCrashMatrix/after_begin_execution
+=== RUN   TestProcessCrashMatrix/after_mark_in_flight
+=== RUN   TestProcessCrashMatrix/before_provider
+=== RUN   TestProcessCrashMatrix/after_provider
+=== RUN   TestProcessCrashMatrix/before_observation
+=== RUN   TestProcessCrashMatrix/after_observation
+=== RUN   TestProcessCrashMatrix/before_finalize
+=== RUN   TestProcessCrashMatrix/after_finalize
+--- PASS: TestProcessCrashMatrix (2.82s)
+    --- PASS: TestProcessCrashMatrix/after_acquire (0.16s)
+    --- PASS: TestProcessCrashMatrix/after_begin_execution (0.73s)
+    --- PASS: TestProcessCrashMatrix/after_mark_in_flight (0.26s)
+    --- PASS: TestProcessCrashMatrix/before_provider (0.64s)
+    --- PASS: TestProcessCrashMatrix/after_provider (0.18s)
+    --- PASS: TestProcessCrashMatrix/before_observation (0.18s)
+    --- PASS: TestProcessCrashMatrix/after_observation (0.21s)
+    --- PASS: TestProcessCrashMatrix/before_finalize (0.25s)
+    --- PASS: TestProcessCrashMatrix/after_finalize (0.20s)
+=== RUN   TestProcessCrashRecoveryCompletion
+--- PASS: TestProcessCrashRecoveryCompletion (0.20s)
+=== RUN   TestClassifyPostDispatchMatrix
+=== RUN   TestClassifyPostDispatchMatrix/critical_success_valid_evidence
+=== RUN   TestClassifyPostDispatchMatrix/critical_success_missing_evidence
+=== RUN   TestClassifyPostDispatchMatrix/critical_success_empty_digest
+=== RUN   TestClassifyPostDispatchMatrix/critical_success_bad_digest
+=== RUN   TestClassifyPostDispatchMatrix/critical_success_wrong_receipt_version
+=== RUN   TestClassifyPostDispatchMatrix/critical_success_missing_run_id
+=== RUN   TestClassifyPostDispatchMatrix/critical_success_nil_execution_meta
+=== RUN   TestClassifyPostDispatchMatrix/mutation_success
+=== RUN   TestClassifyPostDispatchMatrix/mutation_definitive_failure
+=== RUN   TestClassifyPostDispatchMatrix/mutation_ambiguous_failure
+=== RUN   TestClassifyPostDispatchMatrix/critical_ambiguous_failure
+=== RUN   TestClassifyPostDispatchMatrix/denied_after_dispatch
+=== RUN   TestClassifyPostDispatchMatrix/in-flight_status
+=== RUN   TestClassifyPostDispatchMatrix/unknown_status
+=== RUN   TestClassifyPostDispatchMatrix/empty_status
+=== RUN   TestClassifyPostDispatchMatrix/garbage_status
+--- PASS: TestClassifyPostDispatchMatrix (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/critical_success_valid_evidence (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/critical_success_missing_evidence (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/critical_success_empty_digest (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/critical_success_bad_digest (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/critical_success_wrong_receipt_version (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/critical_success_missing_run_id (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/critical_success_nil_execution_meta (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/mutation_success (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/mutation_definitive_failure (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/mutation_ambiguous_failure (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/critical_ambiguous_failure (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/denied_after_dispatch (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/in-flight_status (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/unknown_status (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/empty_status (0.00s)
+    --- PASS: TestClassifyPostDispatchMatrix/garbage_status (0.00s)
+=== RUN   TestEndToEndSystemInfo
+--- PASS: TestEndToEndSystemInfo (0.00s)
+=== RUN   TestEndToEndEcho
+--- PASS: TestEndToEndEcho (0.00s)
+=== RUN   TestEndToEndAuthorityRejection
+--- PASS: TestEndToEndAuthorityRejection (0.00s)
+=== RUN   TestEndToEndExpiredGrant
+--- PASS: TestEndToEndExpiredGrant (0.00s)
+=== RUN   TestEndToEndWrongPrincipal
+--- PASS: TestEndToEndWrongPrincipal (0.00s)
+=== RUN   TestExternalProviderHelperProcess
+--- PASS: TestExternalProviderHelperProcess (0.00s)
+=== RUN   TestExternalProviderCrashMatrix
+=== RUN   TestExternalProviderCrashMatrix/after_mark_in_flight
+=== RUN   TestExternalProviderCrashMatrix/after_provider
+=== RUN   TestExternalProviderCrashMatrix/before_observation
+=== RUN   TestExternalProviderCrashMatrix/after_observation
+=== RUN   TestExternalProviderCrashMatrix/before_finalize
+--- PASS: TestExternalProviderCrashMatrix (6.59s)
+    --- PASS: TestExternalProviderCrashMatrix/after_mark_in_flight (1.33s)
+    --- PASS: TestExternalProviderCrashMatrix/after_provider (1.28s)
+    --- PASS: TestExternalProviderCrashMatrix/before_observation (1.24s)
+    --- PASS: TestExternalProviderCrashMatrix/after_observation (1.31s)
+    --- PASS: TestExternalProviderCrashMatrix/before_finalize (1.43s)
+=== RUN   TestExternalProviderStatusLookupReconciliation
+--- PASS: TestExternalProviderStatusLookupReconciliation (0.22s)
+=== RUN   TestCriticalExternalProviderEndToEnd
+--- PASS: TestCriticalExternalProviderEndToEnd (0.21s)
+=== RUN   TestWriteFullHandlesShortWrites
+--- PASS: TestWriteFullHandlesShortWrites (0.00s)
+=== RUN   TestWriteFullFailsClosed
+--- PASS: TestWriteFullFailsClosed (0.00s)
+=== RUN   TestWriteResponseFramesAndBounds
+=== RUN   TestWriteResponseFramesAndBounds/normal_response_round-trips
+=== RUN   TestWriteResponseFramesAndBounds/oversized_response_is_replaced_by_an_error_frame_(read)
+=== RUN   TestWriteResponseFramesAndBounds/oversized_response_is_replaced_by_an_error_frame_(mutation)
+=== RUN   TestWriteResponseFramesAndBounds/oversized_response_is_replaced_by_an_error_frame_(critical)
+=== RUN   TestWriteResponseFramesAndBounds/oversized_response_is_replaced_by_an_error_frame_(before_admission)
+--- PASS: TestWriteResponseFramesAndBounds (0.84s)
+    --- PASS: TestWriteResponseFramesAndBounds/normal_response_round-trips (0.00s)
+    --- PASS: TestWriteResponseFramesAndBounds/oversized_response_is_replaced_by_an_error_frame_(read) (0.21s)
+    --- PASS: TestWriteResponseFramesAndBounds/oversized_response_is_replaced_by_an_error_frame_(mutation) (0.20s)
+    --- PASS: TestWriteResponseFramesAndBounds/oversized_response_is_replaced_by_an_error_frame_(critical) (0.20s)
+    --- PASS: TestWriteResponseFramesAndBounds/oversized_response_is_replaced_by_an_error_frame_(before_admission) (0.21s)
+=== RUN   TestOversizedMutationResponseIsUnknownNotFailed
+--- PASS: TestOversizedMutationResponseIsUnknownNotFailed (0.23s)
+=== RUN   TestOversizedRequestFrameIsRejected
+--- PASS: TestOversizedRequestFrameIsRejected (0.00s)
+=== RUN   TestGitHubConnResetIsAmbiguous
+=== RUN   TestGitHubConnResetIsAmbiguous/conn_reset_after_send
+=== RUN   TestGitHubConnResetIsAmbiguous/conn_refused
+=== RUN   TestGitHubConnResetIsAmbiguous/dns_failure
+=== RUN   TestGitHubConnResetIsAmbiguous/timeout
+--- PASS: TestGitHubConnResetIsAmbiguous (0.01s)
+    --- PASS: TestGitHubConnResetIsAmbiguous/conn_reset_after_send (0.00s)
+    --- PASS: TestGitHubConnResetIsAmbiguous/conn_refused (0.00s)
+    --- PASS: TestGitHubConnResetIsAmbiguous/dns_failure (0.00s)
+    --- PASS: TestGitHubConnResetIsAmbiguous/timeout (0.00s)
+=== RUN   TestGitHubResolverPaginates
+--- PASS: TestGitHubResolverPaginates (0.00s)
+=== RUN   TestGitHubResolverMarkerAbsentIsUnknown
+--- PASS: TestGitHubResolverMarkerAbsentIsUnknown (0.00s)
+=== RUN   TestGitHubResolverRefusesCrossOriginNext
+--- PASS: TestGitHubResolverRefusesCrossOriginNext (0.00s)
+=== RUN   TestLiveEvidenceDigestRecomputedFromArtifact
+    github_adversarial_test.go:198: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveEvidenceDigestRecomputedFromArtifact (0.00s)
+=== RUN   TestLiveExpiredDeadlineAbandonsPreDispatch
+    github_adversarial_test.go:283: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveExpiredDeadlineAbandonsPreDispatch (0.00s)
+=== RUN   TestLivePreDispatchFailureAbandonsLease
+    github_adversarial_test.go:354: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLivePreDispatchFailureAbandonsLease (0.00s)
+=== RUN   TestLiveCriticalHandlerClaimedDefinitiveFailureFailsClosed
+    github_adversarial_test.go:433: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveCriticalHandlerClaimedDefinitiveFailureFailsClosed (0.00s)
+=== RUN   TestLiveMutationHandlerDefinitiveFailureTerminatesFailed
+    github_adversarial_test.go:480: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveMutationHandlerDefinitiveFailureTerminatesFailed (0.00s)
+=== RUN   TestRealGitHubAPI
+    github_adversarial_test.go:526: CRABBOX_GITHUB_TEST_TOKEN/CRABBOX_GITHUB_TEST_REPO not configured; skipping real GitHub test
+--- SKIP: TestRealGitHubAPI (0.00s)
+=== RUN   TestGitHubCommentCommitsWithMarkerAndEvidence
+--- PASS: TestGitHubCommentCommitsWithMarkerAndEvidence (0.00s)
+=== RUN   TestGitHubCommentArgsValidationIsDefinitive
+=== RUN   TestGitHubCommentArgsValidationIsDefinitive/bad_repo
+=== RUN   TestGitHubCommentArgsValidationIsDefinitive/nonpositive_number
+=== RUN   TestGitHubCommentArgsValidationIsDefinitive/empty_body
+--- PASS: TestGitHubCommentArgsValidationIsDefinitive (0.00s)
+    --- PASS: TestGitHubCommentArgsValidationIsDefinitive/bad_repo (0.00s)
+    --- PASS: TestGitHubCommentArgsValidationIsDefinitive/nonpositive_number (0.00s)
+    --- PASS: TestGitHubCommentArgsValidationIsDefinitive/empty_body (0.00s)
+=== RUN   TestGitHubCommentTransportAmbiguity
+=== RUN   TestGitHubCommentTransportAmbiguity/conn_reset_after_send
+=== RUN   TestGitHubCommentTransportAmbiguity/conn_refused
+=== RUN   TestGitHubCommentTransportAmbiguity/dns_failure
+--- PASS: TestGitHubCommentTransportAmbiguity (0.00s)
+    --- PASS: TestGitHubCommentTransportAmbiguity/conn_reset_after_send (0.00s)
+    --- PASS: TestGitHubCommentTransportAmbiguity/conn_refused (0.00s)
+    --- PASS: TestGitHubCommentTransportAmbiguity/dns_failure (0.00s)
+=== RUN   TestGitHubCommentRecoveryLocator
+--- PASS: TestGitHubCommentRecoveryLocator (0.00s)
+=== RUN   TestGitHubCommentResolverMarkerScan
+--- PASS: TestGitHubCommentResolverMarkerScan (0.00s)
+=== RUN   TestGitHubAdapterMuxRoutesAndFailsClosed
+--- PASS: TestGitHubAdapterMuxRoutesAndFailsClosed (0.00s)
+=== RUN   TestLiveGitHubIssueAtMostOnce
+    github_fault_test.go:191: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveGitHubIssueAtMostOnce (0.00s)
+=== RUN   TestGitHubIssueCloseCommitsWithEvidence
+--- PASS: TestGitHubIssueCloseCommitsWithEvidence (0.00s)
+=== RUN   TestGitHubIssueCloseArgsValidationIsDefinitive
+=== RUN   TestGitHubIssueCloseArgsValidationIsDefinitive/bad_repo
+=== RUN   TestGitHubIssueCloseArgsValidationIsDefinitive/nonpositive_number
+=== RUN   TestGitHubIssueCloseArgsValidationIsDefinitive/bad_state_reason
+--- PASS: TestGitHubIssueCloseArgsValidationIsDefinitive (0.00s)
+    --- PASS: TestGitHubIssueCloseArgsValidationIsDefinitive/bad_repo (0.00s)
+    --- PASS: TestGitHubIssueCloseArgsValidationIsDefinitive/nonpositive_number (0.00s)
+    --- PASS: TestGitHubIssueCloseArgsValidationIsDefinitive/bad_state_reason (0.00s)
+=== RUN   TestGitHubIssueCloseResolverObservesState
+--- PASS: TestGitHubIssueCloseResolverObservesState (0.00s)
+=== RUN   TestGitHubIssueCloseResolverBindsStateReason
+--- PASS: TestGitHubIssueCloseResolverBindsStateReason (0.00s)
+=== RUN   TestGitHubIssueUpdateCommitsProvidedFieldsOnly
+--- PASS: TestGitHubIssueUpdateCommitsProvidedFieldsOnly (0.00s)
+=== RUN   TestGitHubIssueUpdateRequiresOneFieldAndLocatorHoldsDigests
+--- PASS: TestGitHubIssueUpdateRequiresOneFieldAndLocatorHoldsDigests (0.00s)
+=== RUN   TestGitHubIssueUpdateResolverDigestsObservedState
+--- PASS: TestGitHubIssueUpdateResolverDigestsObservedState (0.00s)
+=== RUN   TestGitHubPullCreateCommitsWithMarkerAndEvidence
+--- PASS: TestGitHubPullCreateCommitsWithMarkerAndEvidence (0.00s)
+=== RUN   TestGitHubPullCreateArgsValidationIsDefinitive
+=== RUN   TestGitHubPullCreateArgsValidationIsDefinitive/missing_head
+=== RUN   TestGitHubPullCreateArgsValidationIsDefinitive/missing_base
+=== RUN   TestGitHubPullCreateArgsValidationIsDefinitive/empty_title
+=== RUN   TestGitHubPullCreateArgsValidationIsDefinitive/bad_ref
+--- PASS: TestGitHubPullCreateArgsValidationIsDefinitive (0.00s)
+    --- PASS: TestGitHubPullCreateArgsValidationIsDefinitive/missing_head (0.00s)
+    --- PASS: TestGitHubPullCreateArgsValidationIsDefinitive/missing_base (0.00s)
+    --- PASS: TestGitHubPullCreateArgsValidationIsDefinitive/empty_title (0.00s)
+    --- PASS: TestGitHubPullCreateArgsValidationIsDefinitive/bad_ref (0.00s)
+=== RUN   TestGitHubPullCreateAcceptsDottedRefs
+--- PASS: TestGitHubPullCreateAcceptsDottedRefs (0.00s)
+=== RUN   TestGitHubPullCreateResolverMarkerScan
+--- PASS: TestGitHubPullCreateResolverMarkerScan (0.00s)
+=== RUN   TestGitHubPullMergeCommits
+--- PASS: TestGitHubPullMergeCommits (0.00s)
+=== RUN   TestGitHubPullMergeDeclinedIsDefinitive
+--- PASS: TestGitHubPullMergeDeclinedIsDefinitive (0.00s)
+=== RUN   TestGitHubPullMergeResolverObservesMergedFlag
+--- PASS: TestGitHubPullMergeResolverObservesMergedFlag (0.00s)
+=== RUN   TestGitHubPullMergeResolverBindsMergeMethod
+--- PASS: TestGitHubPullMergeResolverBindsMergeMethod (0.00s)
+=== RUN   TestGitHubPullMergeResolverRejectsASingleParentMergeClaim
+--- PASS: TestGitHubPullMergeResolverRejectsASingleParentMergeClaim (0.00s)
+=== RUN   TestGitHubWritesTransportAmbiguity
+=== RUN   TestGitHubWritesTransportAmbiguity/github.issue.close/conn_reset_after_send
+=== RUN   TestGitHubWritesTransportAmbiguity/github.issue.close/conn_refused
+=== RUN   TestGitHubWritesTransportAmbiguity/github.issue.close/dns_failure
+=== RUN   TestGitHubWritesTransportAmbiguity/github.issue.update/conn_reset_after_send
+=== RUN   TestGitHubWritesTransportAmbiguity/github.issue.update/conn_refused
+=== RUN   TestGitHubWritesTransportAmbiguity/github.issue.update/dns_failure
+=== RUN   TestGitHubWritesTransportAmbiguity/github.pr.create/conn_reset_after_send
+=== RUN   TestGitHubWritesTransportAmbiguity/github.pr.create/conn_refused
+=== RUN   TestGitHubWritesTransportAmbiguity/github.pr.create/dns_failure
+=== RUN   TestGitHubWritesTransportAmbiguity/github.pr.merge/conn_reset_after_send
+=== RUN   TestGitHubWritesTransportAmbiguity/github.pr.merge/conn_refused
+=== RUN   TestGitHubWritesTransportAmbiguity/github.pr.merge/dns_failure
+--- PASS: TestGitHubWritesTransportAmbiguity (0.01s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.issue.close/conn_reset_after_send (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.issue.close/conn_refused (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.issue.close/dns_failure (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.issue.update/conn_reset_after_send (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.issue.update/conn_refused (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.issue.update/dns_failure (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.pr.create/conn_reset_after_send (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.pr.create/conn_refused (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.pr.create/dns_failure (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.pr.merge/conn_reset_after_send (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.pr.merge/conn_refused (0.00s)
+    --- PASS: TestGitHubWritesTransportAmbiguity/github.pr.merge/dns_failure (0.00s)
+=== RUN   TestGitHubAdapterMuxRoutesWriteCapabilities
+--- PASS: TestGitHubAdapterMuxRoutesWriteCapabilities (0.00s)
+=== RUN   TestHistoryCapabilitiesRegistration
+--- PASS: TestHistoryCapabilitiesRegistration (0.00s)
+=== RUN   TestBuiltinRegistryIncludesMemorySurface
+--- PASS: TestBuiltinRegistryIncludesMemorySurface (0.00s)
+=== RUN   TestHistoryArgumentValidation
+--- PASS: TestHistoryArgumentValidation (0.00s)
+=== RUN   TestHistoryAdapterReadSurface
+--- PASS: TestHistoryAdapterReadSurface (0.04s)
+=== RUN   TestHistoryAdapterAppendAndDecision
+--- PASS: TestHistoryAdapterAppendAndDecision (0.03s)
+=== RUN   TestHistoryAdapterCheckpointTrust
+--- PASS: TestHistoryAdapterCheckpointTrust (0.03s)
+=== RUN   TestHistoryAdapterCheckpointRoundTrip
+--- PASS: TestHistoryAdapterCheckpointRoundTrip (0.05s)
+=== RUN   TestINV006PostDispatchAmbiguityIsNeverFailed
+--- PASS: TestINV006PostDispatchAmbiguityIsNeverFailed (0.00s)
+=== RUN   TestINV007StaleLeaseOwnerCannotFinalize
+--- PASS: TestINV007StaleLeaseOwnerCannotFinalize (0.16s)
+=== RUN   TestINV009TerminalReceiptsAreImmutable
+--- PASS: TestINV009TerminalReceiptsAreImmutable (0.17s)
+=== RUN   TestINV010EvidenceSignatureCoversArtifactDigest
+--- PASS: TestINV010EvidenceSignatureCoversArtifactDigest (0.00s)
+=== RUN   TestINV011PolicyChangeChangesRequestIdentity
+--- PASS: TestINV011PolicyChangeChangesRequestIdentity (0.00s)
+=== RUN   TestINV015PlannerFieldsCannotDetermineClassification
+--- PASS: TestINV015PlannerFieldsCannotDetermineClassification (0.00s)
+=== RUN   TestParseInvocationRequestPreservesTheStableAuthorityField
+--- PASS: TestParseInvocationRequestPreservesTheStableAuthorityField (0.00s)
+=== RUN   TestParseInvocationRequestKeepsTheDeprecatedAlias
+--- PASS: TestParseInvocationRequestKeepsTheDeprecatedAlias (0.00s)
+=== RUN   TestParseInvocationRequestRefusesServerResolvedFields
+--- PASS: TestParseInvocationRequestRefusesServerResolvedFields (0.00s)
+=== RUN   TestInvocationABIConformanceCorpus
+=== RUN   TestInvocationABIConformanceCorpus/minimal-valid
+=== RUN   TestInvocationABIConformanceCorpus/full-valid
+=== RUN   TestInvocationABIConformanceCorpus/authority-absent
+=== RUN   TestInvocationABIConformanceCorpus/arguments-absent
+=== RUN   TestInvocationABIConformanceCorpus/arguments-nested-null
+=== RUN   TestInvocationABIConformanceCorpus/unicode-values
+=== RUN   TestInvocationABIConformanceCorpus/integer-max
+=== RUN   TestInvocationABIConformanceCorpus/integer-zero
+=== RUN   TestInvocationABIConformanceCorpus/whitespace
+=== RUN   TestInvocationABIConformanceCorpus/escaped-keys-in-arguments
+=== RUN   TestInvocationABIConformanceCorpus/nested-within-limit
+=== RUN   TestInvocationABIConformanceCorpus/duplicate-capability
+=== RUN   TestInvocationABIConformanceCorpus/duplicate-authority-principal
+=== RUN   TestInvocationABIConformanceCorpus/duplicate-arguments-key
+=== RUN   TestInvocationABIConformanceCorpus/duplicate-key-escaped
+=== RUN   TestInvocationABIConformanceCorpus/duplicate-root-escaped
+=== RUN   TestInvocationABIConformanceCorpus/null-capability
+=== RUN   TestInvocationABIConformanceCorpus/null-arguments
+=== RUN   TestInvocationABIConformanceCorpus/null-authority
+=== RUN   TestInvocationABIConformanceCorpus/null-principal
+=== RUN   TestInvocationABIConformanceCorpus/null-deadline
+=== RUN   TestInvocationABIConformanceCorpus/unknown-root-field
+=== RUN   TestInvocationABIConformanceCorpus/unknown-authority-field
+=== RUN   TestInvocationABIConformanceCorpus/arguments-as-array
+=== RUN   TestInvocationABIConformanceCorpus/arguments-as-string
+=== RUN   TestInvocationABIConformanceCorpus/authority-as-array
+=== RUN   TestInvocationABIConformanceCorpus/authority-as-string
+=== RUN   TestInvocationABIConformanceCorpus/capability-as-number
+=== RUN   TestInvocationABIConformanceCorpus/generation-as-fraction
+=== RUN   TestInvocationABIConformanceCorpus/generation-as-exponent
+=== RUN   TestInvocationABIConformanceCorpus/generation-out-of-range
+=== RUN   TestInvocationABIConformanceCorpus/generation-as-string
+=== RUN   TestInvocationABIConformanceCorpus/root-as-array
+=== RUN   TestInvocationABIConformanceCorpus/root-as-string
+=== RUN   TestInvocationABIConformanceCorpus/empty-input
+=== RUN   TestInvocationABIConformanceCorpus/trailing-data
+=== RUN   TestInvocationABIConformanceCorpus/trailing-object
+=== RUN   TestInvocationABIConformanceCorpus/nested-over-limit
+=== RUN   TestInvocationABIConformanceCorpus/malformed-json
+=== RUN   TestInvocationABIConformanceCorpus/malformed-number
+=== RUN   TestInvocationABIConformanceCorpus/raw-control-char
+=== RUN   TestInvocationABIConformanceCorpus/unterminated-string
+=== RUN   TestInvocationABIConformanceCorpus/invalid-utf8
+=== RUN   TestInvocationABIConformanceCorpus/mediation-valid
+=== RUN   TestInvocationABIConformanceCorpus/mediation-valid-release-root
+=== RUN   TestInvocationABIConformanceCorpus/mediation-valid-explicit-plugin-identity
+=== RUN   TestInvocationABIConformanceCorpus/mediation-empty-string-digests
+=== RUN   TestInvocationABIConformanceCorpus/mediation-noncanonical-digest
+=== RUN   TestInvocationABIConformanceCorpus/mediation-short-digest
+=== RUN   TestInvocationABIConformanceCorpus/unknown-mediation-field
+=== RUN   TestInvocationABIConformanceCorpus/mediation-as-string
+=== RUN   TestInvocationABIConformanceCorpus/mediation-as-array
+=== RUN   TestInvocationABIConformanceCorpus/null-mediation
+=== RUN   TestInvocationABIConformanceCorpus/null-middleware-set-digest
+=== RUN   TestInvocationABIConformanceCorpus/mediation-digest-as-number
+=== RUN   TestInvocationABIConformanceCorpus/duplicate-mediation-key
+=== RUN   TestInvocationABIConformanceCorpus/mediation-missing-original-args
+=== RUN   TestInvocationABIConformanceCorpus/mediation-missing-middleware-set
+=== RUN   TestInvocationABIConformanceCorpus/mediation-empty-object
+=== RUN   TestInvocationABIConformanceCorpus/session-valid
+=== RUN   TestInvocationABIConformanceCorpus/session-missing-proof
+=== RUN   TestInvocationABIConformanceCorpus/session-missing-id
+=== RUN   TestInvocationABIConformanceCorpus/session-empty-object
+=== RUN   TestInvocationABIConformanceCorpus/unknown-session-field
+=== RUN   TestInvocationABIConformanceCorpus/null-session
+=== RUN   TestInvocationABIConformanceCorpus/session-as-string
+=== RUN   TestInvocationABIConformanceCorpus/session-id-nonstring
+=== RUN   TestInvocationABIConformanceCorpus/duplicate-session-key
+--- PASS: TestInvocationABIConformanceCorpus (0.02s)
+    --- PASS: TestInvocationABIConformanceCorpus/minimal-valid (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/full-valid (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/authority-absent (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/arguments-absent (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/arguments-nested-null (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/unicode-values (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/integer-max (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/integer-zero (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/whitespace (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/escaped-keys-in-arguments (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/nested-within-limit (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/duplicate-capability (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/duplicate-authority-principal (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/duplicate-arguments-key (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/duplicate-key-escaped (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/duplicate-root-escaped (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/null-capability (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/null-arguments (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/null-authority (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/null-principal (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/null-deadline (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/unknown-root-field (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/unknown-authority-field (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/arguments-as-array (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/arguments-as-string (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/authority-as-array (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/authority-as-string (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/capability-as-number (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/generation-as-fraction (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/generation-as-exponent (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/generation-out-of-range (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/generation-as-string (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/root-as-array (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/root-as-string (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/empty-input (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/trailing-data (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/trailing-object (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/nested-over-limit (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/malformed-json (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/malformed-number (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/raw-control-char (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/unterminated-string (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/invalid-utf8 (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-valid (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-valid-release-root (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-valid-explicit-plugin-identity (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-empty-string-digests (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-noncanonical-digest (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-short-digest (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/unknown-mediation-field (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-as-string (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-as-array (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/null-mediation (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/null-middleware-set-digest (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-digest-as-number (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/duplicate-mediation-key (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-missing-original-args (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-missing-middleware-set (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/mediation-empty-object (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/session-valid (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/session-missing-proof (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/session-missing-id (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/session-empty-object (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/unknown-session-field (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/null-session (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/session-as-string (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/session-id-nonstring (0.00s)
+    --- PASS: TestInvocationABIConformanceCorpus/duplicate-session-key (0.00s)
+=== RUN   TestInvocationSchemaMatchesTheParser
+--- PASS: TestInvocationSchemaMatchesTheParser (0.00s)
+=== RUN   TestInvocationSchemaRefusesServerResolvedFields
+--- PASS: TestInvocationSchemaRefusesServerResolvedFields (0.00s)
+=== RUN   TestLiveLeaseHeartbeatSurvivesSlowFinalize
+    lease_heartbeat_live_test.go:62: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveLeaseHeartbeatSurvivesSlowFinalize (0.00s)
+=== RUN   TestGitHubOriginPolicyUsesValidatedModeSnapshot
+--- PASS: TestGitHubOriginPolicyUsesValidatedModeSnapshot (0.00s)
+=== RUN   TestEvidenceKeyPolicyUsesValidatedModeSnapshot
+--- PASS: TestEvidenceKeyPolicyUsesValidatedModeSnapshot (0.00s)
+=== RUN   TestValidatedModeSnapshotCoversEveryModeDecision
+--- PASS: TestValidatedModeSnapshotCoversEveryModeDecision (0.00s)
+=== RUN   TestDeploymentModeIsResolvedOnce
+--- PASS: TestDeploymentModeIsResolvedOnce (0.01s)
+=== RUN   TestLiveProviderObservationAlwaysPersisted
+    observation_live_test.go:45: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveProviderObservationAlwaysPersisted (0.00s)
+=== RUN   TestOutcomeCorpusUsesStatusesTheKernelCanEmit
+--- PASS: TestOutcomeCorpusUsesStatusesTheKernelCanEmit (0.00s)
+=== RUN   TestOutcomeCorpusMatchesThePostDispatchTable
+--- PASS: TestOutcomeCorpusMatchesThePostDispatchTable (0.00s)
+=== RUN   TestOutcomeCorpusKernelStatesAreRealStates
+--- PASS: TestOutcomeCorpusKernelStatesAreRealStates (0.00s)
+=== RUN   TestParsePeerPrincipalMap
+=== RUN   TestParsePeerPrincipalMap/unset_disables
+=== RUN   TestParsePeerPrincipalMap/whitespace_disables
+=== RUN   TestParsePeerPrincipalMap/single_mapping
+=== RUN   TestParsePeerPrincipalMap/wildcard
+=== RUN   TestParsePeerPrincipalMap/multiple
+=== RUN   TestParsePeerPrincipalMap/missing_colon
+=== RUN   TestParsePeerPrincipalMap/empty_principal
+=== RUN   TestParsePeerPrincipalMap/non-numeric_uid
+=== RUN   TestParsePeerPrincipalMap/negative_uid
+=== RUN   TestParsePeerPrincipalMap/uid_overflow
+=== RUN   TestParsePeerPrincipalMap/duplicate_uid
+=== RUN   TestParsePeerPrincipalMap/only_separators
+--- PASS: TestParsePeerPrincipalMap (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/unset_disables (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/whitespace_disables (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/single_mapping (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/wildcard (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/multiple (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/missing_colon (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/empty_principal (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/non-numeric_uid (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/negative_uid (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/uid_overflow (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/duplicate_uid (0.00s)
+    --- PASS: TestParsePeerPrincipalMap/only_separators (0.00s)
+=== RUN   TestPeerPrincipalMapAuthorize
+=== RUN   TestPeerPrincipalMapAuthorize/mapped_uid_matching_claim
+=== RUN   TestPeerPrincipalMapAuthorize/mapped_uid_empty_claim_is_assigned
+=== RUN   TestPeerPrincipalMapAuthorize/mapped_uid_mismatched_claim_denied
+=== RUN   TestPeerPrincipalMapAuthorize/unmapped_uid_denied
+=== RUN   TestPeerPrincipalMapAuthorize/unmapped_uid_empty_claim_denied
+=== RUN   TestPeerPrincipalMapAuthorize/wildcard_uid_keeps_claim
+=== RUN   TestPeerPrincipalMapAuthorize/wildcard_uid_empty_claim_denied
+--- PASS: TestPeerPrincipalMapAuthorize (0.00s)
+    --- PASS: TestPeerPrincipalMapAuthorize/mapped_uid_matching_claim (0.00s)
+    --- PASS: TestPeerPrincipalMapAuthorize/mapped_uid_empty_claim_is_assigned (0.00s)
+    --- PASS: TestPeerPrincipalMapAuthorize/mapped_uid_mismatched_claim_denied (0.00s)
+    --- PASS: TestPeerPrincipalMapAuthorize/unmapped_uid_denied (0.00s)
+    --- PASS: TestPeerPrincipalMapAuthorize/unmapped_uid_empty_claim_denied (0.00s)
+    --- PASS: TestPeerPrincipalMapAuthorize/wildcard_uid_keeps_claim (0.00s)
+    --- PASS: TestPeerPrincipalMapAuthorize/wildcard_uid_empty_claim_denied (0.00s)
+=== RUN   TestPeerAuthPolicyRequiresAuthenticationInProduction
+--- PASS: TestPeerAuthPolicyRequiresAuthenticationInProduction (0.00s)
+=== RUN   TestPeerAuthPolicyWildcardRequiresTrustedProxy
+--- PASS: TestPeerAuthPolicyWildcardRequiresTrustedProxy (0.00s)
+=== RUN   TestParseTrustedProxyUIDs
+--- PASS: TestParseTrustedProxyUIDs (0.00s)
+=== RUN   TestPeerAuthOverSocket
+=== RUN   TestPeerAuthOverSocket/mapped_uid_accepted
+=== RUN   TestPeerAuthOverSocket/empty_claim_assigned_mapped_principal
+=== RUN   TestPeerAuthOverSocket/mismatched_claim_denied
+=== RUN   TestPeerAuthOverSocket/unmapped_uid_denied
+=== RUN   TestPeerAuthOverSocket/wildcard_uid_may_claim_any_principal
+=== RUN   TestPeerAuthOverSocket/no_map_preserves_claimed_principal
+--- PASS: TestPeerAuthOverSocket (0.01s)
+    --- PASS: TestPeerAuthOverSocket/mapped_uid_accepted (0.01s)
+    --- PASS: TestPeerAuthOverSocket/empty_claim_assigned_mapped_principal (0.00s)
+    --- PASS: TestPeerAuthOverSocket/mismatched_claim_denied (0.00s)
+    --- PASS: TestPeerAuthOverSocket/unmapped_uid_denied (0.00s)
+    --- PASS: TestPeerAuthOverSocket/wildcard_uid_may_claim_any_principal (0.00s)
+    --- PASS: TestPeerAuthOverSocket/no_map_preserves_claimed_principal (0.00s)
+=== RUN   TestUnixPeerCredentialsResolvePeer
+--- PASS: TestUnixPeerCredentialsResolvePeer (0.00s)
+=== RUN   TestUnixPeerCredentialsRejectsNonUnix
+--- PASS: TestUnixPeerCredentialsRejectsNonUnix (0.00s)
+=== RUN   TestPeerCredentialsEvidence
+--- PASS: TestPeerCredentialsEvidence (0.00s)
+=== RUN   TestProviderGateRefusalDoesNotHealOpenCircuit
+--- PASS: TestProviderGateRefusalDoesNotHealOpenCircuit (0.00s)
+=== RUN   TestProviderGateSaturationDoesNotResetHealth
+--- PASS: TestProviderGateSaturationDoesNotResetHealth (0.00s)
+=== RUN   TestExpiredDeadlineDoesNotCountAsProviderSuccess
+--- PASS: TestExpiredDeadlineDoesNotCountAsProviderSuccess (0.00s)
+=== RUN   TestProviderProbeSuccessResetsHealth
+--- PASS: TestProviderProbeSuccessResetsHealth (0.00s)
+=== RUN   TestReadCeilingCountsAsAmbiguousNotSuccess
+--- PASS: TestReadCeilingCountsAsAmbiguousNotSuccess (0.03s)
+=== RUN   TestProviderGateBoundsConcurrency
+--- PASS: TestProviderGateBoundsConcurrency (0.00s)
+=== RUN   TestProviderGateHealthTransitions
+--- PASS: TestProviderGateHealthTransitions (0.00s)
+=== RUN   TestProviderGateFailingProbeReopensCircuit
+--- PASS: TestProviderGateFailingProbeReopensCircuit (0.00s)
+=== RUN   TestProviderGateSnapshotAccountsWedgedAndTimeouts
+--- PASS: TestProviderGateSnapshotAccountsWedgedAndTimeouts (0.00s)
+=== RUN   TestExecutorRefusesSaturatedProviderBeforeDispatch
+--- PASS: TestExecutorRefusesSaturatedProviderBeforeDispatch (0.22s)
+=== RUN   TestExecutorOpensCircuitAfterRepeatedAmbiguity
+--- PASS: TestExecutorOpensCircuitAfterRepeatedAmbiguity (0.28s)
+=== RUN   TestReconciliationIgnoresDispatchCapacity
+--- PASS: TestReconciliationIgnoresDispatchCapacity (0.00s)
+=== RUN   TestReconciliationLaneHasReservedCapacity
+--- PASS: TestReconciliationLaneHasReservedCapacity (0.00s)
+=== RUN   TestLocalCauseDoesNotDegradeProvider
+--- PASS: TestLocalCauseDoesNotDegradeProvider (0.00s)
+=== RUN   TestSimSuccessLostResponse
+--- PASS: TestSimSuccessLostResponse (0.18s)
+=== RUN   TestSimFailureBeforeExecution
+--- PASS: TestSimFailureBeforeExecution (0.17s)
+=== RUN   TestSimExecutionPlusTimeoutNoRedispatch
+--- PASS: TestSimExecutionPlusTimeoutNoRedispatch (0.17s)
+=== RUN   TestSimDuplicateResponseReplay
+--- PASS: TestSimDuplicateResponseReplay (0.17s)
+=== RUN   TestSimContradictoryResponses
+--- PASS: TestSimContradictoryResponses (0.17s)
+=== RUN   TestSimDelayedObservation
+--- PASS: TestSimDelayedObservation (0.31s)
+=== RUN   TestCriticalAdmissionGate
+=== RUN   TestCriticalAdmissionGate/undeclared_provider_denied
+=== RUN   TestCriticalAdmissionGate/insufficient_capabilities_denied
+=== RUN   TestCriticalAdmissionGate/fully_declared_provider_admitted
+=== RUN   TestCriticalAdmissionGate/mutation_unaffected_by_gate
+--- PASS: TestCriticalAdmissionGate (0.40s)
+    --- PASS: TestCriticalAdmissionGate/undeclared_provider_denied (0.12s)
+    --- PASS: TestCriticalAdmissionGate/insufficient_capabilities_denied (0.08s)
+    --- PASS: TestCriticalAdmissionGate/fully_declared_provider_admitted (0.10s)
+    --- PASS: TestCriticalAdmissionGate/mutation_unaffected_by_gate (0.10s)
+=== RUN   TestServeDeployedQualificationProvider
+Capability availability: 16 of 20 registered capabilities are not executable in this deployment
+  github.issue.close
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.comment
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.create
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.get
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.list
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.update
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.pr.create
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.pr.merge
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.append
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.checkpoint
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.explain
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.query
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.verify
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.diagnose
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.propose
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.record_decision
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+Capability Registry
+-------------------
+Descriptors: 20
+PURE       1
+READ       8
+MUTATION   10
+CRITICAL   1
+NONE           1
+STANDARD       8
+DURABLE        10
+HIGH_ASSURANCE 1
+LOCAL      1
+DIRECT     8
+CRABEDENCE 11
+Registry SHA-256: b65764944d0d6ee54cbec646fbd44dd617cc99c78870ff734f253c347c3ca550
+Capability registry snapshot: /tmp/cbx-sock-538738225/capabilities.json (sha256 b65764944d0d6ee54cbec646fbd44dd617cc99c78870ff734f253c347c3ca550)
+Runtime configuration digest: c0252eb0ee63b558fb61d920774536364b5df6c991af0c72268110db0e62aed0 (/tmp/cbx-sock-538738225/runtime-identity.json)
+Crabedence execution service listening on /tmp/cbx-sock-538738225/execution.sock
+Registered capabilities: [qualification.critical.commit system.info github.issue.comment history.query research.diagnose history.append history.checkpoint research.record_decision history.verify system.echo github.issue.create github.issue.list github.issue.close github.issue.update test.counter.increment github.issue.get github.pr.create github.pr.merge history.explain research.propose]
+Durable idempotency: enabled (sqlite)
+Service configuration:
+  mode:             development
+  topology:         single (declared replicas: 1)
+  effect store:     sqlite
+  evidence key:     provisioned (CRABBOX_EVIDENCE_KEY)
+  github adapter:   disabled
+  qualification:    external provider configured
+  peer auth:        0 mapped UIDs (0 trusted proxies)
+  admission:        64 connections / 16 handshakes
+  checkpoint:       disabled
+  attestation:      disabled
+  provider ceiling: 5m0s
+  provider gate:    max 64 concurrent; degraded after 5 consecutive ambiguous outcomes; circuit opens after 10 (cooldown 30s)
+Provider gate: max 64 concurrent per provider; degraded after 5 consecutive ambiguous outcomes; circuit opens after 10 (cooldown 30s)
+--- PASS: TestServeDeployedQualificationProvider (0.13s)
+=== RUN   TestServeRejectsUnreachableQualificationProvider
+--- PASS: TestServeRejectsUnreachableQualificationProvider (0.00s)
+=== RUN   TestServeRejectsMalformedQualificationProviderURL
+--- PASS: TestServeRejectsMalformedQualificationProviderURL (0.00s)
+=== RUN   TestServeRejectsMalformedPeerPrincipalMap
+--- PASS: TestServeRejectsMalformedPeerPrincipalMap (0.00s)
+=== RUN   TestPeerAuthDeployEndToEnd
+Capability availability: 16 of 20 registered capabilities are not executable in this deployment
+  github.issue.close
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.comment
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.create
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.get
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.list
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.update
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.pr.create
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.pr.merge
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.append
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.checkpoint
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.explain
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.query
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.verify
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.diagnose
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.propose
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.record_decision
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+Capability Registry
+-------------------
+Descriptors: 20
+PURE       1
+READ       8
+MUTATION   10
+CRITICAL   1
+NONE           1
+STANDARD       8
+DURABLE        10
+HIGH_ASSURANCE 1
+LOCAL      1
+DIRECT     8
+CRABEDENCE 11
+Registry SHA-256: b65764944d0d6ee54cbec646fbd44dd617cc99c78870ff734f253c347c3ca550
+Peer authentication: strict UID→principal map (1 entries)
+Capability registry snapshot: /tmp/cbx-sock-1555848659/capabilities.json (sha256 b65764944d0d6ee54cbec646fbd44dd617cc99c78870ff734f253c347c3ca550)
+Runtime configuration digest: c0252eb0ee63b558fb61d920774536364b5df6c991af0c72268110db0e62aed0 (/tmp/cbx-sock-1555848659/runtime-identity.json)
+Crabedence execution service listening on /tmp/cbx-sock-1555848659/execution.sock
+Registered capabilities: [system.echo github.issue.create github.issue.get github.issue.update github.pr.create history.verify history.explain system.info github.issue.comment github.pr.merge research.propose history.checkpoint qualification.critical.commit test.counter.increment history.query github.issue.list github.issue.close research.diagnose history.append research.record_decision]
+Durable idempotency: enabled (sqlite)
+Service configuration:
+  mode:             development
+  topology:         single (declared replicas: 1)
+  effect store:     sqlite
+  evidence key:     provisioned (CRABBOX_EVIDENCE_KEY)
+  github adapter:   disabled
+  qualification:    external provider configured
+  peer auth:        1 mapped UIDs (0 trusted proxies)
+  admission:        64 connections / 16 handshakes
+  checkpoint:       disabled
+  attestation:      disabled
+  provider ceiling: 5m0s
+  provider gate:    max 64 concurrent; degraded after 5 consecutive ambiguous outcomes; circuit opens after 10 (cooldown 30s)
+Provider gate: max 64 concurrent per provider; degraded after 5 consecutive ambiguous outcomes; circuit opens after 10 (cooldown 30s)
+--- PASS: TestPeerAuthDeployEndToEnd (0.14s)
+=== RUN   TestQualificationAdapterLoopbackBoundary
+=== RUN   TestQualificationAdapterLoopbackBoundary/accept/http://127.0.0.1:8080
+=== RUN   TestQualificationAdapterLoopbackBoundary/accept/http://127.9.9.9:1234
+=== RUN   TestQualificationAdapterLoopbackBoundary/accept/http://127.0.0.1
+=== RUN   TestQualificationAdapterLoopbackBoundary/accept/http://[::1]:8080
+=== RUN   TestQualificationAdapterLoopbackBoundary/accept/http://[::1]
+=== RUN   TestQualificationAdapterLoopbackBoundary/accept/http://[::ffff:127.0.0.1]:8080
+=== RUN   TestQualificationAdapterLoopbackBoundary/accept/http://localhost:8080
+=== RUN   TestQualificationAdapterLoopbackBoundary/accept/http://LOCALHOST:8080
+=== RUN   TestQualificationAdapterLoopbackBoundary/accept/http://localhost.:8080
+=== RUN   TestQualificationAdapterLoopbackBoundary/accept/https://127.0.0.1:8443
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/external_hostname
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/localhost_suffix_trick
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/private_LAN_10/8
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/private_LAN_192.168/16
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/private_LAN_172.16/12
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/link-local_metadata_service
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/public_resolver
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/unspecified_address
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/mapped_private_address
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/short-form_IPv4
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/decimal_IPv4
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/hex_IPv4
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/octal_IPv4
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/userinfo_on_loopback
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/userinfo_host_trick
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/fragment_host_trick
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/percent-encoded_loopback_host
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/percent-encoded_remote_host
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/non-http_scheme
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/missing_host
+=== RUN   TestQualificationAdapterLoopbackBoundary/refuse/not_a_URL
+--- PASS: TestQualificationAdapterLoopbackBoundary (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/accept/http://127.0.0.1:8080 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/accept/http://127.9.9.9:1234 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/accept/http://127.0.0.1 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/accept/http://[::1]:8080 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/accept/http://[::1] (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/accept/http://[::ffff:127.0.0.1]:8080 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/accept/http://localhost:8080 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/accept/http://LOCALHOST:8080 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/accept/http://localhost.:8080 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/accept/https://127.0.0.1:8443 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/external_hostname (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/localhost_suffix_trick (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/private_LAN_10/8 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/private_LAN_192.168/16 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/private_LAN_172.16/12 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/link-local_metadata_service (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/public_resolver (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/unspecified_address (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/mapped_private_address (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/short-form_IPv4 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/decimal_IPv4 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/hex_IPv4 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/octal_IPv4 (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/userinfo_on_loopback (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/userinfo_host_trick (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/fragment_host_trick (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/percent-encoded_loopback_host (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/percent-encoded_remote_host (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/non-http_scheme (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/missing_host (0.00s)
+    --- PASS: TestQualificationAdapterLoopbackBoundary/refuse/not_a_URL (0.00s)
+=== RUN   TestQualificationAdapterRefusesRedirects
+--- PASS: TestQualificationAdapterRefusesRedirects (0.00s)
+=== RUN   TestServeRejectsRemoteQualificationProvider
+--- PASS: TestServeRejectsRemoteQualificationProvider (0.00s)
+=== RUN   TestBuiltInRegistryPassesStartupScan
+--- PASS: TestBuiltInRegistryPassesStartupScan (0.00s)
+=== RUN   TestRouteDispatcherRoutesByDescriptorRoute
+2026/10/19 10:59:46 execution audit: route=LOCAL capability=test.pure principal=alice@example.com outcome=SUCCEEDED duration_ms=0
+--- PASS: TestRouteDispatcherRoutesByDescriptorRoute (0.00s)
+=== RUN   TestRouteDispatcherRefusesMutationOnNonDurableRoute
+--- PASS: TestRouteDispatcherRefusesMutationOnNonDurableRoute (0.00s)
+=== RUN   TestFunctionHookRuntimeContract
+2026/10/19 10:59:46 execution audit: route=LOCAL capability=test.pure principal=alice@example.com outcome=SUCCEEDED duration_ms=0
+--- PASS: TestFunctionHookRuntimeContract (0.00s)
+=== RUN   TestFunctionHookRuntimeBoundsAndFailures
+2026/10/19 10:59:46 execution audit: route=LOCAL capability=test.error principal=alice@example.com outcome=FAILED duration_ms=0
+2026/10/19 10:59:46 execution audit: route=LOCAL capability=test.timeout principal=alice@example.com outcome=TIMEOUT duration_ms=250
+2026/10/19 10:59:46 execution audit: route=LOCAL capability=test.oversized principal=alice@example.com outcome=OVERSIZED duration_ms=10
+2026/10/19 10:59:46 execution audit: route=LOCAL capability=test.invalid principal=alice@example.com outcome=INVALID_RESULT duration_ms=0
+--- PASS: TestFunctionHookRuntimeBoundsAndFailures (0.26s)
+=== RUN   TestBuiltInEchoHookExecutesThroughLocalRoute
+2026/10/19 10:59:46 execution audit: route=LOCAL capability=system.echo principal=alice@example.com outcome=SUCCEEDED duration_ms=0
+--- PASS: TestBuiltInEchoHookExecutesThroughLocalRoute (0.00s)
+=== RUN   TestRuntimeConfigurationDigestIsStableAndOrderIndependent
+--- PASS: TestRuntimeConfigurationDigestIsStableAndOrderIndependent (0.00s)
+=== RUN   TestRuntimeConfigurationDigestTracksEveryDimension
+--- PASS: TestRuntimeConfigurationDigestTracksEveryDimension (0.00s)
+=== RUN   TestRuntimeIdentityEnvelopeCoversItsPayload
+--- PASS: TestRuntimeIdentityEnvelopeCoversItsPayload (0.00s)
+=== RUN   TestRuntimeConfigurationHasNoCredentialFields
+--- PASS: TestRuntimeConfigurationHasNoCredentialFields (0.00s)
+=== RUN   TestRuntimeConfigurationNormalizesEmptyAdapters
+--- PASS: TestRuntimeConfigurationNormalizesEmptyAdapters (0.00s)
+=== RUN   TestServeWritesRegistrySnapshotOnAFreshDirectory
+Capability availability: 16 of 19 registered capabilities are not executable in this deployment
+  github.issue.close
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.comment
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.create
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.get
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.list
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.update
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.pr.create
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.pr.merge
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.append
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.checkpoint
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.explain
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.query
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.verify
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.diagnose
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.propose
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.record_decision
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+Capability Registry
+-------------------
+Descriptors: 19
+PURE       1
+READ       8
+MUTATION   10
+CRITICAL   0
+NONE           1
+STANDARD       8
+DURABLE        10
+HIGH_ASSURANCE 0
+LOCAL      1
+DIRECT     8
+CRABEDENCE 10
+Registry SHA-256: ae1ab7adab4b5bb8e2b02e6c4fa8b2c241bf40b5ecc710d8744780ab49fe1057
+Capability registry snapshot: /tmp/cbx-1413601445/crabedence/capabilities.json (sha256 ae1ab7adab4b5bb8e2b02e6c4fa8b2c241bf40b5ecc710d8744780ab49fe1057)
+Runtime configuration digest: d1a6b1d45f385ee71cd30fbcb492d29c2439598c9e2775c29306be2433b381ee (/tmp/cbx-1413601445/crabedence/runtime-identity.json)
+Crabedence execution service listening on /tmp/cbx-1413601445/crabedence/execution.sock
+Registered capabilities: [test.counter.increment github.issue.close github.issue.update github.pr.create github.pr.merge history.verify research.propose history.append system.info research.diagnose research.record_decision history.checkpoint system.echo github.issue.create github.issue.comment github.issue.get github.issue.list history.query history.explain]
+Durable idempotency: disabled (MUTATION/CRITICAL will fail closed)
+Service configuration:
+  mode:             development
+  topology:         single (declared replicas: 1)
+  effect store:     none
+  evidence key:     host-local default (development only)
+  github adapter:   disabled
+  qualification:    not configured
+  peer auth:        0 mapped UIDs (0 trusted proxies)
+  admission:        64 connections / 16 handshakes
+  checkpoint:       disabled
+  attestation:      disabled
+  provider ceiling: 5m0s
+  provider gate:    max 64 concurrent; degraded after 5 consecutive ambiguous outcomes; circuit opens after 10 (cooldown 30s)
+--- PASS: TestServeWritesRegistrySnapshotOnAFreshDirectory (0.01s)
+=== RUN   TestServeWritesVerifiableRuntimeIdentity
+Capability availability: 16 of 19 registered capabilities are not executable in this deployment
+  github.issue.close
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.comment
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.create
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.get
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.list
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.issue.update
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.pr.create
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  github.pr.merge
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   github
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.append
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.checkpoint
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.explain
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.query
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  history.verify
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.diagnose
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.propose
+    KNOWN:     yes
+    POLICY:    READ / STANDARD / DIRECT
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+  research.record_decision
+    KNOWN:     yes
+    POLICY:    MUTATION / DURABLE / CRABEDENCE
+    ADAPTER:   history
+    AVAILABLE: no
+    REASON:    ADAPTER_NOT_CONFIGURED (adapter is not wired in this deployment)
+Capability Registry
+-------------------
+Descriptors: 19
+PURE       1
+READ       8
+MUTATION   10
+CRITICAL   0
+NONE           1
+STANDARD       8
+DURABLE        10
+HIGH_ASSURANCE 0
+LOCAL      1
+DIRECT     8
+CRABEDENCE 10
+Registry SHA-256: ae1ab7adab4b5bb8e2b02e6c4fa8b2c241bf40b5ecc710d8744780ab49fe1057
+Capability registry snapshot: /tmp/cbx-1365834542/crabedence/capabilities.json (sha256 ae1ab7adab4b5bb8e2b02e6c4fa8b2c241bf40b5ecc710d8744780ab49fe1057)
+Runtime configuration digest: 69476f384a2063c6ddf8ca43dc0de3a1cc416da44d0d60ca7b0a276075d28f91 (/tmp/cbx-1365834542/crabedence/runtime-identity.json)
+Crabedence execution service listening on /tmp/cbx-1365834542/crabedence/execution.sock
+Registered capabilities: [research.record_decision system.echo system.info github.issue.comment history.verify research.propose history.append test.counter.increment github.issue.get github.pr.create github.issue.list github.pr.merge history.query research.diagnose history.checkpoint github.issue.create github.issue.close github.issue.update history.explain]
+Durable idempotency: disabled (MUTATION/CRITICAL will fail closed)
+Service configuration:
+  mode:             development
+  topology:         single (declared replicas: 1)
+  effect store:     none
+  evidence key:     host-local default (development only)
+  github adapter:   disabled
+  qualification:    not configured
+  peer auth:        0 mapped UIDs (0 trusted proxies)
+  admission:        64 connections / 16 handshakes
+  checkpoint:       disabled
+  attestation:      disabled
+  provider ceiling: 5m0s
+  provider gate:    max 64 concurrent; degraded after 5 consecutive ambiguous outcomes; circuit opens after 10 (cooldown 30s)
+--- PASS: TestServeWritesVerifiableRuntimeIdentity (0.01s)
+=== RUN   TestServeRejectsReplicatedDeploymentWithoutSharedStore
+=== RUN   TestServeRejectsReplicatedDeploymentWithoutSharedStore/sqlite
+=== RUN   TestServeRejectsReplicatedDeploymentWithoutSharedStore/none
+=== RUN   TestServeRejectsReplicatedDeploymentWithoutSharedStore/auto_without_DSN_resolves_sqlite
+=== RUN   TestServeRejectsReplicatedDeploymentWithoutSharedStore/unset_backend_resolves_sqlite
+=== RUN   TestServeRejectsReplicatedDeploymentWithoutSharedStore/malformed_replica_count_fails_closed
+=== RUN   TestServeRejectsReplicatedDeploymentWithoutSharedStore/zero_replicas_fails_closed
+=== RUN   TestServeRejectsReplicatedDeploymentWithoutSharedStore/postgres_without_DSN_still_requires_it
+--- PASS: TestServeRejectsReplicatedDeploymentWithoutSharedStore (0.00s)
+    --- PASS: TestServeRejectsReplicatedDeploymentWithoutSharedStore/sqlite (0.00s)
+    --- PASS: TestServeRejectsReplicatedDeploymentWithoutSharedStore/none (0.00s)
+    --- PASS: TestServeRejectsReplicatedDeploymentWithoutSharedStore/auto_without_DSN_resolves_sqlite (0.00s)
+    --- PASS: TestServeRejectsReplicatedDeploymentWithoutSharedStore/unset_backend_resolves_sqlite (0.00s)
+    --- PASS: TestServeRejectsReplicatedDeploymentWithoutSharedStore/malformed_replica_count_fails_closed (0.00s)
+    --- PASS: TestServeRejectsReplicatedDeploymentWithoutSharedStore/zero_replicas_fails_closed (0.00s)
+    --- PASS: TestServeRejectsReplicatedDeploymentWithoutSharedStore/postgres_without_DSN_still_requires_it (0.00s)
+=== RUN   TestReplicaCountParsing
+--- PASS: TestReplicaCountParsing (0.00s)
+=== RUN   TestExecutionServiceEcho
+--- PASS: TestExecutionServiceEcho (0.00s)
+=== RUN   TestExecutionServiceCounterIncrement
+--- PASS: TestExecutionServiceCounterIncrement (0.00s)
+=== RUN   TestExecutionServiceUnknownCapability
+--- PASS: TestExecutionServiceUnknownCapability (0.00s)
+=== RUN   TestExecutionServiceUnconfiguredAdapterIsUnavailable
+--- PASS: TestExecutionServiceUnconfiguredAdapterIsUnavailable (0.00s)
+=== RUN   TestExecutionServiceConsultsAdapterAvailability
+--- PASS: TestExecutionServiceConsultsAdapterAvailability (0.00s)
+=== RUN   TestExecutionServiceMissingIdempotencyKey
+--- PASS: TestExecutionServiceMissingIdempotencyKey (0.00s)
+=== RUN   TestExecutionServiceExecutionClassMismatch
+--- PASS: TestExecutionServiceExecutionClassMismatch (0.00s)
+=== RUN   TestExecutionServiceOversizedMessage
+--- PASS: TestExecutionServiceOversizedMessage (0.00s)
+=== RUN   TestExecutionServiceMissingAuthority
+--- PASS: TestExecutionServiceMissingAuthority (0.00s)
+=== RUN   TestDeploymentModeParsing
+--- PASS: TestDeploymentModeParsing (0.00s)
+=== RUN   TestEvidenceKeyPolicyDevelopmentAllowsGeneration
+--- PASS: TestEvidenceKeyPolicyDevelopmentAllowsGeneration (0.00s)
+=== RUN   TestEvidenceKeyPolicyProductionRequiresProvisionedKey
+--- PASS: TestEvidenceKeyPolicyProductionRequiresProvisionedKey (0.00s)
+=== RUN   TestEvidenceKeyPolicyReplicasRequireSharedKey
+--- PASS: TestEvidenceKeyPolicyReplicasRequireSharedKey (0.00s)
+=== RUN   TestEvidenceKeyPolicyClusterRequiresProvisionedKey
+--- PASS: TestEvidenceKeyPolicyClusterRequiresProvisionedKey (0.00s)
+=== RUN   TestStartClearsStaleSocketAndSecuresIt
+--- PASS: TestStartClearsStaleSocketAndSecuresIt (0.00s)
+=== RUN   TestStartRefusesRegularFileAtSocketPath
+--- PASS: TestStartRefusesRegularFileAtSocketPath (0.00s)
+=== RUN   TestStartRefusesDirectoryAtSocketPath
+--- PASS: TestStartRefusesDirectoryAtSocketPath (0.00s)
+=== RUN   TestStartRefusesSymlinkAtSocketPath
+--- PASS: TestStartRefusesSymlinkAtSocketPath (0.00s)
+=== RUN   TestStartRefusesSymlinkedSocketDirectory
+--- PASS: TestStartRefusesSymlinkedSocketDirectory (0.00s)
+=== RUN   TestStartSecuresSocketDirectory
+--- PASS: TestStartSecuresSocketDirectory (0.00s)
+=== RUN   TestStartFailsWhenDirectoryCannotBeCreated
+--- PASS: TestStartFailsWhenDirectoryCannotBeCreated (0.00s)
+=== RUN   TestDefaultSocketPath
+--- PASS: TestDefaultSocketPath (0.00s)
+=== RUN   TestStopBarrierCoversAcceptedConnection
+--- PASS: TestStopBarrierCoversAcceptedConnection (0.50s)
+=== RUN   TestRepeatedStopIsIdempotent
+--- PASS: TestRepeatedStopIsIdempotent (0.00s)
+=== RUN   TestStopRefusesConnectionAcceptedAtBoundary
+--- PASS: TestStopRefusesConnectionAcceptedAtBoundary (0.20s)
+=== RUN   TestConcurrentStopIdempotent
+--- PASS: TestConcurrentStopIdempotent (0.10s)
+=== RUN   TestStopTimeoutNotClean
+--- PASS: TestStopTimeoutNotClean (0.27s)
+=== RUN   TestRestartAfterCleanStop
+--- PASS: TestRestartAfterCleanStop (0.00s)
+=== RUN   TestStopDuringHandshake
+--- PASS: TestStopDuringHandshake (0.27s)
+=== RUN   TestStopWithUnknownExternalEffect
+--- PASS: TestStopWithUnknownExternalEffect (0.25s)
+=== RUN   TestStopRandomizedSchedules
+--- PASS: TestStopRandomizedSchedules (0.92s)
+=== RUN   TestStopRestartCleanupInterleaving
+--- PASS: TestStopRestartCleanupInterleaving (0.00s)
+=== RUN   TestDoubleStopSingleCleanup
+--- PASS: TestDoubleStopSingleCleanup (0.10s)
+=== RUN   TestStopTimeoutThenRetry
+--- PASS: TestStopTimeoutThenRetry (0.27s)
+=== RUN   TestForeignSocketReplacement
+2026/10/19 10:59:49 execution service: not removing /tmp/cbx-sock-2910797038/execution.sock: the path is no longer a socket (mode -rw-------)
+--- PASS: TestForeignSocketReplacement (0.00s)
+=== RUN   TestForeignSocketSuccessor
+2026/10/19 10:59:49 execution service: not removing /tmp/cbx-sock-3185474987/execution.sock: the socket at that path is not the one this lifecycle bound
+--- PASS: TestForeignSocketSuccessor (0.00s)
+=== RUN   TestRapidLifecycleStress
+--- PASS: TestRapidLifecycleStress (0.04s)
+=== RUN   TestStaleStopNeverCleansSuccessorSocket
+--- PASS: TestStaleStopNeverCleansSuccessorSocket (0.00s)
+=== RUN   TestResolveTopologyParsing
+=== RUN   TestResolveTopologyParsing/development_defaults_to_single
+=== RUN   TestResolveTopologyParsing/production_requires_an_explicit_topology
+=== RUN   TestResolveTopologyParsing/explicit_single
+=== RUN   TestResolveTopologyParsing/explicit_cluster
+=== RUN   TestResolveTopologyParsing/production_explicit_cluster
+=== RUN   TestResolveTopologyParsing/unknown_value_fails_closed
+--- PASS: TestResolveTopologyParsing (0.00s)
+    --- PASS: TestResolveTopologyParsing/development_defaults_to_single (0.00s)
+    --- PASS: TestResolveTopologyParsing/production_requires_an_explicit_topology (0.00s)
+    --- PASS: TestResolveTopologyParsing/explicit_single (0.00s)
+    --- PASS: TestResolveTopologyParsing/explicit_cluster (0.00s)
+    --- PASS: TestResolveTopologyParsing/production_explicit_cluster (0.00s)
+    --- PASS: TestResolveTopologyParsing/unknown_value_fails_closed (0.00s)
+=== RUN   TestServeRejectsTopologyContradictions
+=== RUN   TestServeRejectsTopologyContradictions/single_with_declared_replicas
+=== RUN   TestServeRejectsTopologyContradictions/cluster_with_sqlite
+=== RUN   TestServeRejectsTopologyContradictions/cluster_with_none_backend
+=== RUN   TestServeRejectsTopologyContradictions/cluster_with_auto-resolved_sqlite
+=== RUN   TestServeRejectsTopologyContradictions/production_without_topology
+=== RUN   TestServeRejectsTopologyContradictions/unknown_topology
+--- PASS: TestServeRejectsTopologyContradictions (0.00s)
+    --- PASS: TestServeRejectsTopologyContradictions/single_with_declared_replicas (0.00s)
+    --- PASS: TestServeRejectsTopologyContradictions/cluster_with_sqlite (0.00s)
+    --- PASS: TestServeRejectsTopologyContradictions/cluster_with_none_backend (0.00s)
+    --- PASS: TestServeRejectsTopologyContradictions/cluster_with_auto-resolved_sqlite (0.00s)
+    --- PASS: TestServeRejectsTopologyContradictions/production_without_topology (0.00s)
+    --- PASS: TestServeRejectsTopologyContradictions/unknown_topology (0.00s)
+=== RUN   TestIndependentSQLiteLedgersMintDivergentProviderTokens
+--- PASS: TestIndependentSQLiteLedgersMintDivergentProviderTokens (0.18s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/execution	54.958s
+=== RUN   TestGoldenCheckpointChainDigestV2
+--- PASS: TestGoldenCheckpointChainDigestV2 (0.00s)
+=== RUN   TestGoldenCheckpointChainDigestV1
+--- PASS: TestGoldenCheckpointChainDigestV1 (0.00s)
+=== RUN   TestGoldenCheckpointSigningPayload
+--- PASS: TestGoldenCheckpointSigningPayload (0.00s)
+=== RUN   TestGoldenCheckpointSignature
+--- PASS: TestGoldenCheckpointSignature (0.00s)
+=== RUN   TestVerifyCheckpointHistoryAcceptsHealthyStream
+--- PASS: TestVerifyCheckpointHistoryAcceptsHealthyStream (0.00s)
+=== RUN   TestVerifyCheckpointHistoryAcceptsEmptyStream
+--- PASS: TestVerifyCheckpointHistoryAcceptsEmptyStream (0.00s)
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/duplicated_tail
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/truncated_final_line
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/unterminated_tail
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/empty_line_inside
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/unparseable_entry
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/coverage_regression
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/timestamp_regression
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/deleted_middle_entry
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/reordered_entries
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/signer_substitution
+=== RUN   TestVerifyCheckpointHistoryRefusesTampering/corrupt_middle_entry
+--- PASS: TestVerifyCheckpointHistoryRefusesTampering (0.02s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/duplicated_tail (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/truncated_final_line (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/unterminated_tail (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/empty_line_inside (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/unparseable_entry (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/coverage_regression (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/timestamp_regression (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/deleted_middle_entry (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/reordered_entries (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/signer_substitution (0.00s)
+    --- PASS: TestVerifyCheckpointHistoryRefusesTampering/corrupt_middle_entry (0.00s)
+=== RUN   TestVerifyCheckpointHistoryRefusesMidStreamSignerSwitch
+--- PASS: TestVerifyCheckpointHistoryRefusesMidStreamSignerSwitch (0.00s)
+=== RUN   TestVerifyCheckpointHistoryRefusesForeignStream
+--- PASS: TestVerifyCheckpointHistoryRefusesForeignStream (0.00s)
+=== RUN   TestVerifyCheckpointHistoryContinuation
+--- PASS: TestVerifyCheckpointHistoryContinuation (0.00s)
+=== RUN   TestVerifyCheckpointHistoryWithStore
+--- PASS: TestVerifyCheckpointHistoryWithStore (0.00s)
+=== RUN   TestVerifyCheckpointHistoryLongStream
+--- PASS: TestVerifyCheckpointHistoryLongStream (4.53s)
+=== RUN   TestVerifyCheckpointHistoryLineBound
+--- PASS: TestVerifyCheckpointHistoryLineBound (0.00s)
+=== RUN   TestVerifyCheckpointHistoryLineBoundStopsReading
+--- PASS: TestVerifyCheckpointHistoryLineBoundStopsReading (0.02s)
+=== RUN   TestCheckpointSignVerifyRoundtrip
+--- PASS: TestCheckpointSignVerifyRoundtrip (0.00s)
+=== RUN   TestCheckpointEmptyEnumeration
+--- PASS: TestCheckpointEmptyEnumeration (0.00s)
+=== RUN   TestCheckpointDetectsRewrittenRecord
+--- PASS: TestCheckpointDetectsRewrittenRecord (0.00s)
+=== RUN   TestCheckpointDetectsTruncation
+--- PASS: TestCheckpointDetectsTruncation (0.00s)
+=== RUN   TestCheckpointDetectsReordering
+--- PASS: TestCheckpointDetectsReordering (0.00s)
+=== RUN   TestCheckpointToleratesGrowth
+--- PASS: TestCheckpointToleratesGrowth (0.00s)
+=== RUN   TestCheckpointRejectsUntrustedSigner
+--- PASS: TestCheckpointRejectsUntrustedSigner (0.00s)
+=== RUN   TestCheckpointRejectsTamperedSignedFields
+--- PASS: TestCheckpointRejectsTamperedSignedFields (0.00s)
+=== RUN   TestCheckpointRejectsMismatchedSignerField
+--- PASS: TestCheckpointRejectsMismatchedSignerField (0.00s)
+=== RUN   TestCheckpointRejectsMalformed
+=== RUN   TestCheckpointRejectsMalformed/empty_issued_at
+=== RUN   TestCheckpointRejectsMalformed/bad_type
+=== RUN   TestCheckpointRejectsMalformed/negative_seq
+=== RUN   TestCheckpointRejectsMalformed/bad_issued_at
+=== RUN   TestCheckpointRejectsMalformed/bad_chain
+=== RUN   TestCheckpointRejectsMalformed/bad_pubkey
+=== RUN   TestCheckpointRejectsMalformed/bad_signature
+=== RUN   TestCheckpointRejectsMalformed/bad_schema
+=== RUN   TestCheckpointRejectsMalformed/negative_count
+--- PASS: TestCheckpointRejectsMalformed (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/empty_issued_at (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_type (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/negative_seq (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_issued_at (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_chain (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_pubkey (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_signature (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/bad_schema (0.00s)
+    --- PASS: TestCheckpointRejectsMalformed/negative_count (0.00s)
+=== RUN   TestCheckpointDetectsLedgerRenumber
+--- PASS: TestCheckpointDetectsLedgerRenumber (0.00s)
+=== RUN   TestCheckpointRejectsUnsortedEnumeration
+--- PASS: TestCheckpointRejectsUnsortedEnumeration (0.00s)
+=== RUN   TestCheckpointV1LegacyVerification
+--- PASS: TestCheckpointV1LegacyVerification (0.00s)
+=== RUN   TestSignVerifyRoundtrip
+--- PASS: TestSignVerifyRoundtrip (0.00s)
+=== RUN   TestNoEffectAllowsEmptyProviderRunID
+--- PASS: TestNoEffectAllowsEmptyProviderRunID (0.00s)
+=== RUN   TestCompletedRequiresProviderRunID
+--- PASS: TestCompletedRequiresProviderRunID (0.00s)
+=== RUN   TestVerifyRejectsTamperedSignature
+--- PASS: TestVerifyRejectsTamperedSignature (0.00s)
+=== RUN   TestVerifyRejectsUntrustedSigner
+--- PASS: TestVerifyRejectsUntrustedSigner (0.00s)
+=== RUN   TestVerifyRejectsBindingMismatch
+--- PASS: TestVerifyRejectsBindingMismatch (0.00s)
+=== RUN   TestVerifyRejectsMissingReceipt
+--- PASS: TestVerifyRejectsMissingReceipt (0.00s)
+=== RUN   TestParseRejectsUnknownAndDuplicateFields
+--- PASS: TestParseRejectsUnknownAndDuplicateFields (0.00s)
+=== RUN   TestLoadOrCreateSignerRoundtrip
+--- PASS: TestLoadOrCreateSignerRoundtrip (0.03s)
+=== RUN   TestGenerateSignerProducesValidKey
+--- PASS: TestGenerateSignerProducesValidKey (0.00s)
+=== RUN   TestVerifyReceiptKeyRingRotation
+--- PASS: TestVerifyReceiptKeyRingRotation (0.00s)
+=== RUN   TestGoldenSigningPayload
+--- PASS: TestGoldenSigningPayload (0.00s)
+=== RUN   TestGoldenSignature
+--- PASS: TestGoldenSignature (0.00s)
+=== RUN   TestGoldenReceiptRoundTrip
+--- PASS: TestGoldenReceiptRoundTrip (0.00s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/evidence	5.679s
+=== RUN   TestStoreConformanceTerminalEvidence
+=== RUN   TestStoreConformanceTerminalEvidence/sqlite
+--- PASS: TestStoreConformanceTerminalEvidence (0.21s)
+    --- PASS: TestStoreConformanceTerminalEvidence/sqlite (0.21s)
+=== RUN   TestStoreConformanceTerminalEvidenceCommitOrder
+=== RUN   TestStoreConformanceTerminalEvidenceCommitOrder/sqlite
+--- PASS: TestStoreConformanceTerminalEvidenceCommitOrder (0.19s)
+    --- PASS: TestStoreConformanceTerminalEvidenceCommitOrder/sqlite (0.19s)
+=== RUN   TestStoreConformanceTerminalSeqConcurrency
+=== RUN   TestStoreConformanceTerminalSeqConcurrency/sqlite
+--- PASS: TestStoreConformanceTerminalSeqConcurrency (0.98s)
+    --- PASS: TestStoreConformanceTerminalSeqConcurrency/sqlite (0.98s)
+=== RUN   TestStoreConformanceTerminalSeqRecoveryPath
+=== RUN   TestStoreConformanceTerminalSeqRecoveryPath/sqlite
+--- PASS: TestStoreConformanceTerminalSeqRecoveryPath (0.24s)
+    --- PASS: TestStoreConformanceTerminalSeqRecoveryPath/sqlite (0.24s)
+=== RUN   TestSQLiteTerminalSeqUpgradeBackfill
+--- PASS: TestSQLiteTerminalSeqUpgradeBackfill (0.29s)
+=== RUN   TestSQLiteTerminalEvidenceMissingSeqFailsClosed
+--- PASS: TestSQLiteTerminalEvidenceMissingSeqFailsClosed (0.24s)
+=== RUN   TestLeaseConfigValidate
+=== RUN   TestLeaseConfigValidate/valid
+=== RUN   TestLeaseConfigValidate/zero
+=== RUN   TestLeaseConfigValidate/negative
+=== RUN   TestLeaseConfigValidate/exceeds_max
+=== RUN   TestLeaseConfigValidate/at_max
+=== RUN   TestLeaseConfigValidate/short
+--- PASS: TestLeaseConfigValidate (0.00s)
+    --- PASS: TestLeaseConfigValidate/valid (0.00s)
+    --- PASS: TestLeaseConfigValidate/zero (0.00s)
+    --- PASS: TestLeaseConfigValidate/negative (0.00s)
+    --- PASS: TestLeaseConfigValidate/exceeds_max (0.00s)
+    --- PASS: TestLeaseConfigValidate/at_max (0.00s)
+    --- PASS: TestLeaseConfigValidate/short (0.00s)
+=== RUN   TestLeaseConfigValidateNoMaxDuration
+--- PASS: TestLeaseConfigValidateNoMaxDuration (0.00s)
+=== RUN   TestAcquireResultAcquired
+--- PASS: TestAcquireResultAcquired (0.00s)
+=== RUN   TestTerminalReceiptDigestDeterminism
+--- PASS: TestTerminalReceiptDigestDeterminism (0.00s)
+=== RUN   TestTerminalReceiptDigestExcludesFinalizedAt
+--- PASS: TestTerminalReceiptDigestExcludesFinalizedAt (0.00s)
+=== RUN   TestTerminalReceiptDigestDifferentResults
+--- PASS: TestTerminalReceiptDigestDifferentResults (0.00s)
+=== RUN   TestTerminalReceiptDigestDifferentProviderRunID
+--- PASS: TestTerminalReceiptDigestDifferentProviderRunID (0.00s)
+=== RUN   TestTerminalReceiptDigestDifferentReceiptVersion
+--- PASS: TestTerminalReceiptDigestDifferentReceiptVersion (0.00s)
+=== RUN   TestRecoveryDecisionValues
+--- PASS: TestRecoveryDecisionValues (0.00s)
+=== RUN   TestLeaseErrorValues
+--- PASS: TestLeaseErrorValues (0.00s)
+=== RUN   TestAcquireResultKindValues
+--- PASS: TestAcquireResultKindValues (0.00s)
+=== RUN   TestFixedClock
+--- PASS: TestFixedClock (0.00s)
+=== RUN   TestSystemClock
+--- PASS: TestSystemClock (0.00s)
+=== RUN   TestRecoveryRetryableExists
+--- PASS: TestRecoveryRetryableExists (0.00s)
+=== RUN   TestTerminalReceiptIdentityFields
+--- PASS: TestTerminalReceiptIdentityFields (0.00s)
+=== RUN   TestTerminalReceiptDigestIsSHA256
+--- PASS: TestTerminalReceiptDigestIsSHA256 (0.00s)
+=== RUN   TestDefaultLeaseConfig
+--- PASS: TestDefaultLeaseConfig (0.00s)
+=== RUN   TestMigrateState
+--- PASS: TestMigrateState (0.00s)
+=== RUN   TestRecoveryResultJSON
+--- PASS: TestRecoveryResultJSON (0.00s)
+=== RUN   TestLegalTransitionMatrix
+=== RUN   TestLegalTransitionMatrix/PREPARED→EXECUTING
+=== RUN   TestLegalTransitionMatrix/EXECUTING→IN_FLIGHT
+=== RUN   TestLegalTransitionMatrix/EXECUTING→PREPARED
+=== RUN   TestLegalTransitionMatrix/IN_FLIGHT→COMMITTED
+=== RUN   TestLegalTransitionMatrix/IN_FLIGHT→FAILED
+=== RUN   TestLegalTransitionMatrix/IN_FLIGHT→UNKNOWN
+=== RUN   TestLegalTransitionMatrix/UNKNOWN→COMMITTED
+=== RUN   TestLegalTransitionMatrix/UNKNOWN→FAILED
+=== RUN   TestLegalTransitionMatrix/PREPARED→DENIED
+=== RUN   TestLegalTransitionMatrix/EXECUTING→DENIED
+=== RUN   TestLegalTransitionMatrix/PREPARED→COMMITTED
+=== RUN   TestLegalTransitionMatrix/PREPARED→IN_FLIGHT
+=== RUN   TestLegalTransitionMatrix/PREPARED→UNKNOWN
+=== RUN   TestLegalTransitionMatrix/EXECUTING→COMMITTED
+=== RUN   TestLegalTransitionMatrix/EXECUTING→UNKNOWN
+=== RUN   TestLegalTransitionMatrix/EXECUTING→FAILED
+=== RUN   TestLegalTransitionMatrix/IN_FLIGHT→PREPARED
+=== RUN   TestLegalTransitionMatrix/IN_FLIGHT→EXECUTING
+=== RUN   TestLegalTransitionMatrix/IN_FLIGHT→DENIED
+=== RUN   TestLegalTransitionMatrix/UNKNOWN→IN_FLIGHT
+=== RUN   TestLegalTransitionMatrix/UNKNOWN→PREPARED
+=== RUN   TestLegalTransitionMatrix/UNKNOWN→EXECUTING
+=== RUN   TestLegalTransitionMatrix/UNKNOWN→DENIED
+=== RUN   TestLegalTransitionMatrix/COMMITTED→EXECUTING
+=== RUN   TestLegalTransitionMatrix/COMMITTED→FAILED
+=== RUN   TestLegalTransitionMatrix/COMMITTED→UNKNOWN
+=== RUN   TestLegalTransitionMatrix/FAILED→COMMITTED
+=== RUN   TestLegalTransitionMatrix/FAILED→UNKNOWN
+=== RUN   TestLegalTransitionMatrix/DENIED→COMMITTED
+=== RUN   TestLegalTransitionMatrix/DENIED→IN_FLIGHT
+--- PASS: TestLegalTransitionMatrix (0.00s)
+    --- PASS: TestLegalTransitionMatrix/PREPARED→EXECUTING (0.00s)
+    --- PASS: TestLegalTransitionMatrix/EXECUTING→IN_FLIGHT (0.00s)
+    --- PASS: TestLegalTransitionMatrix/EXECUTING→PREPARED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/IN_FLIGHT→COMMITTED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/IN_FLIGHT→FAILED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/IN_FLIGHT→UNKNOWN (0.00s)
+    --- PASS: TestLegalTransitionMatrix/UNKNOWN→COMMITTED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/UNKNOWN→FAILED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/PREPARED→DENIED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/EXECUTING→DENIED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/PREPARED→COMMITTED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/PREPARED→IN_FLIGHT (0.00s)
+    --- PASS: TestLegalTransitionMatrix/PREPARED→UNKNOWN (0.00s)
+    --- PASS: TestLegalTransitionMatrix/EXECUTING→COMMITTED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/EXECUTING→UNKNOWN (0.00s)
+    --- PASS: TestLegalTransitionMatrix/EXECUTING→FAILED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/IN_FLIGHT→PREPARED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/IN_FLIGHT→EXECUTING (0.00s)
+    --- PASS: TestLegalTransitionMatrix/IN_FLIGHT→DENIED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/UNKNOWN→IN_FLIGHT (0.00s)
+    --- PASS: TestLegalTransitionMatrix/UNKNOWN→PREPARED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/UNKNOWN→EXECUTING (0.00s)
+    --- PASS: TestLegalTransitionMatrix/UNKNOWN→DENIED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/COMMITTED→EXECUTING (0.00s)
+    --- PASS: TestLegalTransitionMatrix/COMMITTED→FAILED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/COMMITTED→UNKNOWN (0.00s)
+    --- PASS: TestLegalTransitionMatrix/FAILED→COMMITTED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/FAILED→UNKNOWN (0.00s)
+    --- PASS: TestLegalTransitionMatrix/DENIED→COMMITTED (0.00s)
+    --- PASS: TestLegalTransitionMatrix/DENIED→IN_FLIGHT (0.00s)
+=== RUN   TestLegalTransitionMatrixExhaustive
+--- PASS: TestLegalTransitionMatrixExhaustive (0.00s)
+=== RUN   TestGenerateExecutionID
+--- PASS: TestGenerateExecutionID (0.00s)
+=== RUN   TestGenerateExecutionIDUniqueness
+--- PASS: TestGenerateExecutionIDUniqueness (0.06s)
+=== RUN   TestIsLegalTransitionNilFrom
+--- PASS: TestIsLegalTransitionNilFrom (0.00s)
+=== RUN   TestCanonicalizeJSONRejectsTrailingData
+=== RUN   TestCanonicalizeJSONRejectsTrailingData/valid/object
+=== RUN   TestCanonicalizeJSONRejectsTrailingData/valid/array
+=== RUN   TestCanonicalizeJSONRejectsTrailingData/valid/scalar
+=== RUN   TestCanonicalizeJSONRejectsTrailingData/valid/trailing_whitespace
+=== RUN   TestCanonicalizeJSONRejectsTrailingData/invalid/extra_closing_brace
+=== RUN   TestCanonicalizeJSONRejectsTrailingData/invalid/extra_closing_bracket
+=== RUN   TestCanonicalizeJSONRejectsTrailingData/invalid/object_then_garbage_brace
+=== RUN   TestCanonicalizeJSONRejectsTrailingData/invalid/two_values
+=== RUN   TestCanonicalizeJSONRejectsTrailingData/invalid/value_then_scalar
+=== RUN   TestCanonicalizeJSONRejectsTrailingData/invalid/trailing_garbage
+--- PASS: TestCanonicalizeJSONRejectsTrailingData (0.00s)
+    --- PASS: TestCanonicalizeJSONRejectsTrailingData/valid/object (0.00s)
+    --- PASS: TestCanonicalizeJSONRejectsTrailingData/valid/array (0.00s)
+    --- PASS: TestCanonicalizeJSONRejectsTrailingData/valid/scalar (0.00s)
+    --- PASS: TestCanonicalizeJSONRejectsTrailingData/valid/trailing_whitespace (0.00s)
+    --- PASS: TestCanonicalizeJSONRejectsTrailingData/invalid/extra_closing_brace (0.00s)
+    --- PASS: TestCanonicalizeJSONRejectsTrailingData/invalid/extra_closing_bracket (0.00s)
+    --- PASS: TestCanonicalizeJSONRejectsTrailingData/invalid/object_then_garbage_brace (0.00s)
+    --- PASS: TestCanonicalizeJSONRejectsTrailingData/invalid/two_values (0.00s)
+    --- PASS: TestCanonicalizeJSONRejectsTrailingData/invalid/value_then_scalar (0.00s)
+    --- PASS: TestCanonicalizeJSONRejectsTrailingData/invalid/trailing_garbage (0.00s)
+=== RUN   TestTerminalReceiptDigestFrozenVector
+--- PASS: TestTerminalReceiptDigestFrozenVector (0.00s)
+=== RUN   TestCanonicalJSONConformanceCorpus
+=== RUN   TestCanonicalJSONConformanceCorpus/flat_object_keys_sorted
+=== RUN   TestCanonicalJSONConformanceCorpus/nested_object_keys_sorted
+=== RUN   TestCanonicalJSONConformanceCorpus/array_order_preserved
+=== RUN   TestCanonicalJSONConformanceCorpus/json.Number_lexical_preservation
+=== RUN   TestCanonicalJSONConformanceCorpus/json.Number_large_integer
+=== RUN   TestCanonicalJSONConformanceCorpus/json.Number_decimal
+=== RUN   TestCanonicalJSONConformanceCorpus/int
+=== RUN   TestCanonicalJSONConformanceCorpus/float64
+=== RUN   TestCanonicalJSONConformanceCorpus/unicode_string
+=== RUN   TestCanonicalJSONConformanceCorpus/boolean_true
+=== RUN   TestCanonicalJSONConformanceCorpus/boolean_false
+=== RUN   TestCanonicalJSONConformanceCorpus/null_value
+=== RUN   TestCanonicalJSONConformanceCorpus/empty_object
+=== RUN   TestCanonicalJSONConformanceCorpus/empty_array
+=== RUN   TestCanonicalJSONConformanceCorpus/mixed_nesting
+--- PASS: TestCanonicalJSONConformanceCorpus (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/flat_object_keys_sorted (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/nested_object_keys_sorted (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/array_order_preserved (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/json.Number_lexical_preservation (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/json.Number_large_integer (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/json.Number_decimal (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/int (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/float64 (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/unicode_string (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/boolean_true (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/boolean_false (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/null_value (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/empty_object (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/empty_array (0.00s)
+    --- PASS: TestCanonicalJSONConformanceCorpus/mixed_nesting (0.00s)
+=== RUN   TestCanonicalJSONDeterministic
+--- PASS: TestCanonicalJSONDeterministic (0.00s)
+=== RUN   TestCanonicalJSONDistinctInputs
+=== RUN   TestCanonicalJSONDistinctInputs/int_vs_string
+=== RUN   TestCanonicalJSONDistinctInputs/true_vs_1
+=== RUN   TestCanonicalJSONDistinctInputs/array_vs_object
+=== RUN   TestCanonicalJSONDistinctInputs/null_vs_false
+=== RUN   TestCanonicalJSONDistinctInputs/nested_vs_flat
+--- PASS: TestCanonicalJSONDistinctInputs (0.00s)
+    --- PASS: TestCanonicalJSONDistinctInputs/int_vs_string (0.00s)
+    --- PASS: TestCanonicalJSONDistinctInputs/true_vs_1 (0.00s)
+    --- PASS: TestCanonicalJSONDistinctInputs/array_vs_object (0.00s)
+    --- PASS: TestCanonicalJSONDistinctInputs/null_vs_false (0.00s)
+    --- PASS: TestCanonicalJSONDistinctInputs/nested_vs_flat (0.00s)
+=== RUN   TestDigestBindsDescriptorIdentity
+--- PASS: TestDigestBindsDescriptorIdentity (0.00s)
+=== RUN   TestDispatchIdentityDeterminismAndSensitivity
+--- PASS: TestDispatchIdentityDeterminismAndSensitivity (0.00s)
+=== RUN   TestDispatchIdentityRandomizedDistinctness
+--- PASS: TestDispatchIdentityRandomizedDistinctness (0.03s)
+=== RUN   TestDigestBindsMediation
+--- PASS: TestDigestBindsMediation (0.00s)
+=== RUN   TestDigestMediationDeterminism
+--- PASS: TestDigestMediationDeterminism (0.00s)
+=== RUN   TestComputeDigestFromRawNumericPrecision
+--- PASS: TestComputeDigestFromRawNumericPrecision (0.00s)
+=== RUN   TestComputeDigestFromRawLargeIntegers
+--- PASS: TestComputeDigestFromRawLargeIntegers (0.00s)
+=== RUN   TestComputeDigestFromRawFloatPreserved
+--- PASS: TestComputeDigestFromRawFloatPreserved (0.00s)
+=== RUN   TestCanonicalJSONSortedKeys
+--- PASS: TestCanonicalJSONSortedKeys (0.00s)
+=== RUN   TestCanonicalJSONNested
+--- PASS: TestCanonicalJSONNested (0.00s)
+=== RUN   TestComputeDigestDeterministic
+--- PASS: TestComputeDigestDeterministic (0.00s)
+=== RUN   TestComputeDigestDifferentGrant
+--- PASS: TestComputeDigestDifferentGrant (0.00s)
+=== RUN   TestComputeDigestDifferentClass
+--- PASS: TestComputeDigestDifferentClass (0.00s)
+=== RUN   TestComputeDigestFromRaw
+--- PASS: TestComputeDigestFromRaw (0.00s)
+=== RUN   TestComputeDigestAuthorityBinding
+--- PASS: TestComputeDigestAuthorityBinding (0.00s)
+=== RUN   TestStateIsTerminal
+--- PASS: TestStateIsTerminal (0.00s)
+=== RUN   TestStateCallerTerminal
+--- PASS: TestStateCallerTerminal (0.00s)
+=== RUN   TestStateDurablyFinal
+--- PASS: TestStateDurablyFinal (0.00s)
+=== RUN   TestCanonicalJSONNumber
+--- PASS: TestCanonicalJSONNumber (0.00s)
+=== RUN   TestCanonicalJSONNumberHostileExponents
+--- PASS: TestCanonicalJSONNumberHostileExponents (0.00s)
+=== RUN   TestCanonicalJSONNumberRejectsInvalid
+--- PASS: TestCanonicalJSONNumberRejectsInvalid (0.00s)
+=== RUN   TestComputeDigestHostileNumberEquivalence
+--- PASS: TestComputeDigestHostileNumberEquivalence (0.00s)
+=== RUN   TestComputeDigestFromRawEquivalentNumbers
+--- PASS: TestComputeDigestFromRawEquivalentNumbers (0.00s)
+=== RUN   TestComputeDigestFromRawLargeIntegersDistinct
+--- PASS: TestComputeDigestFromRawLargeIntegersDistinct (0.00s)
+=== RUN   TestDigestVectors
+=== RUN   TestDigestVectors/key-order
+=== RUN   TestDigestVectors/unicode
+=== RUN   TestDigestVectors/escaped-strings
+=== RUN   TestDigestVectors/number-lexical-equivalence
+=== RUN   TestDigestVectors/number-decimals-and-exponents
+=== RUN   TestDigestVectors/number-large-integers
+=== RUN   TestDigestVectors/containers-and-scalars
+=== RUN   TestDigestVectors/deep-nesting
+=== RUN   TestDigestVectors/authority-binding
+--- PASS: TestDigestVectors (0.07s)
+    --- PASS: TestDigestVectors/key-order (0.00s)
+    --- PASS: TestDigestVectors/unicode (0.00s)
+    --- PASS: TestDigestVectors/escaped-strings (0.00s)
+    --- PASS: TestDigestVectors/number-lexical-equivalence (0.00s)
+    --- PASS: TestDigestVectors/number-decimals-and-exponents (0.00s)
+    --- PASS: TestDigestVectors/number-large-integers (0.00s)
+    --- PASS: TestDigestVectors/containers-and-scalars (0.00s)
+    --- PASS: TestDigestVectors/deep-nesting (0.00s)
+    --- PASS: TestDigestVectors/authority-binding (0.00s)
+=== RUN   TestSQLiteClusterEpochSeedAndFreshStore
+--- PASS: TestSQLiteClusterEpochSeedAndFreshStore (0.10s)
+=== RUN   TestSQLiteAdvanceClusterEpochConcurrency
+--- PASS: TestSQLiteAdvanceClusterEpochConcurrency (0.17s)
+=== RUN   TestSQLiteClusterRecoveryMode
+--- PASS: TestSQLiteClusterRecoveryMode (0.17s)
+=== RUN   TestSQLiteMigrationClusterEpochBackfill
+--- PASS: TestSQLiteMigrationClusterEpochBackfill (0.12s)
+=== RUN   TestStoreConformanceRejectsReceiptIdentityMismatch
+=== RUN   TestStoreConformanceRejectsReceiptIdentityMismatch/sqlite
+--- PASS: TestStoreConformanceRejectsReceiptIdentityMismatch (0.18s)
+    --- PASS: TestStoreConformanceRejectsReceiptIdentityMismatch/sqlite (0.18s)
+=== RUN   TestLiveForensicEventHistory
+    forensic_live_test.go:57: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveForensicEventHistory (0.00s)
+=== RUN   TestLiveForensicObservationLedger
+    forensic_live_test.go:111: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveForensicObservationLedger (0.00s)
+=== RUN   TestLiveForensicRecoveryObservationRace
+    forensic_live_test.go:161: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveForensicRecoveryObservationRace (0.00s)
+=== RUN   TestForensicEventHistoryLifecycle
+--- PASS: TestForensicEventHistoryLifecycle (0.15s)
+=== RUN   TestForensicObservationLedgerBytes
+--- PASS: TestForensicObservationLedgerBytes (0.22s)
+=== RUN   TestForensicEvidenceSplit
+--- PASS: TestForensicEvidenceSplit (0.23s)
+=== RUN   TestForensicRecoveryObservationKinds
+--- PASS: TestForensicRecoveryObservationKinds (0.23s)
+=== RUN   TestForensicLeaseLostEvent
+--- PASS: TestForensicLeaseLostEvent (0.36s)
+=== RUN   TestForensicClaimEvents
+--- PASS: TestForensicClaimEvents (0.16s)
+=== RUN   TestForensicEventRollbackOnFailure
+--- PASS: TestForensicEventRollbackOnFailure (0.15s)
+=== RUN   TestStoreMetricsLifecycle
+    metrics_test.go:94: effect_acquires_total = 2
+    metrics_test.go:94: effect_failed_total = 1
+    metrics_test.go:94: reconciliation_claims_total = 0
+    metrics_test.go:94: reconciliation_resolutions_total = 1
+    metrics_test.go:94: critical_evidence_rejected_total = 0
+    metrics_test.go:94: effect_lease_lost_total = 0
+    metrics_test.go:94: effect_executing_total = 2
+    metrics_test.go:94: effect_fence_rejections_total = 1
+    metrics_test.go:94: provider_observation_conflicts_total = 0
+    metrics_test.go:94: effect_lease_renewals_total = 0
+    metrics_test.go:94: effect_observation_writes_total = 1
+    metrics_test.go:94: cluster_recovery_rejections_total = 0
+    metrics_test.go:94: effect_in_flight_total = 2
+    metrics_test.go:94: effect_committed_total = 1
+    metrics_test.go:94: effect_unknown_entered_total = 1
+    metrics_test.go:94: cluster_epoch_rejections_total = 0
+    metrics_test.go:94: reconciliation_suspended_total = 0
+--- PASS: TestStoreMetricsLifecycle (0.26s)
+=== RUN   TestStoreMetricsSnapshotKeys
+--- PASS: TestStoreMetricsSnapshotKeys (0.00s)
+=== RUN   TestMultiProcWorkerHelper
+--- PASS: TestMultiProcWorkerHelper (0.00s)
+=== RUN   TestLiveMultiProcessSingleKeyDispatch
+    multiproc_live_test.go:153: CRABBOX_TEST_DATABASE_URL not set; skipping multi-process PostgreSQL test
+--- SKIP: TestLiveMultiProcessSingleKeyDispatch (0.00s)
+=== RUN   TestLiveMultiProcessDistinctKeys
+    multiproc_live_test.go:196: CRABBOX_TEST_DATABASE_URL not set; skipping multi-process PostgreSQL test
+--- SKIP: TestLiveMultiProcessDistinctKeys (0.00s)
+=== RUN   TestLiveMultiProcessLeaseOwnerKilled
+    multiproc_live_test.go:239: CRABBOX_TEST_DATABASE_URL not set; skipping multi-process PostgreSQL test
+--- SKIP: TestLiveMultiProcessLeaseOwnerKilled (0.00s)
+=== RUN   TestSQLitePragmasApplied
+--- PASS: TestSQLitePragmasApplied (0.00s)
+=== RUN   TestSQLiteRestartIntegrity
+--- PASS: TestSQLiteRestartIntegrity (0.21s)
+=== RUN   TestStateMachinePropertySequences
+--- PASS: TestStateMachinePropertySequences (32.45s)
+=== RUN   TestProviderIdempotencyKeyDeterministic
+--- PASS: TestProviderIdempotencyKeyDeterministic (0.00s)
+=== RUN   TestSQLiteStoreHappyPath
+--- PASS: TestSQLiteStoreHappyPath (0.11s)
+=== RUN   TestSQLiteStoreStaleFencing
+--- PASS: TestSQLiteStoreStaleFencing (0.09s)
+=== RUN   TestSQLiteStoreExpiredInFlightBecomesUnknown
+--- PASS: TestSQLiteStoreExpiredInFlightBecomesUnknown (0.12s)
+=== RUN   TestSQLiteStoreAbandonAndReclaim
+--- PASS: TestSQLiteStoreAbandonAndReclaim (0.09s)
+=== RUN   TestSQLiteStoreReconcileClaimLifecycle
+--- PASS: TestSQLiteStoreReconcileClaimLifecycle (0.13s)
+=== RUN   TestSQLiteStoreProviderIdentityMonotonic
+--- PASS: TestSQLiteStoreProviderIdentityMonotonic (0.12s)
+=== RUN   TestSQLiteStoreLocatorDenylist
+--- PASS: TestSQLiteStoreLocatorDenylist (0.41s)
+=== RUN   TestSQLiteStoreConcurrentAcquire
+--- PASS: TestSQLiteStoreConcurrentAcquire (0.64s)
+=== RUN   TestSQLiteStoreSchemaVersion
+--- PASS: TestSQLiteStoreSchemaVersion (0.07s)
+=== RUN   TestOpenSQLiteDBRejectsDSNMetachars
+--- PASS: TestOpenSQLiteDBRejectsDSNMetachars (0.00s)
+=== RUN   TestOpenSQLiteDBPermissionHardening
+--- PASS: TestOpenSQLiteDBPermissionHardening (0.01s)
+=== RUN   TestSQLiteMigrationForwardCompat
+--- PASS: TestSQLiteMigrationForwardCompat (0.12s)
+=== RUN   TestSQLiteMigrationIdempotent
+--- PASS: TestSQLiteMigrationIdempotent (0.07s)
+=== RUN   TestSQLiteMigrationCrashConsistency
+--- PASS: TestSQLiteMigrationCrashConsistency (0.09s)
+=== RUN   TestSQLiteMigrationTornAppliedState
+--- PASS: TestSQLiteMigrationTornAppliedState (0.09s)
+=== RUN   TestStateTransitionMatrixIsExhaustive
+--- PASS: TestStateTransitionMatrixIsExhaustive (0.00s)
+=== RUN   TestStoreEnforcesTransitionMatrix
+=== RUN   TestStoreEnforcesTransitionMatrix/sqlite
+--- PASS: TestStoreEnforcesTransitionMatrix (0.19s)
+    --- PASS: TestStoreEnforcesTransitionMatrix/sqlite (0.19s)
+=== RUN   TestStoreConformanceLifecycle
+=== RUN   TestStoreConformanceLifecycle/sqlite
+--- PASS: TestStoreConformanceLifecycle (0.17s)
+    --- PASS: TestStoreConformanceLifecycle/sqlite (0.17s)
+=== RUN   TestStoreConformanceAcquireSemantics
+=== RUN   TestStoreConformanceAcquireSemantics/sqlite
+--- PASS: TestStoreConformanceAcquireSemantics (0.14s)
+    --- PASS: TestStoreConformanceAcquireSemantics/sqlite (0.14s)
+=== RUN   TestStoreConformanceFencing
+=== RUN   TestStoreConformanceFencing/sqlite
+--- PASS: TestStoreConformanceFencing (0.16s)
+    --- PASS: TestStoreConformanceFencing/sqlite (0.16s)
+=== RUN   TestStoreConformanceExpiredInFlight
+=== RUN   TestStoreConformanceExpiredInFlight/sqlite
+--- PASS: TestStoreConformanceExpiredInFlight (0.16s)
+    --- PASS: TestStoreConformanceExpiredInFlight/sqlite (0.16s)
+=== RUN   TestStoreConformanceExpiredPreDispatch
+=== RUN   TestStoreConformanceExpiredPreDispatch/sqlite
+--- PASS: TestStoreConformanceExpiredPreDispatch (0.14s)
+    --- PASS: TestStoreConformanceExpiredPreDispatch/sqlite (0.14s)
+=== RUN   TestStoreConformanceObservationMonotonic
+=== RUN   TestStoreConformanceObservationMonotonic/sqlite
+--- PASS: TestStoreConformanceObservationMonotonic (0.18s)
+    --- PASS: TestStoreConformanceObservationMonotonic/sqlite (0.18s)
+=== RUN   TestStoreConformanceObservationResultPreserved
+=== RUN   TestStoreConformanceObservationResultPreserved/sqlite
+--- PASS: TestStoreConformanceObservationResultPreserved (0.19s)
+    --- PASS: TestStoreConformanceObservationResultPreserved/sqlite (0.19s)
+=== RUN   TestStoreConformanceReconcile
+=== RUN   TestStoreConformanceReconcile/sqlite
+--- PASS: TestStoreConformanceReconcile (0.21s)
+    --- PASS: TestStoreConformanceReconcile/sqlite (0.21s)
+=== RUN   TestStoreConformanceCriticalProof
+=== RUN   TestStoreConformanceCriticalProof/sqlite
+--- PASS: TestStoreConformanceCriticalProof (0.14s)
+    --- PASS: TestStoreConformanceCriticalProof/sqlite (0.14s)
+=== RUN   TestStoreConformanceLocatorPolicy
+=== RUN   TestStoreConformanceLocatorPolicy/sqlite
+--- PASS: TestStoreConformanceLocatorPolicy (0.16s)
+    --- PASS: TestStoreConformanceLocatorPolicy/sqlite (0.16s)
+=== RUN   TestStoreConformanceForensicRecord
+=== RUN   TestStoreConformanceForensicRecord/sqlite
+--- PASS: TestStoreConformanceForensicRecord (0.19s)
+    --- PASS: TestStoreConformanceForensicRecord/sqlite (0.19s)
+=== RUN   TestStoreConformancePayloadBounds
+=== RUN   TestStoreConformancePayloadBounds/sqlite
+--- PASS: TestStoreConformancePayloadBounds (0.18s)
+    --- PASS: TestStoreConformancePayloadBounds/sqlite (0.18s)
+=== RUN   TestStoreConformanceClusterEpochFencing
+=== RUN   TestStoreConformanceClusterEpochFencing/sqlite
+--- PASS: TestStoreConformanceClusterEpochFencing (0.25s)
+    --- PASS: TestStoreConformanceClusterEpochFencing/sqlite (0.25s)
+=== RUN   TestStoreConformanceReconciliationBacklog
+=== RUN   TestStoreConformanceReconciliationBacklog/sqlite
+--- PASS: TestStoreConformanceReconciliationBacklog (0.24s)
+    --- PASS: TestStoreConformanceReconciliationBacklog/sqlite (0.24s)
+=== RUN   TestStoreConformanceMediationPersistence
+=== RUN   TestStoreConformanceMediationPersistence/sqlite
+--- PASS: TestStoreConformanceMediationPersistence (0.17s)
+    --- PASS: TestStoreConformanceMediationPersistence/sqlite (0.17s)
+=== RUN   TestStoreConformanceAttestationPersistence
+=== RUN   TestStoreConformanceAttestationPersistence/sqlite
+--- PASS: TestStoreConformanceAttestationPersistence (0.18s)
+    --- PASS: TestStoreConformanceAttestationPersistence/sqlite (0.18s)
+=== RUN   TestStoreConformanceMigrateRequestDigest
+=== RUN   TestStoreConformanceMigrateRequestDigest/sqlite
+--- PASS: TestStoreConformanceMigrateRequestDigest (0.25s)
+    --- PASS: TestStoreConformanceMigrateRequestDigest/sqlite (0.25s)
+=== RUN   TestLiveStoreConcurrentReserveSingleExecution
+    store_live_test.go:111: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreConcurrentReserveSingleExecution (0.00s)
+=== RUN   TestLiveStoreSameKeyDifferentDigestConflict
+    store_live_test.go:213: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreSameKeyDifferentDigestConflict (0.00s)
+=== RUN   TestLiveStoreLeaseExpiryReclaim
+    store_live_test.go:265: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreLeaseExpiryReclaim (0.00s)
+=== RUN   TestLiveStoreFinalizeConflict
+    store_live_test.go:346: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreFinalizeConflict (0.00s)
+=== RUN   TestLiveStoreListExpiredLeases
+    store_live_test.go:429: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreListExpiredLeases (0.00s)
+=== RUN   TestLiveStoreLargeIntegerConflict
+    store_live_test.go:503: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreLargeIntegerConflict (0.00s)
+=== RUN   TestLiveStoreCrashInDispatchingRecovery
+    store_live_test.go:576: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreCrashInDispatchingRecovery (0.00s)
+=== RUN   TestLiveStoreCrashInFlightUnknown
+    store_live_test.go:655: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreCrashInFlightUnknown (0.00s)
+=== RUN   TestLiveStoreLeaseRenewalByOldTokenRejected
+    store_live_test.go:745: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreLeaseRenewalByOldTokenRejected (0.00s)
+=== RUN   TestLiveStoreRetryAfterInvalidEvidenceNoMagicV3
+    store_live_test.go:814: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreRetryAfterInvalidEvidenceNoMagicV3 (0.00s)
+=== RUN   TestLiveStoreRecoveryWithProofOfCompletion
+    store_live_test.go:887: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreRecoveryWithProofOfCompletion (0.00s)
+=== RUN   TestLiveStoreRecoveryWithProofOfFailure
+    store_live_test.go:957: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreRecoveryWithProofOfFailure (0.00s)
+=== RUN   TestLiveStoreRecoveryWithoutProofStaysUnknown
+    store_live_test.go:1025: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreRecoveryWithoutProofStaysUnknown (0.00s)
+=== RUN   TestLiveEffectFabricExpiredLeaseMatrix
+    store_live_test.go:1106: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveEffectFabricExpiredLeaseMatrix (0.00s)
+=== RUN   TestLiveEffectFabricStaleWorkerFencing
+    store_live_test.go:1272: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveEffectFabricStaleWorkerFencing (0.00s)
+=== RUN   TestLiveEffectFabricFinalizationConflicts
+    store_live_test.go:1375: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveEffectFabricFinalizationConflicts (0.00s)
+=== RUN   TestLiveEffectFabricEvidenceRecovery
+    store_live_test.go:1546: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveEffectFabricEvidenceRecovery (0.00s)
+=== RUN   TestLiveEffectFabricCrashAfterPrepared
+    store_live_test.go:1668: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveEffectFabricCrashAfterPrepared (0.00s)
+=== RUN   TestLiveEffectFabricCrashAfterFinalization
+    store_live_test.go:1744: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveEffectFabricCrashAfterFinalization (0.00s)
+=== RUN   TestLiveStoreRenewLeaseMonotonic
+    store_live_test.go:1827: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreRenewLeaseMonotonic (0.00s)
+=== RUN   TestLiveStoreRecoveryLocatorPersisted
+    store_live_test.go:1890: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreRecoveryLocatorPersisted (0.00s)
+=== RUN   TestLiveStoreCriticalRecoveryFailedRequiresProof
+    store_live_test.go:1953: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreCriticalRecoveryFailedRequiresProof (0.00s)
+=== RUN   TestLiveStoreCriticalNoEffectWithoutRunID
+    store_live_test.go:2090: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreCriticalNoEffectWithoutRunID (0.00s)
+=== RUN   TestLiveStoreReplayProviderMetadata
+    store_live_test.go:2162: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveStoreReplayProviderMetadata (0.00s)
+=== RUN   TestLiveClaimUnknownBatch
+    store_live_test.go:2238: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveClaimUnknownBatch (0.00s)
+=== RUN   TestLiveClaimUnknownBatchRespectsBackoff
+    store_live_test.go:2332: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveClaimUnknownBatchRespectsBackoff (0.00s)
+=== RUN   TestLiveResolveRecoveryClearsClaim
+    store_live_test.go:2410: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveResolveRecoveryClearsClaim (0.00s)
+=== RUN   TestLiveFinalizeDeniedRejected
+    store_live_test.go:2490: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveFinalizeDeniedRejected (0.00s)
+=== RUN   TestLiveEnterRecoveryRejectsNonInFlight
+    store_live_test.go:2543: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveEnterRecoveryRejectsNonInFlight (0.00s)
+=== RUN   TestLiveConcurrentIdenticalFinalize
+    store_live_test.go:2611: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveConcurrentIdenticalFinalize (0.00s)
+=== RUN   TestLiveCriticalFinalizeRequiresProof
+    store_live_test.go:2700: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveCriticalFinalizeRequiresProof (0.00s)
+=== RUN   TestLiveRecoveryLocatorCleared
+    store_live_test.go:2823: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveRecoveryLocatorCleared (0.00s)
+=== RUN   TestLiveEnterRecoveryWithObservation
+    store_live_test.go:2883: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveEnterRecoveryWithObservation (0.00s)
+=== RUN   TestLiveClaimExpiredBatch
+    store_live_test.go:2949: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveClaimExpiredBatch (0.00s)
+=== RUN   TestLiveRecordProviderObservation
+    store_live_test.go:3019: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveRecordProviderObservation (0.00s)
+=== RUN   TestLiveRecoverExpiredPreDispatch
+    store_live_test.go:3211: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveRecoverExpiredPreDispatch (0.00s)
+=== RUN   TestLiveScrubStaleRecoveryLocators
+    store_live_test.go:3315: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveScrubStaleRecoveryLocators (0.00s)
+=== RUN   TestLiveRecoveryLocatorBounds
+    store_live_test.go:3407: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveRecoveryLocatorBounds (0.00s)
+=== RUN   TestLiveTerminalWritesProviderIdentityMonotonic
+    store_live_test.go:3523: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveTerminalWritesProviderIdentityMonotonic (0.00s)
+=== RUN   TestLiveAbandonPreDispatchFailureClassification
+    store_live_test.go:3671: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveAbandonPreDispatchFailureClassification (0.00s)
+=== RUN   TestLiveMarkInFlightRedactorRunsBeforeDenylist
+    store_live_test.go:3746: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveMarkInFlightRedactorRunsBeforeDenylist (0.00s)
+=== RUN   TestLiveResolveRecoveryObservationMonotonic
+    store_live_test.go:3833: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveResolveRecoveryObservationMonotonic (0.00s)
+=== RUN   TestLiveEnsureValidIndexScopedToActiveSchema
+    store_live_test.go:3972: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveEnsureValidIndexScopedToActiveSchema (0.00s)
+=== RUN   TestLiveClusterRecoveryMode
+    store_live_test.go:4052: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveClusterRecoveryMode (0.00s)
+=== RUN   TestObservationFailClosedInvalidJSON
+--- PASS: TestObservationFailClosedInvalidJSON (0.14s)
+=== RUN   TestObservationDigestHonesty
+--- PASS: TestObservationDigestHonesty (0.15s)
+=== RUN   TestObservationPayloadBounds
+--- PASS: TestObservationPayloadBounds (0.14s)
+=== RUN   TestFinalizePayloadBounds
+--- PASS: TestFinalizePayloadBounds (0.09s)
+=== RUN   TestFinalizeStoresAssertedResultBytes
+--- PASS: TestFinalizeStoresAssertedResultBytes (0.10s)
+=== RUN   TestResolveRecoveryPayloadBounds
+--- PASS: TestResolveRecoveryPayloadBounds (0.15s)
+=== RUN   FuzzCanonicalJSONNumber
+=== RUN   FuzzCanonicalJSONNumber/seed#0
+=== RUN   FuzzCanonicalJSONNumber/seed#1
+=== RUN   FuzzCanonicalJSONNumber/seed#2
+=== RUN   FuzzCanonicalJSONNumber/seed#3
+=== RUN   FuzzCanonicalJSONNumber/seed#4
+=== RUN   FuzzCanonicalJSONNumber/seed#5
+=== RUN   FuzzCanonicalJSONNumber/seed#6
+=== RUN   FuzzCanonicalJSONNumber/seed#7
+=== RUN   FuzzCanonicalJSONNumber/seed#8
+=== RUN   FuzzCanonicalJSONNumber/seed#9
+=== RUN   FuzzCanonicalJSONNumber/seed#10
+=== RUN   FuzzCanonicalJSONNumber/seed#11
+=== RUN   FuzzCanonicalJSONNumber/seed#12
+=== RUN   FuzzCanonicalJSONNumber/seed#13
+=== RUN   FuzzCanonicalJSONNumber/seed#14
+=== RUN   FuzzCanonicalJSONNumber/seed#15
+=== RUN   FuzzCanonicalJSONNumber/seed#16
+=== RUN   FuzzCanonicalJSONNumber/seed#17
+=== RUN   FuzzCanonicalJSONNumber/seed#18
+=== RUN   FuzzCanonicalJSONNumber/seed#19
+=== RUN   FuzzCanonicalJSONNumber/seed#20
+=== RUN   FuzzCanonicalJSONNumber/seed#21
+=== RUN   FuzzCanonicalJSONNumber/seed#22
+=== RUN   FuzzCanonicalJSONNumber/seed#23
+=== RUN   FuzzCanonicalJSONNumber/seed#24
+=== RUN   FuzzCanonicalJSONNumber/seed#25
+=== RUN   FuzzCanonicalJSONNumber/seed#26
+=== RUN   FuzzCanonicalJSONNumber/seed#27
+=== RUN   FuzzCanonicalJSONNumber/seed#28
+=== RUN   FuzzCanonicalJSONNumber/seed#29
+--- PASS: FuzzCanonicalJSONNumber (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#0 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#1 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#2 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#3 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#4 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#5 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#6 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#7 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#8 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#9 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#10 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#11 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#12 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#13 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#14 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#15 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#16 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#17 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#18 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#19 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#20 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#21 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#22 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#23 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#24 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#25 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#26 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#27 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#28 (0.00s)
+    --- PASS: FuzzCanonicalJSONNumber/seed#29 (0.00s)
+=== RUN   FuzzCanonicalJSON
+=== RUN   FuzzCanonicalJSON/seed#0
+=== RUN   FuzzCanonicalJSON/seed#1
+=== RUN   FuzzCanonicalJSON/seed#2
+=== RUN   FuzzCanonicalJSON/seed#3
+=== RUN   FuzzCanonicalJSON/seed#4
+=== RUN   FuzzCanonicalJSON/seed#5
+=== RUN   FuzzCanonicalJSON/seed#6
+=== RUN   FuzzCanonicalJSON/seed#7
+=== RUN   FuzzCanonicalJSON/seed#8
+=== RUN   FuzzCanonicalJSON/seed#9
+=== RUN   FuzzCanonicalJSON/seed#10
+=== RUN   FuzzCanonicalJSON/seed#11
+=== RUN   FuzzCanonicalJSON/seed#12
+=== RUN   FuzzCanonicalJSON/seed#13
+=== RUN   FuzzCanonicalJSON/seed#14
+--- PASS: FuzzCanonicalJSON (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#0 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#1 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#2 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#3 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#4 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#5 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#6 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#7 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#8 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#9 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#10 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#11 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#12 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#13 (0.00s)
+    --- PASS: FuzzCanonicalJSON/seed#14 (0.00s)
+=== RUN   FuzzRequestDigest
+=== RUN   FuzzRequestDigest/seed#0
+=== RUN   FuzzRequestDigest/seed#1
+=== RUN   FuzzRequestDigest/seed#2
+=== RUN   FuzzRequestDigest/seed#3
+=== RUN   FuzzRequestDigest/seed#4
+=== RUN   FuzzRequestDigest/seed#5
+=== RUN   FuzzRequestDigest/seed#6
+=== RUN   FuzzRequestDigest/seed#7
+--- PASS: FuzzRequestDigest (0.00s)
+    --- PASS: FuzzRequestDigest/seed#0 (0.00s)
+    --- PASS: FuzzRequestDigest/seed#1 (0.00s)
+    --- PASS: FuzzRequestDigest/seed#2 (0.00s)
+    --- PASS: FuzzRequestDigest/seed#3 (0.00s)
+    --- PASS: FuzzRequestDigest/seed#4 (0.00s)
+    --- PASS: FuzzRequestDigest/seed#5 (0.00s)
+    --- PASS: FuzzRequestDigest/seed#6 (0.00s)
+    --- PASS: FuzzRequestDigest/seed#7 (0.00s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/idempotency	44.737s
+=== RUN   TestSupervisorPublishesReadinessToStatusWriter
+2026/10/19 10:59:47 reconciliation readiness: NOT_READY -> READY
+2026/10/19 10:59:47 reconciliation cycle failed (1 consecutive): failed to claim unknown records: injected claim failure
+--- PASS: TestSupervisorPublishesReadinessToStatusWriter (0.00s)
+=== RUN   TestSupervisorPublishesStoreInvariantCounters
+2026/10/19 10:59:47 reconciliation readiness: NOT_READY -> READY
+2026/10/19 10:59:47 reconciliation readiness: NOT_READY -> READY
+--- PASS: TestSupervisorPublishesStoreInvariantCounters (0.10s)
+=== RUN   TestSupervisorReadinessPolicy
+2026/10/19 10:59:47 reconciliation readiness: NOT_READY -> READY
+2026/10/19 10:59:47 reconciliation readiness: NOT_READY -> DEGRADED ([no successful cycle for 0s (limit 1ns)])
+2026/10/19 10:59:47 reconciliation cycle failed (1 consecutive): failed to claim unknown records: injected claim failure
+2026/10/19 10:59:47 reconciliation readiness: NOT_READY -> READY
+2026/10/19 10:59:47 reconciliation cycle failed (2 consecutive): failed to claim unknown records: injected claim failure
+2026/10/19 10:59:47 reconciliation readiness: READY -> NOT_READY ([2 consecutive failed cycles])
+--- PASS: TestSupervisorReadinessPolicy (0.00s)
+=== RUN   TestSupervisorDegradedOnUnknownBacklogAge
+2026/10/19 10:59:47 reconciliation readiness: NOT_READY -> DEGRADED ([oldest UNKNOWN is 2h0m0s old (limit 1h0m0s)])
+--- PASS: TestSupervisorDegradedOnUnknownBacklogAge (0.00s)
+=== RUN   TestSupervisorRunLoopObservesCycles
+2026/10/19 10:59:47 reconciliation readiness: NOT_READY -> READY
+--- PASS: TestSupervisorRunLoopObservesCycles (0.03s)
+=== RUN   TestWorkerCountersDeadLettersAndResolverFailures
+--- PASS: TestWorkerCountersDeadLettersAndResolverFailures (0.00s)
+=== RUN   TestSQLiteWorkerReconcileCommitted
+--- PASS: TestSQLiteWorkerReconcileCommitted (0.12s)
+=== RUN   TestNoopResolverReturnsUnknown
+--- PASS: TestNoopResolverReturnsUnknown (0.00s)
+=== RUN   TestWorkerRegisterResolver
+--- PASS: TestWorkerRegisterResolver (0.00s)
+=== RUN   TestWorkerNilDefaultResolver
+--- PASS: TestWorkerNilDefaultResolver (0.00s)
+=== RUN   TestReconcileBackoff
+=== RUN   TestReconcileBackoff/attempt_0
+=== RUN   TestReconcileBackoff/attempt_1
+=== RUN   TestReconcileBackoff/attempt_2
+=== RUN   TestReconcileBackoff/attempt_3
+=== RUN   TestReconcileBackoff/attempt_4
+=== RUN   TestReconcileBackoff/attempt_5
+=== RUN   TestReconcileBackoff/attempt_6
+=== RUN   TestReconcileBackoff/attempt_7
+=== RUN   TestReconcileBackoff/attempt_10
+=== RUN   TestReconcileBackoff/attempt_50
+=== RUN   TestReconcileBackoff/attempt_-1
+--- PASS: TestReconcileBackoff (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_0 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_1 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_2 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_3 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_4 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_5 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_6 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_7 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_10 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_50 (0.00s)
+    --- PASS: TestReconcileBackoff/attempt_-1 (0.00s)
+=== RUN   TestReconcileBackoffNeverZero
+--- PASS: TestReconcileBackoffNeverZero (0.00s)
+=== RUN   TestLiveWorkerReconciliation
+    worker_test.go:133: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveWorkerReconciliation (0.00s)
+=== RUN   TestLiveWorkerDeadLettersAfterAttemptCeiling
+    worker_test.go:217: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveWorkerDeadLettersAfterAttemptCeiling (0.00s)
+=== RUN   TestLiveWorkerReconcileCriticalFailedWithoutProof
+    worker_test.go:295: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveWorkerReconcileCriticalFailedWithoutProof (0.00s)
+=== RUN   TestLiveClaimHeartbeatBlocksSecondWorker
+    worker_test.go:415: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveClaimHeartbeatBlocksSecondWorker (0.00s)
+=== RUN   TestLiveClaimExpiryRecovery
+    worker_test.go:493: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveClaimExpiryRecovery (0.00s)
+=== RUN   TestLiveWorkerSuspendsPastClaimCeiling
+    worker_test.go:586: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveWorkerSuspendsPastClaimCeiling (0.00s)
+=== RUN   TestLiveWorkerResolverRunsAtLastAllowedClaim
+    worker_test.go:654: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveWorkerResolverRunsAtLastAllowedClaim (0.00s)
+=== RUN   TestLiveBatchClaimHeartbeatProtectsQueuedRecords
+    worker_test.go:725: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveBatchClaimHeartbeatProtectsQueuedRecords (0.00s)
+=== RUN   TestLiveReconcileSkipsResolverOnStaleClaim
+    worker_test.go:818: CRABBOX_TEST_DATABASE_URL not set; skipping live PostgreSQL test
+--- SKIP: TestLiveReconcileSkipsResolverOnStaleClaim (0.00s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/reconcile	1.258s
+---
+finished_at=2026-10-19T10:59:50Z
+exit=0

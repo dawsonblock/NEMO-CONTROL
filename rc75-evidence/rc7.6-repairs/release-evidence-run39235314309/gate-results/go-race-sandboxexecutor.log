@@ -1,0 +1,958 @@
+command=go test -v -race -count=1 -timeout=1200s ./internal/sandboxexecutor/
+started_at=2026-10-19T10:44:02Z
+---
+=== RUN   TestAdversarialFaultMatrix
+=== RUN   TestAdversarialFaultMatrix/create_refused_before_boot
+=== RUN   TestAdversarialFaultMatrix/create_failed_after_boot
+=== RUN   TestAdversarialFaultMatrix/create_deadline_mid-boot
+=== RUN   TestAdversarialFaultMatrix/post-launch_identity_unprovable
+=== RUN   TestAdversarialFaultMatrix/spawn_rejected_by_the_guest
+=== RUN   TestAdversarialFaultMatrix/launch_failed_before_admission
+=== RUN   TestAdversarialFaultMatrix/launch_admitted_but_unnamed
+=== RUN   TestAdversarialFaultMatrix/launched_job_in_a_substituted_VM
+=== RUN   TestAdversarialFaultMatrix/policy/extra_env
+=== RUN   TestAdversarialFaultMatrix/policy/duplicate_env
+=== RUN   TestAdversarialFaultMatrix/policy/init_hook
+=== RUN   TestAdversarialFaultMatrix/policy/patches
+=== RUN   TestAdversarialFaultMatrix/policy/scripts
+=== RUN   TestAdversarialFaultMatrix/policy/rlimits
+=== RUN   TestAdversarialFaultMatrix/policy/mount_policy_loose
+=== RUN   TestAdversarialFaultMatrix/policy/extra_interface
+=== RUN   TestAdversarialFaultMatrix/policy/port_publish
+=== RUN   TestAdversarialFaultMatrix/policy/max_cpus_headroom
+=== RUN   TestAdversarialFaultMatrix/policy/max_memory_headroom
+=== RUN   TestAdversarialFaultMatrix/policy/ephemeral
+=== RUN   TestAdversarialFaultMatrix/policy/idle_timeout
+=== RUN   TestAdversarialFaultMatrix/policy/workdir
+=== RUN   TestAdversarialFaultMatrix/policy/shell
+=== RUN   TestAdversarialFaultMatrix/policy/runtime_cmd
+=== RUN   TestAdversarialFaultMatrix/policy/entrypoint
+=== RUN   TestAdversarialFaultMatrix/policy/runtime_user
+=== RUN   TestAdversarialFaultMatrix/policy/hostname
+=== RUN   TestAdversarialFaultMatrix/policy/pending_changes
+=== RUN   TestAdversarialFaultMatrix/policy/paused
+=== RUN   TestAdversarialFaultMatrix/policy/recovery_required
+=== RUN   TestAdversarialFaultMatrix/adoption/substituted_boot_generation
+=== RUN   TestAdversarialFaultMatrix/adoption/rewritten_nonce
+=== RUN   TestAdversarialFaultMatrix/adoption/rewritten_policy_digest
+=== RUN   TestAdversarialFaultMatrix/adoption/missing_boot_generation
+=== NAME  TestAdversarialFaultMatrix
+    adversarial_test.go:235: adversarial matrix: 8 dispatch scenarios, 22 policy scenarios, 4 adoption scenarios — targets {falseNoEffect:0 unauthorizedAdopt:0 duplicateDispatch:0 acceptedForbidden:0}
+--- PASS: TestAdversarialFaultMatrix (169.63s)
+    --- PASS: TestAdversarialFaultMatrix/create_refused_before_boot (1.22s)
+    --- PASS: TestAdversarialFaultMatrix/create_failed_after_boot (3.47s)
+    --- PASS: TestAdversarialFaultMatrix/create_deadline_mid-boot (1.71s)
+    --- PASS: TestAdversarialFaultMatrix/post-launch_identity_unprovable (4.19s)
+    --- PASS: TestAdversarialFaultMatrix/spawn_rejected_by_the_guest (7.32s)
+    --- PASS: TestAdversarialFaultMatrix/launch_failed_before_admission (4.49s)
+    --- PASS: TestAdversarialFaultMatrix/launch_admitted_but_unnamed (4.29s)
+    --- PASS: TestAdversarialFaultMatrix/launched_job_in_a_substituted_VM (5.27s)
+    --- PASS: TestAdversarialFaultMatrix/policy/extra_env (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/duplicate_env (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/init_hook (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/patches (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/scripts (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/rlimits (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/mount_policy_loose (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/extra_interface (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/port_publish (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/max_cpus_headroom (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/max_memory_headroom (5.12s)
+    --- PASS: TestAdversarialFaultMatrix/policy/ephemeral (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/idle_timeout (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/workdir (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/shell (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/runtime_cmd (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/entrypoint (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/runtime_user (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/hostname (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/pending_changes (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/paused (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/policy/recovery_required (5.10s)
+    --- PASS: TestAdversarialFaultMatrix/adoption/substituted_boot_generation (7.11s)
+    --- PASS: TestAdversarialFaultMatrix/adoption/rewritten_nonce (6.11s)
+    --- PASS: TestAdversarialFaultMatrix/adoption/rewritten_policy_digest (6.10s)
+    --- PASS: TestAdversarialFaultMatrix/adoption/missing_boot_generation (6.11s)
+=== RUN   TestDispatchClassVocabulary
+--- PASS: TestDispatchClassVocabulary (0.00s)
+=== RUN   TestArchiveMovesSettledTerminalRows
+--- PASS: TestArchiveMovesSettledTerminalRows (0.40s)
+=== RUN   TestArchivePreservesReplayForever
+--- PASS: TestArchivePreservesReplayForever (0.55s)
+=== RUN   TestArchiveSkipsUnevidencedAndUnresolved
+--- PASS: TestArchiveSkipsUnevidencedAndUnresolved (0.45s)
+=== RUN   TestArchiveWaitsForVerifiedCleanup
+--- PASS: TestArchiveWaitsForVerifiedCleanup (0.63s)
+=== RUN   TestTerminalRefsSpanArchiveInOrder
+--- PASS: TestTerminalRefsSpanArchiveInOrder (0.63s)
+=== RUN   TestArchiveSurvivesRestart
+--- PASS: TestArchiveSurvivesRestart (0.71s)
+=== RUN   TestVerifyArchiveSegmentsDetectsTamper
+--- PASS: TestVerifyArchiveSegmentsDetectsTamper (0.15s)
+=== RUN   TestListMergesActiveAndArchive
+--- PASS: TestListMergesActiveAndArchive (0.65s)
+=== RUN   TestCustodialArchiveHoldsRowsUntilWitnessed
+--- PASS: TestCustodialArchiveHoldsRowsUntilWitnessed (0.44s)
+=== RUN   TestCustodialArchiveResumesAfterRestart
+--- PASS: TestCustodialArchiveResumesAfterRestart (0.13s)
+=== RUN   TestInspectLedgerSeesTheArchive
+--- PASS: TestInspectLedgerSeesTheArchive (0.11s)
+=== RUN   TestAdmissionArchivesSettledRowsInsteadOfRefusing
+--- PASS: TestAdmissionArchivesSettledRowsInsteadOfRefusing (12.65s)
+=== RUN   TestMigrationBackfillsPermanentIdentities
+--- PASS: TestMigrationBackfillsPermanentIdentities (0.17s)
+=== RUN   TestArchiveCustodyOverSocket
+--- PASS: TestArchiveCustodyOverSocket (0.27s)
+=== RUN   TestArchiveCustodyOfflineHoldsRows
+--- PASS: TestArchiveCustodyOfflineHoldsRows (0.15s)
+=== RUN   TestParsePeerAllowlist
+=== RUN   TestParsePeerAllowlist/valid_entries
+=== RUN   TestParsePeerAllowlist/empty_refuses
+=== RUN   TestParsePeerAllowlist/malformed_entry
+=== RUN   TestParsePeerAllowlist/duplicate_uid
+=== RUN   TestParsePeerAllowlist/unknown_uid_denied
+--- PASS: TestParsePeerAllowlist (0.00s)
+    --- PASS: TestParsePeerAllowlist/valid_entries (0.00s)
+    --- PASS: TestParsePeerAllowlist/empty_refuses (0.00s)
+    --- PASS: TestParsePeerAllowlist/malformed_entry (0.00s)
+    --- PASS: TestParsePeerAllowlist/duplicate_uid (0.00s)
+    --- PASS: TestParsePeerAllowlist/unknown_uid_denied (0.00s)
+=== RUN   TestLoadSubmissionToken
+=== RUN   TestLoadSubmissionToken/valid_0600
+=== RUN   TestLoadSubmissionToken/group/world_readable_refuses
+=== RUN   TestLoadSubmissionToken/symlink_refuses
+=== RUN   TestLoadSubmissionToken/empty_refuses
+=== RUN   TestLoadSubmissionToken/missing_refuses
+=== RUN   TestLoadSubmissionToken/nil_token_allows_all
+--- PASS: TestLoadSubmissionToken (0.00s)
+    --- PASS: TestLoadSubmissionToken/valid_0600 (0.00s)
+    --- PASS: TestLoadSubmissionToken/group/world_readable_refuses (0.00s)
+    --- PASS: TestLoadSubmissionToken/symlink_refuses (0.00s)
+    --- PASS: TestLoadSubmissionToken/empty_refuses (0.00s)
+    --- PASS: TestLoadSubmissionToken/missing_refuses (0.00s)
+    --- PASS: TestLoadSubmissionToken/nil_token_allows_all (0.00s)
+=== RUN   TestTokenConstantTimeShape
+--- PASS: TestTokenConstantTimeShape (0.00s)
+=== RUN   TestBoundedArtifactWriterDigestMatchesStoredBytes
+--- PASS: TestBoundedArtifactWriterDigestMatchesStoredBytes (0.00s)
+=== RUN   TestMSBDispatchRefusesPreexistingSandbox
+--- PASS: TestMSBDispatchRefusesPreexistingSandbox (1.07s)
+=== RUN   TestMSBDispatchVerifiesPolicyBeforeExec
+=== RUN   TestMSBDispatchVerifiesPolicyBeforeExec/net_public
+=== RUN   TestMSBDispatchVerifiesPolicyBeforeExec/ingress_allow
+--- PASS: TestMSBDispatchVerifiesPolicyBeforeExec (10.20s)
+    --- PASS: TestMSBDispatchVerifiesPolicyBeforeExec/net_public (5.10s)
+    --- PASS: TestMSBDispatchVerifiesPolicyBeforeExec/ingress_allow (5.10s)
+=== RUN   TestMSBDispatchAmbiguousCreateLeaksNothing
+--- PASS: TestMSBDispatchAmbiguousCreateLeaksNothing (1.06s)
+=== RUN   TestMSBDispatchRefusesUnauthorizedPublicRules
+=== RUN   TestMSBDispatchRefusesUnauthorizedPublicRules/authorized_public_rules_accepted
+=== RUN   TestMSBDispatchRefusesUnauthorizedPublicRules/extra_private_rule_refused
+--- PASS: TestMSBDispatchRefusesUnauthorizedPublicRules (12.22s)
+    --- PASS: TestMSBDispatchRefusesUnauthorizedPublicRules/authorized_public_rules_accepted (7.11s)
+    --- PASS: TestMSBDispatchRefusesUnauthorizedPublicRules/extra_private_rule_refused (5.10s)
+=== RUN   TestMSBDispatchVerifiesBootedConfiguration
+--- PASS: TestMSBDispatchVerifiesBootedConfiguration (5.10s)
+=== RUN   TestMSBDispatchFailedCreateRemovesItsOwnLeftover
+--- PASS: TestMSBDispatchFailedCreateRemovesItsOwnLeftover (3.09s)
+=== RUN   TestMSBDispatchFailedCreateLeavesForeignSandboxAlone
+--- PASS: TestMSBDispatchFailedCreateLeavesForeignSandboxAlone (1.07s)
+=== RUN   TestMSBDispatchPullPolicy
+=== RUN   TestMSBDispatchPullPolicy/if-missing_is_passed_through_when_configured
+=== RUN   TestMSBDispatchPullPolicy/unknown_policy_refuses
+--- PASS: TestMSBDispatchPullPolicy (8.21s)
+    --- PASS: TestMSBDispatchPullPolicy/if-missing_is_passed_through_when_configured (7.14s)
+    --- PASS: TestMSBDispatchPullPolicy/unknown_policy_refuses (1.06s)
+=== RUN   TestMSBDispatchMapsContractToSandbox
+--- PASS: TestMSBDispatchMapsContractToSandbox (9.14s)
+=== RUN   TestMSBDispatchAdoptsARejectedSpawn
+--- PASS: TestMSBDispatchAdoptsARejectedSpawn (6.11s)
+=== RUN   TestMSBDispatchFailureWithoutARecordIsUncertain
+--- PASS: TestMSBDispatchFailureWithoutARecordIsUncertain (4.10s)
+=== RUN   TestMSBDispatchAdoptsAdmittedUnnamedJob
+--- PASS: TestMSBDispatchAdoptsAdmittedUnnamedJob (4.09s)
+=== RUN   TestMSBWaitVerifiesGuestExit
+=== RUN   TestMSBWaitVerifiesGuestExit/exit-0
+=== RUN   TestMSBWaitVerifiesGuestExit/exit-72
+--- PASS: TestMSBWaitVerifiesGuestExit (14.23s)
+    --- PASS: TestMSBWaitVerifiesGuestExit/exit-0 (7.11s)
+    --- PASS: TestMSBWaitVerifiesGuestExit/exit-72 (7.11s)
+=== RUN   TestMSBWaitTimeoutIsObservedNotInvented
+--- PASS: TestMSBWaitTimeoutIsObservedNotInvented (7.11s)
+=== RUN   TestMSBWaitSpawnRejected
+--- PASS: TestMSBWaitSpawnRejected (7.11s)
+=== RUN   TestMSBWaitRefusesUnprovenSpawnRejection
+=== RUN   TestMSBWaitRefusesUnprovenSpawnRejection/bare_failed_state
+=== RUN   TestMSBWaitRefusesUnprovenSpawnRejection/unrecognized_failure_stage
+=== RUN   TestMSBWaitRefusesUnprovenSpawnRejection/signals_disagree_about_starting
+--- PASS: TestMSBWaitRefusesUnprovenSpawnRejection (18.32s)
+    --- PASS: TestMSBWaitRefusesUnprovenSpawnRejection/bare_failed_state (6.10s)
+    --- PASS: TestMSBWaitRefusesUnprovenSpawnRejection/unrecognized_failure_stage (6.11s)
+    --- PASS: TestMSBWaitRefusesUnprovenSpawnRejection/signals_disagree_about_starting (6.11s)
+=== RUN   TestPreExecutionFailureRequiresEverySignal
+=== RUN   TestPreExecutionFailureRequiresEverySignal/proven_pre-execution_failure
+=== RUN   TestPreExecutionFailureRequiresEverySignal/no_failure_object
+=== RUN   TestPreExecutionFailureRequiresEverySignal/failure_without_a_stage
+=== RUN   TestPreExecutionFailureRequiresEverySignal/unrecognized_stage
+=== RUN   TestPreExecutionFailureRequiresEverySignal/record_shows_a_pid
+=== RUN   TestPreExecutionFailureRequiresEverySignal/record_shows_a_start_timestamp
+--- PASS: TestPreExecutionFailureRequiresEverySignal (0.00s)
+    --- PASS: TestPreExecutionFailureRequiresEverySignal/proven_pre-execution_failure (0.00s)
+    --- PASS: TestPreExecutionFailureRequiresEverySignal/no_failure_object (0.00s)
+    --- PASS: TestPreExecutionFailureRequiresEverySignal/failure_without_a_stage (0.00s)
+    --- PASS: TestPreExecutionFailureRequiresEverySignal/unrecognized_stage (0.00s)
+    --- PASS: TestPreExecutionFailureRequiresEverySignal/record_shows_a_pid (0.00s)
+    --- PASS: TestPreExecutionFailureRequiresEverySignal/record_shows_a_start_timestamp (0.00s)
+=== RUN   TestMSBWaitLostRuntimeIsUnobserved
+--- PASS: TestMSBWaitLostRuntimeIsUnobserved (6.10s)
+=== RUN   TestMSBWaitVanishedSandboxIsUnobserved
+--- PASS: TestMSBWaitVanishedSandboxIsUnobserved (6.40s)
+=== RUN   TestMSBWaitCorrelatesTheAuthorizedCommand
+--- PASS: TestMSBWaitCorrelatesTheAuthorizedCommand (6.10s)
+=== RUN   TestMSBWaitPollsUntilTerminal
+--- PASS: TestMSBWaitPollsUntilTerminal (8.14s)
+=== RUN   TestMSBCaptureBoundedAndTruncated
+--- PASS: TestMSBCaptureBoundedAndTruncated (7.12s)
+=== RUN   TestMSBCaptureKeepsSmallOutputWhole
+--- PASS: TestMSBCaptureKeepsSmallOutputWhole (7.11s)
+=== RUN   TestMSBCaptureFailureIsNotFullyVerified
+--- PASS: TestMSBCaptureFailureIsNotFullyVerified (6.11s)
+=== RUN   TestMSBCleanupRemovesSandbox
+--- PASS: TestMSBCleanupRemovesSandbox (7.13s)
+=== RUN   TestMSBCleanupFailureIsReported
+--- PASS: TestMSBCleanupFailureIsReported (7.12s)
+=== RUN   TestMSBKeepSandboxesLeavesForensicVM
+--- PASS: TestMSBKeepSandboxesLeavesForensicVM (7.14s)
+=== RUN   TestMSBVerifyRuntimeAcceptsPinnedVersion
+--- PASS: TestMSBVerifyRuntimeAcceptsPinnedVersion (2.09s)
+=== RUN   TestMSBVerifyRuntimeRefusesDrift
+--- PASS: TestMSBVerifyRuntimeRefusesDrift (1.06s)
+=== RUN   TestMSBVerifyRuntimeHonorsExplicitPin
+--- PASS: TestMSBVerifyRuntimeHonorsExplicitPin (2.08s)
+=== RUN   TestMSBResumeAdoptsTheRuntimesOwnRecord
+--- PASS: TestMSBResumeAdoptsTheRuntimesOwnRecord (9.13s)
+=== RUN   TestMSBResumeRefusesAmbiguousAdoption
+=== RUN   TestMSBResumeRefusesAmbiguousAdoption/no_sandbox_at_all
+=== RUN   TestMSBResumeRefusesAmbiguousAdoption/no_matching_job_record
+=== RUN   TestMSBResumeRefusesAmbiguousAdoption/several_matching_job_records
+--- PASS: TestMSBResumeRefusesAmbiguousAdoption (13.18s)
+    --- PASS: TestMSBResumeRefusesAmbiguousAdoption/no_sandbox_at_all (0.01s)
+    --- PASS: TestMSBResumeRefusesAmbiguousAdoption/no_matching_job_record (7.06s)
+    --- PASS: TestMSBResumeRefusesAmbiguousAdoption/several_matching_job_records (6.06s)
+=== RUN   TestMSBPinsDeploymentProfile
+=== RUN   TestMSBPinsDeploymentProfile/default_single-tenant_is_pinned_and_verified
+=== RUN   TestMSBPinsDeploymentProfile/downgraded_booted_profile_refuses
+=== RUN   TestMSBPinsDeploymentProfile/explicit_multi-tenant_pin_is_honored
+=== RUN   TestMSBPinsDeploymentProfile/unknown_profile_refuses
+--- PASS: TestMSBPinsDeploymentProfile (18.38s)
+    --- PASS: TestMSBPinsDeploymentProfile/default_single-tenant_is_pinned_and_verified (7.12s)
+    --- PASS: TestMSBPinsDeploymentProfile/downgraded_booted_profile_refuses (5.10s)
+    --- PASS: TestMSBPinsDeploymentProfile/explicit_multi-tenant_pin_is_honored (5.10s)
+    --- PASS: TestMSBPinsDeploymentProfile/unknown_profile_refuses (1.06s)
+=== RUN   TestMSBVerifyHost
+=== RUN   TestMSBVerifyHost/ready_host_passes
+=== RUN   TestMSBVerifyHost/unsupported_host_refuses
+--- PASS: TestMSBVerifyHost (1.12s)
+    --- PASS: TestMSBVerifyHost/ready_host_passes (1.06s)
+    --- PASS: TestMSBVerifyHost/unsupported_host_refuses (0.06s)
+=== RUN   TestMSBBoundsUtilityCallOutput
+--- PASS: TestMSBBoundsUtilityCallOutput (1.12s)
+=== RUN   TestMSBRuntimeIdentityRefusesSubstitutedBytes
+=== RUN   TestMSBRuntimeIdentityRefusesSubstitutedBytes/substituted_executable
+=== RUN   TestMSBRuntimeIdentityRefusesSubstitutedBytes/substituted_firmware
+=== RUN   TestMSBRuntimeIdentityRefusesSubstitutedBytes/missing_manifest_refuses
+--- PASS: TestMSBRuntimeIdentityRefusesSubstitutedBytes (4.22s)
+    --- PASS: TestMSBRuntimeIdentityRefusesSubstitutedBytes/substituted_executable (1.08s)
+    --- PASS: TestMSBRuntimeIdentityRefusesSubstitutedBytes/substituted_firmware (2.08s)
+    --- PASS: TestMSBRuntimeIdentityRefusesSubstitutedBytes/missing_manifest_refuses (1.06s)
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/extra_env
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/init_hook
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/patches
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/scripts
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/rlimits
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/mount_policy_loose
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/extra_interface
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/port_publish
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/max_cpus_headroom
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/max_memory_headroom
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/ephemeral
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/idle_timeout
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/workdir
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/shell
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/runtime_cmd
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/entrypoint
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/runtime_user
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/hostname
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/duplicate_env
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/pending_changes
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/paused
+=== RUN   TestMSBPolicyRefusesUnauthorizedSettings/recovery_required
+--- PASS: TestMSBPolicyRefusesUnauthorizedSettings (112.26s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/extra_env (5.11s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/init_hook (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/patches (5.11s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/scripts (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/rlimits (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/mount_policy_loose (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/extra_interface (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/port_publish (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/max_cpus_headroom (5.11s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/max_memory_headroom (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/ephemeral (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/idle_timeout (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/workdir (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/shell (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/runtime_cmd (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/entrypoint (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/runtime_user (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/hostname (5.11s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/duplicate_env (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/pending_changes (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/paused (5.10s)
+    --- PASS: TestMSBPolicyRefusesUnauthorizedSettings/recovery_required (5.10s)
+=== RUN   TestMSBPolicyRefusesReorderedExecutionHooks
+=== RUN   TestMSBPolicyRefusesReorderedExecutionHooks/cmd_reordered
+=== RUN   TestMSBPolicyRefusesReorderedExecutionHooks/entrypoint_reordered
+--- PASS: TestMSBPolicyRefusesReorderedExecutionHooks (10.20s)
+    --- PASS: TestMSBPolicyRefusesReorderedExecutionHooks/cmd_reordered (5.10s)
+    --- PASS: TestMSBPolicyRefusesReorderedExecutionHooks/entrypoint_reordered (5.10s)
+=== RUN   TestSameStringSequenceIsOrderSensitive
+=== RUN   TestSameStringSequenceIsOrderSensitive/identical
+=== RUN   TestSameStringSequenceIsOrderSensitive/both_empty
+=== RUN   TestSameStringSequenceIsOrderSensitive/reordered
+=== RUN   TestSameStringSequenceIsOrderSensitive/different_length
+=== RUN   TestSameStringSequenceIsOrderSensitive/different_word
+=== RUN   TestSameStringSequenceIsOrderSensitive/reordered_suffix
+--- PASS: TestSameStringSequenceIsOrderSensitive (0.00s)
+    --- PASS: TestSameStringSequenceIsOrderSensitive/identical (0.00s)
+    --- PASS: TestSameStringSequenceIsOrderSensitive/both_empty (0.00s)
+    --- PASS: TestSameStringSequenceIsOrderSensitive/reordered (0.00s)
+    --- PASS: TestSameStringSequenceIsOrderSensitive/different_length (0.00s)
+    --- PASS: TestSameStringSequenceIsOrderSensitive/different_word (0.00s)
+    --- PASS: TestSameStringSequenceIsOrderSensitive/reordered_suffix (0.00s)
+=== RUN   TestMSBPolicyRefusesHostChannelsAndUnknownFields
+=== RUN   TestMSBPolicyRefusesHostChannelsAndUnknownFields/vsock_route
+=== RUN   TestMSBPolicyRefusesHostChannelsAndUnknownFields/unknown_field
+--- PASS: TestMSBPolicyRefusesHostChannelsAndUnknownFields (10.21s)
+    --- PASS: TestMSBPolicyRefusesHostChannelsAndUnknownFields/vsock_route (5.10s)
+    --- PASS: TestMSBPolicyRefusesHostChannelsAndUnknownFields/unknown_field (5.10s)
+=== RUN   TestBootedConfigClosureNamesEveryUnknownField
+--- PASS: TestBootedConfigClosureNamesEveryUnknownField (0.00s)
+=== RUN   TestVerifyNoHostChannelsRefusesEveryRoute
+--- PASS: TestVerifyNoHostChannelsRefusesEveryRoute (0.00s)
+=== RUN   TestMSBCreateArgsArePolicyDerived
+--- PASS: TestMSBCreateArgsArePolicyDerived (0.05s)
+=== RUN   TestBootedNetworkRefusesUnverifiedSurfaces
+=== RUN   TestBootedNetworkRefusesUnverifiedSurfaces/injected_secrets
+=== RUN   TestBootedNetworkRefusesUnverifiedSurfaces/TLS_interception
+=== RUN   TestBootedNetworkRefusesUnverifiedSurfaces/interception_CA
+=== RUN   TestBootedNetworkRefusesUnverifiedSurfaces/upstream_CA_pinning
+=== RUN   TestBootedNetworkRefusesUnverifiedSurfaces/host_CA_trust
+=== RUN   TestBootedNetworkRefusesUnverifiedSurfaces/non-strict_network
+=== RUN   TestBootedNetworkRefusesUnverifiedSurfaces/DNS_override
+--- PASS: TestBootedNetworkRefusesUnverifiedSurfaces (0.00s)
+    --- PASS: TestBootedNetworkRefusesUnverifiedSurfaces/injected_secrets (0.00s)
+    --- PASS: TestBootedNetworkRefusesUnverifiedSurfaces/TLS_interception (0.00s)
+    --- PASS: TestBootedNetworkRefusesUnverifiedSurfaces/interception_CA (0.00s)
+    --- PASS: TestBootedNetworkRefusesUnverifiedSurfaces/upstream_CA_pinning (0.00s)
+    --- PASS: TestBootedNetworkRefusesUnverifiedSurfaces/host_CA_trust (0.00s)
+    --- PASS: TestBootedNetworkRefusesUnverifiedSurfaces/non-strict_network (0.00s)
+    --- PASS: TestBootedNetworkRefusesUnverifiedSurfaces/DNS_override (0.00s)
+=== RUN   TestBootedMountsRefusesHostRootSymlinkFollowing
+--- PASS: TestBootedMountsRefusesHostRootSymlinkFollowing (0.00s)
+=== RUN   TestBootedMountsRequireDeclaredHardening
+--- PASS: TestBootedMountsRequireDeclaredHardening (0.00s)
+=== RUN   TestBootedMountsRequireConfinedHostRendering
+=== RUN   TestBootedMountsRequireConfinedHostRendering/host_permissions_shared
+=== RUN   TestBootedMountsRequireConfinedHostRendering/host_file_stats_exposed
+--- PASS: TestBootedMountsRequireConfinedHostRendering (0.00s)
+    --- PASS: TestBootedMountsRequireConfinedHostRendering/host_permissions_shared (0.00s)
+    --- PASS: TestBootedMountsRequireConfinedHostRendering/host_file_stats_exposed (0.00s)
+=== RUN   TestBootedInertFieldsAreSchemaFields
+--- PASS: TestBootedInertFieldsAreSchemaFields (0.00s)
+=== RUN   TestBootedConfigClosureIsDeep
+=== RUN   TestBootedConfigClosureIsDeep/unknown_inside_network
+=== RUN   TestBootedConfigClosureIsDeep/unknown_inside_runtime
+=== RUN   TestBootedConfigClosureIsDeep/unknown_inside_a_mount
+=== RUN   TestBootedConfigClosureIsDeep/unknown_inside_a_network_rule_destination
+--- PASS: TestBootedConfigClosureIsDeep (0.00s)
+    --- PASS: TestBootedConfigClosureIsDeep/unknown_inside_network (0.00s)
+    --- PASS: TestBootedConfigClosureIsDeep/unknown_inside_runtime (0.00s)
+    --- PASS: TestBootedConfigClosureIsDeep/unknown_inside_a_mount (0.00s)
+    --- PASS: TestBootedConfigClosureIsDeep/unknown_inside_a_network_rule_destination (0.00s)
+=== RUN   TestMSBDispatchBindsBootGeneration
+--- PASS: TestMSBDispatchBindsBootGeneration (5.10s)
+=== RUN   TestMSBDispatchDiscoveredBootMismatchIsAmbiguous
+--- PASS: TestMSBDispatchDiscoveredBootMismatchIsAmbiguous (4.10s)
+=== RUN   TestMSBDispatchDuplicateAdmittedJobsIsAmbiguous
+--- PASS: TestMSBDispatchDuplicateAdmittedJobsIsAmbiguous (4.10s)
+=== RUN   TestMSBDispatchProbeFailureIsAmbiguous
+--- PASS: TestMSBDispatchProbeFailureIsAmbiguous (3.09s)
+=== RUN   TestMSBDispatchCancelledAfterAdmissionIsAmbiguous
+--- PASS: TestMSBDispatchCancelledAfterAdmissionIsAmbiguous (3.09s)
+=== RUN   TestMSBWaitRefusesSubstitutedBootGeneration
+--- PASS: TestMSBWaitRefusesSubstitutedBootGeneration (6.10s)
+=== RUN   TestMSBResumeRefusesSubstitutedBootGeneration
+--- PASS: TestMSBResumeRefusesSubstitutedBootGeneration (6.11s)
+=== RUN   TestMSBListJobsIsExhaustive
+--- PASS: TestMSBListJobsIsExhaustive (8.13s)
+=== RUN   TestMSBListJobsRefusesStuckCursor
+--- PASS: TestMSBListJobsRefusesStuckCursor (2.07s)
+=== RUN   TestSyncDirRefusesMissingDirectory
+--- PASS: TestSyncDirRefusesMissingDirectory (0.00s)
+=== RUN   TestMSBDispatchPostLaunchFailureIsUncertain
+--- PASS: TestMSBDispatchPostLaunchFailureIsUncertain (4.10s)
+=== RUN   TestMSBDispatchRefusalsAreProven
+=== RUN   TestMSBDispatchRefusalsAreProven/create_refused_before_boot
+=== RUN   TestMSBDispatchRefusalsAreProven/pre-exec_policy_refusal
+--- PASS: TestMSBDispatchRefusalsAreProven (6.18s)
+    --- PASS: TestMSBDispatchRefusalsAreProven/create_refused_before_boot (1.07s)
+    --- PASS: TestMSBDispatchRefusalsAreProven/pre-exec_policy_refusal (5.10s)
+=== RUN   TestMSBPrepareIsSideEffectFree
+--- PASS: TestMSBPrepareIsSideEffectFree (5.10s)
+=== RUN   TestMSBResumeRefusesRewrittenAuthorization
+=== RUN   TestMSBResumeRefusesRewrittenAuthorization/rewritten_nonce
+=== RUN   TestMSBResumeRefusesRewrittenAuthorization/rewritten_policy_digest
+=== RUN   TestMSBResumeRefusesRewrittenAuthorization/intact_authorization_resumes
+--- PASS: TestMSBResumeRefusesRewrittenAuthorization (10.14s)
+    --- PASS: TestMSBResumeRefusesRewrittenAuthorization/rewritten_nonce (1.01s)
+    --- PASS: TestMSBResumeRefusesRewrittenAuthorization/rewritten_policy_digest (1.01s)
+    --- PASS: TestMSBResumeRefusesRewrittenAuthorization/intact_authorization_resumes (3.03s)
+=== RUN   TestMSBResumeRequiresTheFullAuthorization
+=== RUN   TestMSBResumeRequiresTheFullAuthorization/missing_policy_digest
+=== RUN   TestMSBResumeRequiresTheFullAuthorization/missing_nonce
+=== RUN   TestMSBResumeRequiresTheFullAuthorization/missing_both
+=== RUN   TestMSBResumeRequiresTheFullAuthorization/missing_authorization_with_a_matching_command
+--- PASS: TestMSBResumeRequiresTheFullAuthorization (9.13s)
+    --- PASS: TestMSBResumeRequiresTheFullAuthorization/missing_policy_digest (1.01s)
+    --- PASS: TestMSBResumeRequiresTheFullAuthorization/missing_nonce (1.01s)
+    --- PASS: TestMSBResumeRequiresTheFullAuthorization/missing_both (1.01s)
+    --- PASS: TestMSBResumeRequiresTheFullAuthorization/missing_authorization_with_a_matching_command (1.01s)
+=== RUN   TestMSBRuntimeIdentityCoversTheComponentChain
+=== RUN   TestMSBRuntimeIdentityCoversTheComponentChain/unpinned_component_refuses
+=== RUN   TestMSBRuntimeIdentityCoversTheComponentChain/pinned_component_with_the_wrong_bytes_refuses
+=== RUN   TestMSBRuntimeIdentityCoversTheComponentChain/pinned_component_that_is_missing_refuses
+=== RUN   TestMSBRuntimeIdentityCoversTheComponentChain/the_qualified_chain_is_accepted
+--- PASS: TestMSBRuntimeIdentityCoversTheComponentChain (12.37s)
+    --- PASS: TestMSBRuntimeIdentityCoversTheComponentChain/unpinned_component_refuses (3.09s)
+    --- PASS: TestMSBRuntimeIdentityCoversTheComponentChain/pinned_component_with_the_wrong_bytes_refuses (3.09s)
+    --- PASS: TestMSBRuntimeIdentityCoversTheComponentChain/pinned_component_that_is_missing_refuses (3.09s)
+    --- PASS: TestMSBRuntimeIdentityCoversTheComponentChain/the_qualified_chain_is_accepted (3.09s)
+=== RUN   TestCleanupSubstitutedVMSurvives
+--- PASS: TestCleanupSubstitutedVMSurvives (6.11s)
+=== RUN   TestCleanupSubstitutionInsideRemovalWindow
+--- PASS: TestCleanupSubstitutionInsideRemovalWindow (7.12s)
+=== RUN   TestCleanupReusedNameWrongNonce
+--- PASS: TestCleanupReusedNameWrongNonce (6.11s)
+=== RUN   TestCleanupMissingIdentityFailsClosed
+--- PASS: TestCleanupMissingIdentityFailsClosed (5.10s)
+=== RUN   TestCleanupWrongJobLabel
+--- PASS: TestCleanupWrongJobLabel (6.10s)
+=== RUN   TestCleanupConcurrentJobsAreIndependent
+--- PASS: TestCleanupConcurrentJobsAreIndependent (11.17s)
+=== RUN   TestCleanupOneJobNeverTouchesAnother
+--- PASS: TestCleanupOneJobNeverTouchesAnother (11.16s)
+=== RUN   TestCleanupTransportFailureIsUncertain
+--- PASS: TestCleanupTransportFailureIsUncertain (7.12s)
+=== RUN   TestCleanupIdentitySurvivesLedgerReopen
+--- PASS: TestCleanupIdentitySurvivesLedgerReopen (0.10s)
+=== RUN   TestCleanupResultNeverErasesTheOutcome
+--- PASS: TestCleanupResultNeverErasesTheOutcome (9.36s)
+=== RUN   TestCleanupOutsideNamespaceRefused
+--- PASS: TestCleanupOutsideNamespaceRefused (0.05s)
+=== RUN   TestContractRoundTrip
+--- PASS: TestContractRoundTrip (0.00s)
+=== RUN   TestContractForgedSignatureRefused
+--- PASS: TestContractForgedSignatureRefused (0.00s)
+=== RUN   TestContractTamperedFieldRefused
+=== RUN   TestContractTamperedFieldRefused/image_swapped
+=== RUN   TestContractTamperedFieldRefused/job_id_swapped
+=== RUN   TestContractTamperedFieldRefused/principal
+=== RUN   TestContractTamperedFieldRefused/expiry_widened
+=== RUN   TestContractTamperedFieldRefused/argv_swapped
+=== RUN   TestContractTamperedFieldRefused/timeout_widened
+=== RUN   TestContractTamperedFieldRefused/memory_widened
+=== RUN   TestContractTamperedFieldRefused/network_opened
+=== RUN   TestContractTamperedFieldRefused/env_injected
+=== RUN   TestContractTamperedFieldRefused/mount_injected
+=== RUN   TestContractTamperedFieldRefused/submitter_injected
+--- PASS: TestContractTamperedFieldRefused (0.01s)
+    --- PASS: TestContractTamperedFieldRefused/image_swapped (0.00s)
+    --- PASS: TestContractTamperedFieldRefused/job_id_swapped (0.00s)
+    --- PASS: TestContractTamperedFieldRefused/principal (0.00s)
+    --- PASS: TestContractTamperedFieldRefused/expiry_widened (0.00s)
+    --- PASS: TestContractTamperedFieldRefused/argv_swapped (0.00s)
+    --- PASS: TestContractTamperedFieldRefused/timeout_widened (0.00s)
+    --- PASS: TestContractTamperedFieldRefused/memory_widened (0.00s)
+    --- PASS: TestContractTamperedFieldRefused/network_opened (0.00s)
+    --- PASS: TestContractTamperedFieldRefused/env_injected (0.00s)
+    --- PASS: TestContractTamperedFieldRefused/mount_injected (0.00s)
+    --- PASS: TestContractTamperedFieldRefused/submitter_injected (0.00s)
+=== RUN   TestContractExpiredRefused
+--- PASS: TestContractExpiredRefused (0.00s)
+=== RUN   TestContractNotYetValidRefused
+--- PASS: TestContractNotYetValidRefused (0.00s)
+=== RUN   TestContractTTLBoundRefused
+--- PASS: TestContractTTLBoundRefused (0.00s)
+=== RUN   TestContractUnknownAuthorityRefused
+--- PASS: TestContractUnknownAuthorityRefused (0.00s)
+=== RUN   TestContractSubmitterBindingRefused
+--- PASS: TestContractSubmitterBindingRefused (0.00s)
+=== RUN   TestContractStructuralRefusals
+=== RUN   TestContractStructuralRefusals/empty_job_id
+=== RUN   TestContractStructuralRefusals/job_id_with_slash
+=== RUN   TestContractStructuralRefusals/bad_security
+=== RUN   TestContractStructuralRefusals/empty_argv
+=== RUN   TestContractStructuralRefusals/allow_on_none-net
+=== RUN   TestContractStructuralRefusals/duplicate_allow
+=== RUN   TestContractStructuralRefusals/rel_mount_source
+=== RUN   TestContractStructuralRefusals/missing_image_digest
+=== RUN   TestContractStructuralRefusals/fractional_cpus
+=== RUN   TestContractStructuralRefusals/allow_with_port
+=== RUN   TestContractStructuralRefusals/bad_image_digest
+=== RUN   TestContractStructuralRefusals/rel_mount_dest
+=== RUN   TestContractStructuralRefusals/version_1
+=== RUN   TestContractStructuralRefusals/empty_image
+=== RUN   TestContractStructuralRefusals/empty_allowlist
+=== RUN   TestContractStructuralRefusals/job_id_with_equals
+=== RUN   TestContractStructuralRefusals/uppercase_digest
+=== RUN   TestContractStructuralRefusals/dotdot_dest
+=== RUN   TestContractStructuralRefusals/image_with_digest
+=== RUN   TestContractStructuralRefusals/missing_security
+=== RUN   TestContractStructuralRefusals/bad_net_mode
+=== RUN   TestContractStructuralRefusals/allow_single_label
+=== RUN   TestContractStructuralRefusals/expires<=issued
+=== RUN   TestContractStructuralRefusals/job_id_with_newline
+=== RUN   TestContractStructuralRefusals/no_timeout
+=== RUN   TestContractStructuralRefusals/disk_too_large
+=== RUN   TestContractStructuralRefusals/allow_uppercase
+=== RUN   TestContractStructuralRefusals/bad_env
+=== RUN   TestContractStructuralRefusals/empty_nonce
+=== RUN   TestContractStructuralRefusals/bad_authority
+=== RUN   TestContractStructuralRefusals/duplicate_env_key
+=== RUN   TestContractStructuralRefusals/duplicate_mount_dest
+--- PASS: TestContractStructuralRefusals (0.00s)
+    --- PASS: TestContractStructuralRefusals/empty_job_id (0.00s)
+    --- PASS: TestContractStructuralRefusals/job_id_with_slash (0.00s)
+    --- PASS: TestContractStructuralRefusals/bad_security (0.00s)
+    --- PASS: TestContractStructuralRefusals/empty_argv (0.00s)
+    --- PASS: TestContractStructuralRefusals/allow_on_none-net (0.00s)
+    --- PASS: TestContractStructuralRefusals/duplicate_allow (0.00s)
+    --- PASS: TestContractStructuralRefusals/rel_mount_source (0.00s)
+    --- PASS: TestContractStructuralRefusals/missing_image_digest (0.00s)
+    --- PASS: TestContractStructuralRefusals/fractional_cpus (0.00s)
+    --- PASS: TestContractStructuralRefusals/allow_with_port (0.00s)
+    --- PASS: TestContractStructuralRefusals/bad_image_digest (0.00s)
+    --- PASS: TestContractStructuralRefusals/rel_mount_dest (0.00s)
+    --- PASS: TestContractStructuralRefusals/version_1 (0.00s)
+    --- PASS: TestContractStructuralRefusals/empty_image (0.00s)
+    --- PASS: TestContractStructuralRefusals/empty_allowlist (0.00s)
+    --- PASS: TestContractStructuralRefusals/job_id_with_equals (0.00s)
+    --- PASS: TestContractStructuralRefusals/uppercase_digest (0.00s)
+    --- PASS: TestContractStructuralRefusals/dotdot_dest (0.00s)
+    --- PASS: TestContractStructuralRefusals/image_with_digest (0.00s)
+    --- PASS: TestContractStructuralRefusals/missing_security (0.00s)
+    --- PASS: TestContractStructuralRefusals/bad_net_mode (0.00s)
+    --- PASS: TestContractStructuralRefusals/allow_single_label (0.00s)
+    --- PASS: TestContractStructuralRefusals/expires<=issued (0.00s)
+    --- PASS: TestContractStructuralRefusals/job_id_with_newline (0.00s)
+    --- PASS: TestContractStructuralRefusals/no_timeout (0.00s)
+    --- PASS: TestContractStructuralRefusals/disk_too_large (0.00s)
+    --- PASS: TestContractStructuralRefusals/allow_uppercase (0.00s)
+    --- PASS: TestContractStructuralRefusals/bad_env (0.00s)
+    --- PASS: TestContractStructuralRefusals/empty_nonce (0.00s)
+    --- PASS: TestContractStructuralRefusals/bad_authority (0.00s)
+    --- PASS: TestContractStructuralRefusals/duplicate_env_key (0.00s)
+    --- PASS: TestContractStructuralRefusals/duplicate_mount_dest (0.00s)
+=== RUN   TestContractParserStrictness
+--- PASS: TestContractParserStrictness (0.00s)
+=== RUN   TestContractV2AcceptsDomainAllowlist
+--- PASS: TestContractV2AcceptsDomainAllowlist (0.00s)
+=== RUN   TestSignerRefusesMismatchedAuthority
+--- PASS: TestSignerRefusesMismatchedAuthority (0.00s)
+=== RUN   TestDaemonCrashPreservesAcknowledgedJobs
+    crash_test.go:153: srv: reconciled 1 job(s) from a previous lifetime to DISPATCH_AMBIGUOUS
+    crash_test.go:153: srv: sandbox-executord listening on /tmp/sx-524634231/executor.sock (peers=1, auth=peer-uid-only (token disabled), jobs=signed-contracts (1 authority keys), backend=true, max_conns=64, ledger=/tmp/sx-524634231/executor-ledger.db epoch=2, evidence_dir=/tmp/sx-524634231/evidence evidence_signer=72a639f2f8c63da0f168ef7d0d2531645b0ee4b04976ac3e6c8c5c8f1786794b)
+    crash_test.go:185: srv2: sandbox-executord listening on /tmp/sx-524634231/executor.sock (peers=1, auth=peer-uid-only (token disabled), jobs=signed-contracts (1 authority keys), backend=true, max_conns=64, ledger=/tmp/sx-524634231/executor-ledger.db epoch=3, evidence_dir=/tmp/sx-524634231/evidence evidence_signer=72a639f2f8c63da0f168ef7d0d2531645b0ee4b04976ac3e6c8c5c8f1786794b)
+    crash_test.go:185: srv2: maintenance: recovery checkpoint queued for custody
+    crash_test.go:185: srv2: ESCALATION: registry residue persists — 1 unresolved job(s) (oldest 0s ago), 0 cleanup pending (oldest 2562047h47m16.854775807s ago) — operator reconciliation required; these are never auto-retried blind or auto-destroyed
+    crash_test.go:185: srv2: maintenance: recovery checkpoint queued for custody
+    crash_test.go:185: srv2: reconcile: job crash-1 (DISPATCH_AMBIGUOUS) resumed from run job_2843db9b7e73ca2d2b5a1d43da6aa489 boot boot_6d50f81ebfc033ed6346dd9cd68aa875 — settling the observed outcome
+    crash_test.go:185: srv2: job crash-1: cleanup pending (REMOVAL_UNCERTAIN) — the removal deadline expired after the command was issued — outcome uncertain; sandbox sx-crash-1-7c2a12418eb851802c66514a83cfc5e4 still carries the authorized identity after the removal — the runtime could not prove it was destroyed
+    crash_test.go:185: srv2: job crash-1 finished: state=SUCCEEDED exit=0 timed_out=false runtime_state=exited run_id=job_2843db9b7e73ca2d2b5a1d43da6aa489 output_sha256=5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03 cleanup_pending=true
+    crash_test.go:185: srv2: cleanup retry: job crash-1 handle sx-crash-1-7c2a12418eb851802c66514a83cfc5e4 still pending (REMOVAL_UNCERTAIN): the removal deadline expired after the command was issued — outcome uncertain; sandbox sx-crash-1-7c2a12418eb851802c66514a83cfc5e4 still carries the authorized identity after the removal — the runtime could not prove it was destroyed
+    crash_test.go:185: srv2: maintenance: recovery checkpoint queued for custody
+    crash_test.go:185: srv2: ESCALATION: registry residue persists — 0 unresolved job(s) (oldest 2562047h47m16.854775807s ago), 1 cleanup pending (oldest 1s ago) — operator reconciliation required; these are never auto-retried blind or auto-destroyed
+    crash_test.go:185: srv2: maintenance: recovery checkpoint queued for custody
+--- PASS: TestDaemonCrashPreservesAcknowledgedJobs (14.06s)
+=== RUN   TestDaemonRefusesWithoutAnArtifactDirectory
+--- PASS: TestDaemonRefusesWithoutAnArtifactDirectory (0.49s)
+=== RUN   TestCustodyRejectsForgedSuccess
+--- PASS: TestCustodyRejectsForgedSuccess (0.00s)
+=== RUN   TestCustodyRejectsBadSignature
+--- PASS: TestCustodyRejectsBadSignature (0.00s)
+=== RUN   TestCustodyRejectsSubstitutedSigner
+--- PASS: TestCustodyRejectsSubstitutedSigner (0.01s)
+=== RUN   TestCustodyRejectsAckForWrongSegment
+--- PASS: TestCustodyRejectsAckForWrongSegment (0.00s)
+=== RUN   TestCustodyFailsClosedWithoutTrust
+--- PASS: TestCustodyFailsClosedWithoutTrust (0.00s)
+=== RUN   TestCustodyAckPersistedWithWitnessedSegment
+--- PASS: TestCustodyAckPersistedWithWitnessedSegment (0.24s)
+=== RUN   TestArchiveHoldsRowsAgainstForgedAck
+--- PASS: TestArchiveHoldsRowsAgainstForgedAck (0.25s)
+=== RUN   TestEvidenceLifecycle
+--- PASS: TestEvidenceLifecycle (0.31s)
+=== RUN   TestEvidenceNOEFFECT
+--- PASS: TestEvidenceNOEFFECT (0.35s)
+=== RUN   TestInterruptedJobNeverCheckpointed
+--- PASS: TestInterruptedJobNeverCheckpointed (0.19s)
+=== RUN   TestEvidenceDetectsCorruption
+=== RUN   TestEvidenceDetectsCorruption/terminal_row_rewritten
+=== RUN   TestEvidenceDetectsCorruption/terminal_row_deleted
+=== RUN   TestEvidenceDetectsCorruption/receipt_log_truncated
+=== RUN   TestEvidenceDetectsCorruption/forged_receipt_appended
+=== RUN   TestEvidenceDetectsCorruption/receipt_swapped_for_wrong_binding
+=== RUN   TestEvidenceDetectsCorruption/coordinated_rollback_detected_by_held_checkpoint
+=== RUN   TestEvidenceDetectsCorruption/artifact_substituted
+=== RUN   TestEvidenceDetectsCorruption/artifact_size_not_reported
+--- PASS: TestEvidenceDetectsCorruption (2.38s)
+    --- PASS: TestEvidenceDetectsCorruption/terminal_row_rewritten (0.58s)
+    --- PASS: TestEvidenceDetectsCorruption/terminal_row_deleted (0.38s)
+    --- PASS: TestEvidenceDetectsCorruption/receipt_log_truncated (0.32s)
+    --- PASS: TestEvidenceDetectsCorruption/forged_receipt_appended (0.28s)
+    --- PASS: TestEvidenceDetectsCorruption/receipt_swapped_for_wrong_binding (0.30s)
+    --- PASS: TestEvidenceDetectsCorruption/coordinated_rollback_detected_by_held_checkpoint (0.16s)
+    --- PASS: TestEvidenceDetectsCorruption/artifact_substituted (0.18s)
+    --- PASS: TestEvidenceDetectsCorruption/artifact_size_not_reported (0.18s)
+=== RUN   TestVerifyDetectsArtifactBeyondContractBound
+--- PASS: TestVerifyDetectsArtifactBeyondContractBound (0.13s)
+=== RUN   TestCheckpointPrefixProperty
+--- PASS: TestCheckpointPrefixProperty (0.27s)
+=== RUN   TestExecutorRefusesToStartWithoutEvidence
+--- PASS: TestExecutorRefusesToStartWithoutEvidence (0.07s)
+=== RUN   TestReceiptBindsExecutionIdentity
+--- PASS: TestReceiptBindsExecutionIdentity (0.18s)
+=== RUN   TestEvidenceDetectsIdentitySubstitution
+--- PASS: TestEvidenceDetectsIdentitySubstitution (0.15s)
+=== RUN   TestCleanupBookkeepingPreservesTheCheckpointChain
+--- PASS: TestCleanupBookkeepingPreservesTheCheckpointChain (0.20s)
+=== RUN   TestLedgerPersistsJobIdentity
+--- PASS: TestLedgerPersistsJobIdentity (0.16s)
+=== RUN   TestLedgerDuplicateAndReplayRefused
+--- PASS: TestLedgerDuplicateAndReplayRefused (0.08s)
+=== RUN   TestLedgerTransitionCAS
+--- PASS: TestLedgerTransitionCAS (0.08s)
+=== RUN   TestLedgerFenceLockRefusesSecondExecutor
+--- PASS: TestLedgerFenceLockRefusesSecondExecutor (0.07s)
+=== RUN   TestLedgerReconcileMarksAmbiguous
+--- PASS: TestLedgerReconcileMarksAmbiguous (0.11s)
+=== RUN   TestLedgerInterruptRunning
+--- PASS: TestLedgerInterruptRunning (0.11s)
+=== RUN   TestActiveUsageReservesAndReleases
+--- PASS: TestActiveUsageReservesAndReleases (0.27s)
+=== RUN   TestActiveUsageHoldsUnresolvedReservations
+--- PASS: TestActiveUsageHoldsUnresolvedReservations (0.11s)
+=== RUN   TestActiveUsageReleasesProvablyDeadVMs
+--- PASS: TestActiveUsageReleasesProvablyDeadVMs (0.14s)
+=== RUN   TestActiveUsageHoldsCleanupPendingVMs
+=== RUN   TestActiveUsageHoldsCleanupPendingVMs/terminal_with_cleanup_verified_releases
+=== RUN   TestActiveUsageHoldsCleanupPendingVMs/terminal_with_cleanup_pending_holds
+=== RUN   TestActiveUsageHoldsCleanupPendingVMs/verified_cleanup_releases
+=== RUN   TestActiveUsageHoldsCleanupPendingVMs/a_provably_dead_VM_releases_even_while_cleanup_is_pending
+--- PASS: TestActiveUsageHoldsCleanupPendingVMs (0.50s)
+    --- PASS: TestActiveUsageHoldsCleanupPendingVMs/terminal_with_cleanup_verified_releases (0.00s)
+    --- PASS: TestActiveUsageHoldsCleanupPendingVMs/terminal_with_cleanup_pending_holds (0.00s)
+    --- PASS: TestActiveUsageHoldsCleanupPendingVMs/verified_cleanup_releases (0.00s)
+    --- PASS: TestActiveUsageHoldsCleanupPendingVMs/a_provably_dead_VM_releases_even_while_cleanup_is_pending (0.20s)
+=== RUN   TestReconcileCandidatesWalkEveryRow
+--- PASS: TestReconcileCandidatesWalkEveryRow (1.34s)
+=== RUN   TestCleanupCandidatesWalkEveryRow
+--- PASS: TestCleanupCandidatesWalkEveryRow (2.17s)
+=== RUN   TestReservationBoundOutlastsTheVMsOwnLifetime
+--- PASS: TestReservationBoundOutlastsTheVMsOwnLifetime (0.00s)
+=== RUN   TestReservationBoundHoldsWhenItCannotBeEstablished
+--- PASS: TestReservationBoundHoldsWhenItCannotBeEstablished (0.00s)
+=== RUN   TestLedgerRefusesSymlink
+--- PASS: TestLedgerRefusesSymlink (0.00s)
+=== RUN   TestMaintenanceDispatchesStrandedJob
+--- PASS: TestMaintenanceDispatchesStrandedJob (0.16s)
+=== RUN   TestMaintenanceExpiresStrandedContract
+--- PASS: TestMaintenanceExpiresStrandedContract (0.23s)
+=== RUN   TestMaintenanceDeferredDispatchRespectsPool
+--- PASS: TestMaintenanceDeferredDispatchRespectsPool (0.48s)
+=== RUN   TestMaintenanceRetriesPendingCleanup
+--- PASS: TestMaintenanceRetriesPendingCleanup (0.23s)
+=== RUN   TestMaintenanceEscalatesResidue
+--- PASS: TestMaintenanceEscalatesResidue (0.17s)
+=== RUN   TestMaintenanceDisabledLeavesRecordedRow
+--- PASS: TestMaintenanceDisabledLeavesRecordedRow (0.28s)
+=== RUN   TestAdmitJobClaimsDispatchAtomically
+--- PASS: TestAdmitJobClaimsDispatchAtomically (0.11s)
+=== RUN   TestMaintenanceRecoversAfterRestart
+--- PASS: TestMaintenanceRecoversAfterRestart (0.26s)
+=== RUN   TestMaintenanceArchivesSettledRows
+--- PASS: TestMaintenanceArchivesSettledRows (0.22s)
+=== RUN   TestMaintenanceAmbiguousDispatchReconcilesNotRetries
+--- PASS: TestMaintenanceAmbiguousDispatchReconcilesNotRetries (0.18s)
+=== RUN   TestMaintenanceMarksStaleDispatchingAmbiguous
+--- PASS: TestMaintenanceMarksStaleDispatchingAmbiguous (0.21s)
+=== RUN   TestMaintenanceClaimFailsClosedOnEvidenceFailure
+--- PASS: TestMaintenanceClaimFailsClosedOnEvidenceFailure (0.61s)
+=== RUN   TestMaintenanceMarkAmbiguousFailsClosedOnEvidenceFailure
+--- PASS: TestMaintenanceMarkAmbiguousFailsClosedOnEvidenceFailure (0.62s)
+=== RUN   TestMaintenanceExpireFailsClosedOnEvidenceFailure
+--- PASS: TestMaintenanceExpireFailsClosedOnEvidenceFailure (0.73s)
+=== RUN   TestMaintenanceEscalationEvidencePrecedesThrottle
+--- PASS: TestMaintenanceEscalationEvidencePrecedesThrottle (0.57s)
+=== RUN   TestMSBLiveJobLifecycle
+    msb_live_test.go:229: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveJobLifecycle (0.00s)
+=== RUN   TestMSBLiveArtifactIntegrityUnderConcurrency
+    msb_live_test.go:303: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveArtifactIntegrityUnderConcurrency (0.00s)
+=== RUN   TestMSBLiveRefusesPreexistingSandbox
+    msb_live_test.go:352: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveRefusesPreexistingSandbox (0.00s)
+=== RUN   TestMSBLiveNetworkIsolation
+    msb_live_test.go:439: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveNetworkIsolation (0.00s)
+=== RUN   TestMSBLiveCredentialIsolation
+    msb_live_test.go:510: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveCredentialIsolation (0.00s)
+=== RUN   TestMSBLiveMonitorInterruptedLeavesJobUncertain
+    msb_live_test.go:540: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveMonitorInterruptedLeavesJobUncertain (0.00s)
+=== RUN   TestMSBLiveTransportFailureLeavesJobUncertain
+    msb_live_test.go:614: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveTransportFailureLeavesJobUncertain (0.00s)
+=== RUN   TestMSBLiveContractTimeoutIsObserved
+    msb_live_test.go:679: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveContractTimeoutIsObserved (0.00s)
+=== RUN   TestMSBLiveMountIsReadOnly
+    msb_live_test.go:718: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveMountIsReadOnly (0.00s)
+=== RUN   TestMSBLiveRefusalsAndCleanup
+    msb_live_test.go:758: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveRefusalsAndCleanup (0.00s)
+=== RUN   TestMSBLiveRecoveryResumesInterruptedJob
+    msb_live_test.go:791: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveRecoveryResumesInterruptedJob (0.00s)
+=== RUN   TestMSBLiveSubstitutedVMIsNeverAdopted
+    msb_live_test.go:862: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveSubstitutedVMIsNeverAdopted (0.00s)
+=== RUN   TestMSBLivePlatformIdentity
+    msb_live_test.go:989: microVM qualification lane: linux-kvm (linux/amd64)
+    msb_live_test.go:992: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLivePlatformIdentity (0.00s)
+=== RUN   TestMSBLiveLinuxKVM
+    msb_live_test.go:1008: CRABBOX_MSB_LIVE=1 not set — skipping live microsandbox test
+--- SKIP: TestMSBLiveLinuxKVM (0.00s)
+=== RUN   TestUnixPeerCredentials
+--- PASS: TestUnixPeerCredentials (0.00s)
+=== RUN   TestRecoveryChainVerifiesClean
+--- PASS: TestRecoveryChainVerifiesClean (0.09s)
+=== RUN   TestRecoveryChainDetectsModifiedEvent
+--- PASS: TestRecoveryChainDetectsModifiedEvent (0.09s)
+=== RUN   TestRecoveryChainDetectsDeletedEvent
+--- PASS: TestRecoveryChainDetectsDeletedEvent (0.11s)
+=== RUN   TestRecoveryChainDetectsReorderedEvents
+--- PASS: TestRecoveryChainDetectsReorderedEvents (0.19s)
+=== RUN   TestRecoveryChainDetectsClaimUIDTamper
+--- PASS: TestRecoveryChainDetectsClaimUIDTamper (0.14s)
+=== RUN   TestRecoveryCheckpointSignsAndVerifies
+--- PASS: TestRecoveryCheckpointSignsAndVerifies (0.10s)
+=== RUN   TestRecoveryCheckpointRejectsUntrustedAndForged
+--- PASS: TestRecoveryCheckpointRejectsUntrustedAndForged (0.08s)
+=== RUN   TestRecoveryCheckpointDetectsRollbackAndTruncation
+--- PASS: TestRecoveryCheckpointDetectsRollbackAndTruncation (0.12s)
+=== RUN   TestRecoveryCheckpointDetectsRewrite
+--- PASS: TestRecoveryCheckpointDetectsRewrite (0.10s)
+=== RUN   TestRecoveryEventWriteIsAtomicWithState
+--- PASS: TestRecoveryEventWriteIsAtomicWithState (0.09s)
+=== RUN   TestRecoveryCustodyOutboxDrainsAndRetries
+--- PASS: TestRecoveryCustodyOutboxDrainsAndRetries (0.09s)
+=== RUN   TestRecoveryCustodyDetectsCompetingHead
+--- PASS: TestRecoveryCustodyDetectsCompetingHead (0.10s)
+=== RUN   TestRecoveryCustodyRefusesUnverifiableAck
+--- PASS: TestRecoveryCustodyRefusesUnverifiableAck (0.09s)
+=== RUN   TestRecoveryChainMigrationBackfillsLegacyEvents
+--- PASS: TestRecoveryChainMigrationBackfillsLegacyEvents (0.12s)
+=== RUN   TestStaleClaimantCannotRelease
+--- PASS: TestStaleClaimantCannotRelease (0.12s)
+=== RUN   TestStaleClaimCannotReleaseAfterLeaseExpiry
+--- PASS: TestStaleClaimCannotReleaseAfterLeaseExpiry (0.10s)
+=== RUN   TestStaleClaimCannotCommitTransition
+--- PASS: TestStaleClaimCannotCommitTransition (0.11s)
+=== RUN   TestStaleClaimCannotExtend
+--- PASS: TestStaleClaimCannotExtend (0.17s)
+=== RUN   TestExtendLeaseKeepsALiveClaimOwner
+--- PASS: TestExtendLeaseKeepsALiveClaimOwner (0.12s)
+=== RUN   TestStaleClaimCannotClearCleanup
+--- PASS: TestStaleClaimCannotClearCleanup (0.11s)
+=== RUN   TestNilClaimClearsForTheLivePath
+--- PASS: TestNilClaimClearsForTheLivePath (0.21s)
+=== RUN   TestClaimGenerationsAreNeverReused
+--- PASS: TestClaimGenerationsAreNeverReused (0.09s)
+=== RUN   TestClaimValidationReadsPersistedState
+--- PASS: TestClaimValidationReadsPersistedState (0.23s)
+=== RUN   TestClaimTakeoverBlocksMidFlightCommit
+--- PASS: TestClaimTakeoverBlocksMidFlightCommit (0.09s)
+=== RUN   TestClaimCommitLeavesNoPartialState
+--- PASS: TestClaimCommitLeavesNoPartialState (0.09s)
+=== RUN   TestRecoveryPacingSurvivesRestart
+--- PASS: TestRecoveryPacingSurvivesRestart (0.09s)
+=== RUN   TestRecoveryDowntimeMakesAttemptDue
+--- PASS: TestRecoveryDowntimeMakesAttemptDue (0.11s)
+=== RUN   TestRecoveryForgetClearsPacing
+--- PASS: TestRecoveryForgetClearsPacing (0.12s)
+=== RUN   TestRecoveryEventsDurable
+--- PASS: TestRecoveryEventsDurable (0.16s)
+=== RUN   TestResidueThrottleSurvivesReopen
+--- PASS: TestResidueThrottleSurvivesReopen (0.30s)
+=== RUN   TestRecoveryClaimAtomicUnderContention
+--- PASS: TestRecoveryClaimAtomicUnderContention (0.23s)
+=== RUN   TestRecoveryClaimDistinctJobsAllWin
+--- PASS: TestRecoveryClaimDistinctJobsAllWin (0.19s)
+=== RUN   TestRecoveryClaimLeaseBoundsReassignment
+--- PASS: TestRecoveryClaimLeaseBoundsReassignment (0.20s)
+=== RUN   TestRecoveryClaimOwnershipFollowsTheFenceEpoch
+--- PASS: TestRecoveryClaimOwnershipFollowsTheFenceEpoch (0.09s)
+=== RUN   TestRecoveryClaimDeadEpochLeaseDoesNotBlockTakeover
+--- PASS: TestRecoveryClaimDeadEpochLeaseDoesNotBlockTakeover (0.41s)
+=== RUN   TestRecoveryClaimClockRollbackStaysClosed
+--- PASS: TestRecoveryClaimClockRollbackStaysClosed (0.57s)
+=== RUN   TestRecoveryClaimActionsAreIndependent
+--- PASS: TestRecoveryClaimActionsAreIndependent (0.08s)
+=== RUN   TestRecoveryClaimWritesItsEventAtomically
+--- PASS: TestRecoveryClaimWritesItsEventAtomically (0.26s)
+=== RUN   TestRecoveryClaimFailsClosedWhenEvidenceCannotCommit
+--- PASS: TestRecoveryClaimFailsClosedWhenEvidenceCannotCommit (0.08s)
+=== RUN   TestConnectionLimitRefusesOverflow
+--- PASS: TestConnectionLimitRefusesOverflow (0.20s)
+=== RUN   TestStopDrainsBeforeDone
+--- PASS: TestStopDrainsBeforeDone (0.18s)
+=== RUN   TestUnsignedRefusedWhenKeysConfigured
+--- PASS: TestUnsignedRefusedWhenKeysConfigured (0.08s)
+=== RUN   TestSignedJobAcceptedEndToEnd
+--- PASS: TestSignedJobAcceptedEndToEnd (0.08s)
+=== RUN   TestForgedJobRefusedEndToEnd
+--- PASS: TestForgedJobRefusedEndToEnd (0.12s)
+=== RUN   TestBackendRefusesWithoutKeys
+--- PASS: TestBackendRefusesWithoutKeys (0.00s)
+=== RUN   TestCrashRecoveryAcrossRestart
+--- PASS: TestCrashRecoveryAcrossRestart (0.10s)
+=== RUN   TestPerPeerConnectionCap
+--- PASS: TestPerPeerConnectionCap (0.17s)
+=== RUN   TestPipelinedJobsShareOneConnection
+--- PASS: TestPipelinedJobsShareOneConnection (0.08s)
+=== RUN   TestJobRegistryBound
+--- PASS: TestJobRegistryBound (7.53s)
+=== RUN   TestReplayAcrossRestart
+--- PASS: TestReplayAcrossRestart (0.09s)
+=== RUN   TestReconcileInspectsUnresolvedHandles
+--- PASS: TestReconcileInspectsUnresolvedHandles (0.21s)
+=== RUN   TestCeilingRefusesOverBudgetContract
+=== RUN   TestCeilingRefusesOverBudgetContract/cpus
+=== RUN   TestCeilingRefusesOverBudgetContract/memory
+=== RUN   TestCeilingRefusesOverBudgetContract/disk
+=== RUN   TestCeilingRefusesOverBudgetContract/output
+=== RUN   TestCeilingRefusesOverBudgetContract/ttl
+--- PASS: TestCeilingRefusesOverBudgetContract (0.09s)
+    --- PASS: TestCeilingRefusesOverBudgetContract/cpus (0.00s)
+    --- PASS: TestCeilingRefusesOverBudgetContract/memory (0.00s)
+    --- PASS: TestCeilingRefusesOverBudgetContract/disk (0.00s)
+    --- PASS: TestCeilingRefusesOverBudgetContract/output (0.00s)
+    --- PASS: TestCeilingRefusesOverBudgetContract/ttl (0.00s)
+=== RUN   TestServerRequiresPeers
+--- PASS: TestServerRequiresPeers (0.00s)
+=== RUN   TestServerBindsOwnerOnlySocket
+--- PASS: TestServerBindsOwnerOnlySocket (0.23s)
+=== RUN   TestAcceptedSubmissionIsRecorded
+--- PASS: TestAcceptedSubmissionIsRecorded (0.68s)
+=== RUN   TestUnpermittedPeerIsRefused
+--- PASS: TestUnpermittedPeerIsRefused (0.25s)
+=== RUN   TestTokenEnforcement
+=== RUN   TestTokenEnforcement/missing_token_refused
+=== RUN   TestTokenEnforcement/wrong_token_refused
+=== RUN   TestTokenEnforcement/right_token_accepted
+--- PASS: TestTokenEnforcement (0.08s)
+    --- PASS: TestTokenEnforcement/missing_token_refused (0.00s)
+    --- PASS: TestTokenEnforcement/wrong_token_refused (0.00s)
+    --- PASS: TestTokenEnforcement/right_token_accepted (0.00s)
+=== RUN   TestMalformedFramesRefused
+--- PASS: TestMalformedFramesRefused (0.20s)
+=== RUN   TestOversizedFrameRefused
+--- PASS: TestOversizedFrameRefused (0.46s)
+=== RUN   TestDuplicateJobIDRefused
+--- PASS: TestDuplicateJobIDRefused (0.40s)
+=== RUN   TestServerLifecycle
+--- PASS: TestServerLifecycle (0.10s)
+=== RUN   TestSocketDirHardening
+--- PASS: TestSocketDirHardening (0.08s)
+=== RUN   TestStopKeepsForeignOccupant
+--- PASS: TestStopKeepsForeignOccupant (0.08s)
+=== RUN   TestBackendHandoff
+=== RUN   TestBackendHandoff/dispatch_recorded_running
+=== RUN   TestBackendHandoff/backend_refusal_keeps_the_job_recorded
+=== RUN   TestBackendHandoff/unclassified_backend_error_stays_uncertain
+=== RUN   TestBackendHandoff/ambiguous_dispatch_never_retries
+--- PASS: TestBackendHandoff (0.71s)
+    --- PASS: TestBackendHandoff/dispatch_recorded_running (0.20s)
+    --- PASS: TestBackendHandoff/backend_refusal_keeps_the_job_recorded (0.39s)
+    --- PASS: TestBackendHandoff/unclassified_backend_error_stays_uncertain (0.03s)
+    --- PASS: TestBackendHandoff/ambiguous_dispatch_never_retries (0.08s)
+=== RUN   TestLostMonitorNeverCompletes
+--- PASS: TestLostMonitorNeverCompletes (0.39s)
+=== RUN   TestResourcePoolBoundsAdmission
+--- PASS: TestResourcePoolBoundsAdmission (0.49s)
+=== RUN   TestResourcePoolRequiresDeclaredBudgets
+--- PASS: TestResourcePoolRequiresDeclaredBudgets (0.83s)
+=== RUN   TestResourcePoolIgnoresRecordOnlyJobs
+--- PASS: TestResourcePoolIgnoresRecordOnlyJobs (0.18s)
+=== RUN   TestNegativeDispatchTimeoutRefused
+--- PASS: TestNegativeDispatchTimeoutRefused (0.00s)
+=== RUN   TestDeadlineDoesNotHang
+--- PASS: TestDeadlineDoesNotHang (0.43s)
+=== RUN   TestMonitorClassifiesObservedOutcomes
+=== RUN   TestMonitorClassifiesObservedOutcomes/verified_success
+=== RUN   TestMonitorClassifiesObservedOutcomes/verified_failure
+=== RUN   TestMonitorClassifiesObservedOutcomes/runtime_timeout
+=== RUN   TestMonitorClassifiesObservedOutcomes/spawn_rejected
+=== RUN   TestMonitorClassifiesObservedOutcomes/rejection_without_a_pre-execution_stage_refused
+=== RUN   TestMonitorClassifiesObservedOutcomes/unverified_outcome_refused
+=== RUN   TestMonitorClassifiesObservedOutcomes/artifact_not_finalized
+=== RUN   TestMonitorClassifiesObservedOutcomes/outcome_unobserved
+--- PASS: TestMonitorClassifiesObservedOutcomes (2.95s)
+    --- PASS: TestMonitorClassifiesObservedOutcomes/verified_success (0.29s)
+    --- PASS: TestMonitorClassifiesObservedOutcomes/verified_failure (0.54s)
+    --- PASS: TestMonitorClassifiesObservedOutcomes/runtime_timeout (0.60s)
+    --- PASS: TestMonitorClassifiesObservedOutcomes/spawn_rejected (0.29s)
+    --- PASS: TestMonitorClassifiesObservedOutcomes/rejection_without_a_pre-execution_stage_refused (0.41s)
+    --- PASS: TestMonitorClassifiesObservedOutcomes/unverified_outcome_refused (0.46s)
+    --- PASS: TestMonitorClassifiesObservedOutcomes/artifact_not_finalized (0.26s)
+    --- PASS: TestMonitorClassifiesObservedOutcomes/outcome_unobserved (0.11s)
+=== RUN   TestCleanupPendingIsRecordedAndRetried
+--- PASS: TestCleanupPendingIsRecordedAndRetried (0.15s)
+=== RUN   TestReconcileResumesInterruptedRun
+--- PASS: TestReconcileResumesInterruptedRun (0.28s)
+=== RUN   TestReconcileAdoptsLostRunIdentity
+--- PASS: TestReconcileAdoptsLostRunIdentity (0.14s)
+=== RUN   TestBackendRequiresAggregateBounds
+=== RUN   TestBackendRequiresAggregateBounds/no_pool_at_all
+=== RUN   TestBackendRequiresAggregateBounds/a_zero-valued_dimension_refuses
+=== RUN   TestBackendRequiresAggregateBounds/a_fully_positive_pool_is_accepted
+--- PASS: TestBackendRequiresAggregateBounds (0.00s)
+    --- PASS: TestBackendRequiresAggregateBounds/no_pool_at_all (0.00s)
+    --- PASS: TestBackendRequiresAggregateBounds/a_zero-valued_dimension_refuses (0.00s)
+    --- PASS: TestBackendRequiresAggregateBounds/a_fully_positive_pool_is_accepted (0.00s)
+=== RUN   TestServerNeverClaimsNoEffectForALaunchedJob
+--- PASS: TestServerNeverClaimsNoEffectForALaunchedJob (4.42s)
+=== RUN   TestServerPersistsDispatchIdentityBeforeTheVM
+--- PASS: TestServerPersistsDispatchIdentityBeforeTheVM (1.65s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/sandboxexecutor	772.464s
+---
+finished_at=2026-10-19T10:56:57Z
+exit=0

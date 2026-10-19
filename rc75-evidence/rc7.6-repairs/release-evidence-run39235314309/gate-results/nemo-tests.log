@@ -1,0 +1,26 @@
+command=sh -c cd nemo && npx vitest run
+started_at=2026-10-19T11:02:28Z
+---
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/runner/work/nemo-rc75-qualification/nemo-rc75-qualification/nemo[39m
+
+ [32m✓[39m test/adversarial.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 598[2mms[22m[39m
+     [33m[2m✓[22m[39m POST_DISPATCH: MUTATION returns UNKNOWN when socket closes after send [33m 501[2mms[22m[39m
+ [32m✓[39m test/adapter.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m test/audit_regression.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m test/concurrency_invariant.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 494[2mms[22m[39m
+     [33m[2m✓[22m[39m 100 iterations x 8 identical concurrent mutations converge on one terminal outcome [33m 493[2mms[22m[39m
+ [32m✓[39m test/framing_regression.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32m✓[39m test/snapshot.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m test/invocation-schema.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m test/outcome-conformance.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m test/invocation-abi-conformance.test.ts [2m([22m[2m69 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m9 passed[39m[22m[90m (9)[39m
+[2m      Tests [22m [1m[32m145 passed[39m[22m[90m (145)[39m
+[2m   Start at [22m 11:02:28
+[2m   Duration [22m 2.46s[2m (transform 141ms, setup 0ms, import 289ms, tests 1.26s, environment 1ms)[22m
+
+---
+finished_at=2026-10-19T11:02:31Z
+exit=0
