@@ -181,6 +181,30 @@ archive digest; bind per-lane evidence (logs/artifacts) to the same commit.
 
 ---
 
+## D-RC75-11 (P1) — Development zip drops symlinks; extracted tree cannot match declared provenance
+
+**Files:** `NEMO-CONTROL-v0.54.0-rc7.5-development.zip` (the shipped `796437dd…` archive).
+
+**Defect:** the archive's `runtimes/nemo-relay` entries contain zero symlink entries — the
+packaging step neither preserved nor dereferenced the runtime's 10 declared symlinks
+(5× `crates/*/LICENSE`, `.claude/skills`, `CLAUDE.md`, `integrations/pi/{package.json,index.ts,src}`),
+it dropped them. Any tree extracted from the zip recomputes `shipped_tree_sha256 = 6b4ccaa7…`
+against the declared `f6229bb3…` with `symlink_count` 0 vs 10, so the
+`nemo-transfer-provenance` mandatory gate fails on the shipped bytes themselves (observed on
+run 39221954134: 33/34 gates pass, this gate FAIL). The authoritative repo tree and the frozen
+reference both carry the symlinks — the defect is in archive production, not the source.
+
+**Impact:** a consumer verifying the shipped artifact against its own declared manifest gets a
+provenance failure indistinguishable from tampering; qualification of the extracted tree is
+impossible without repairing transport loss out-of-band.
+
+**Fix:** restore the 10 symlinks (done on `fix/rc7.6-defect-repair` @ `1d9536e`, verified locally:
+`verify-nemo-provenance.sh --require-source` recomputes `f6229bb3` and the typed delta is
+exhaustive); longer-term, produce the development zip with symlink-preserving packaging so the
+shipped artifact is self-verifying.
+
+---
+
 # RC7.6 repair status (branch `fix/rc7.6-defect-repair`, over RC7.5 baseline `67bacdb3`)
 
 Repairs implemented in the extracted RC7.5 source tree; `main` remains the frozen RC7.5
@@ -201,6 +225,8 @@ against real `msb 0.7.8` (`-race`, qualifying mode, PASS 14 / SKIP 1 / FAIL 0 �
 | D-RC75-8 | **Repaired** | Generic custody boundaries (recovery drain + archive `completeCustodial`) verify the ack's signature, signer trust root, sequence, payload digest and segment binding before recording; unsigned/forged acks rejected at the boundary, covered by a dedicated negative test. |
 | D-RC75-9 | **Repaired** | Verifier extracts the embedded `release-evidence/rc75-source-manifest.json` and compares schema/version, `entry_count`, `root_hash` and the full entry list to the attested external manifest. Tampered package (zeroed embedded `root_hash`, regenerated sidecars) now fails exit 1; the real archive still verifies exit 0. The trusted-signature gap remains a design limitation — the attestation is a JSON sidecar, not a signature. |
 | D-RC75-10 | **Repaired** | In-archive report's stale `6001dd98…` cite corrected to `796437dd…` with the external attestation named as the authoritative binding; `RELEASE_MANIFEST.json` regenerated for the shipped RC7.5 artifact (was RC7.4). |
+| D-RC75-11 | **Repaired (tree)** | The 10 dropped symlinks restored on `fix/rc7.6-defect-repair` @ `1d9536e` — `verify-nemo-provenance.sh --require-source` recomputes declared `f6229bb3` and the typed delta is exhaustive. Residual: the zip production step still drops symlinks — a future archive must be produced with symlink-preserving packaging. |
+| CI-evidence-timeout | **Repaired** | `release-qualification.yml` evidence job `timeout-minutes` 30 → 60 @ `6563a6c`: the step re-runs the heavyweight gates (~15min sandboxexecutor race alone) and was cancelled at 29m11s on run 39216619316, making admission unreachable on a green run. |
 
 **Residual release blockers (not closed by repairs):** trusted release signature (the attestation
 is hash-binding, not signing); independently controlled external custodian still NOT_RUN;
