@@ -41,3 +41,12 @@ Both live lanes produced real-microVM evidence — that part of RC7.5 qualificat
 The release is still blocked by D-RC75-1 (Linux crash recovery cannot settle ambiguous
 dispatches — the serious one), D-RC75-2, D-RC75-3, plus the pre-existing RC7.4 register items
 above and the external-custody gate.
+
+## External audit reconciliation (2026-10-19)
+
+An independent second-pass audit of the same archive was merged into `DEFECT_REGISTER.md` after
+each claim was re-verified against the extracted source — seven additional confirmed entries
+(D-RC75-4 … D-RC75-10), including a **reproduced** release-verifier bypass: a package whose
+embedded manifest root hash is zeroed still verifies (see
+`defect-logs/D-RC75-9-verifier-bypass.txt`). The audit's P0 severity on dispatch-refusal cleanup
+and non-atomic identified deletion stands — both confirmed in `backend_msb.go`.

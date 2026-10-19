@@ -65,6 +65,120 @@ Apple Silicon (local run or self-hosted runner).
 identically in both invocations; the same suite passes on the M2 Pro host (13/13, log in
 `rc75-evidence/rc7.5-qualification/apple-hypervisor-framework/local-m2pro-test.log`).
 
+---
+
+# External audit merge — verified 2026-10-19 against the shipped archive
+
+Independent second-pass audit of the same archive (SHA `796437dd…f6c0`). Each claim below was
+re-verified against the extracted source before registration — several were confirmed by live
+reproduction, not reading alone. D-RC75-1 and D-RC75-2 above carry the audit's root-cause
+refinements in-line.
+
+## D-RC75-1 addendum — root cause confirmed in code
+
+`reconcileOne` (server.go:452) extends the durable claim by `ReconcileTimeout + 1m` (≈90s at the
+30s default) before issuing work. On CI, the first daemon's shutdown context cancelled the
+in-flight `msb inspect`; the replacement daemon then could not reclaim the row — a fresh epoch's
+`ClaimRecoveryAttempt` requires `claim_until_ms <= now` (recovery.go:126), so the dead claimant's
+durable lease (~90s) blocks takeover far past the test's 20s settlement window. A crash inside the
+extended observation window is a progress failure with no bound: epoch-aware takeover must wait on
+verified prior-owner shutdown, not lease expiry alone.
+
+## D-RC75-4 (P0) — Dispatch refusal discards the uncertain cleanup obligation
+
+**Files:** `internal/sandboxexecutor/backend_msb.go:766–807`, `:900–915` (`destroyDispatch`),
+`server.go` dispatch-failure path.
+
+**Defect (confirmed in source):** when `msb create` fails after partial effect, the backend calls
+`destroyDispatch(nonce)` — best-effort by design ("Failures are ignored by design",
+`_, _ = b.runOnce(...)`) — then returns `ErrDispatchRefused` with an **empty `RunIdentity`**. The
+server records `DISPATCH_FAILED` and issues a `NO_EFFECT` receipt even though nothing proves the
+VM is gone: the removal result is never observed and no durable cleanup obligation is recorded.
+The context-canceled path one case up (line 772) does preserve the identity and returns
+`ErrAmbiguousDispatch` — the plain-failure path does not, which is the asymmetry.
+
+**Fix:** preserve the prepared dispatch identity on create-failure and record a durable cleanup
+obligation whenever VM creation may have had an effect; never terminalize resource cleanup on
+best-effort removal.
+
+## D-RC75-5 (P0) — Identity-conditioned destroy is non-atomic across the CLI's resolve→delete window
+
+**File:** `internal/sandboxexecutor/backend_msb.go:1393–1508` (`Cleanup`).
+
+**Defect (confirmed in source):** removal is `msb rm -f --label crabedence.dispatch=<nonce>` —
+the CLI resolves labels to names and then deletes. The code's own comment bounds the residual
+window on "msb's own transition guard", but a fake-runtime test cannot prove the real runtime
+never deletes a substituted instance inside that window: the label check and the destroy are not
+one runtime operation.
+
+**Fix:** deletion through an identity-aware operation in the native runtime SDK (single fused
+identify+remove), exercised against the real backend with concurrent substitution and stale
+cleanup on both lanes.
+
+## D-RC75-6 (P1) — Retained sandbox is reported as verified-absent
+
+**File:** `internal/sandboxexecutor/backend_msb.go:1394–1397`.
+
+**Defect (confirmed in source):** with `KeepSandboxes` set, `Cleanup` returns
+`CleanupAlreadyAbsentVerified` for a sandbox that is intentionally retained — i.e., still exists.
+A result named "absent verified" satisfies a predicate the retained instance does not meet;
+retention must not satisfy absence accounting.
+
+**Fix:** a distinct `RETAINED_BY_POLICY` classification, tracked separately from
+`REMOVED_VERIFIED` / `ALREADY_ABSENT_VERIFIED`.
+
+## D-RC75-7 (P1) — Post-cleanup verification runs unbounded
+
+**File:** `internal/sandboxexecutor/backend_msb.go:1471,1475` (`postCleanupVerify`).
+
+**Defect (confirmed in source):** both call sites pass `context.WithoutCancel(ctx)` with no fresh
+deadline — a hung `msb inspect` blocks cleanup accounting indefinitely. The same file already uses
+the correct pattern for the image lookup (`context.WithTimeout(context.WithoutCancel(ctx), 15s)`,
+line 233); it was not applied here.
+
+**Fix:** bounded verification context; deadline expiry records `REMOVAL_UNCERTAIN`.
+
+## D-RC75-8 (P1) — Custody recording boundary performs no cryptographic verification
+
+**File:** `internal/sandboxexecutor/custody_outbox.go:137–181` (`DrainRecoveryCustody`).
+
+**Defect (confirmed in source):** the drain records whatever `RecoveryCustodian.
+WitnessRecoveryCheckpoint` returns after only monotonic-sequence checks. `SocketCustodian`
+verifies its signed ack internally (refuses when trust is unconfigured) — but that is
+adapter-level defense. Any other implementation can return a fabricated ack and the drain records
+it as verified custody.
+
+**Fix:** verify the acknowledgement cryptographically at the recording boundary; adapter checks
+are additive, never the sole enforcement point.
+
+## D-RC75-9 (P1) — Release verifier never binds the embedded manifest — reproduced
+
+**File:** `scripts/verify-rc75-release.py:327–435` (`cmd_verify`).
+
+**Defect (reproduced 2026-10-19):** `verify` checks the *external* `--manifest` against the
+attestation and the extracted tree against the external manifest — but never compares the
+**embedded** `release-evidence/rc75-source-manifest.json` against either. Reproduction: copied the
+real archive, set the embedded manifest's `root_hash` to 64 zeros, regenerated the external
+manifest and attestation sidecar — `verify` printed `verified: tampered.zip` and exited 0.
+A package whose embedded manifest asserts a fabricated root hash is "verified".
+
+**Fix:** parse the embedded manifest during verification; require its `root_hash`, `version`, and
+`entry_count` to equal the external manifest's, and require a trusted signature over the release
+identity — the attestation is currently a JSON sidecar, so an attacker controlling archive +
+sidecar can construct self-consistent hashes.
+
+## D-RC75-10 (P2) — Release records disagree about what was shipped
+
+**Files:** `docs/qualification/RC75_QUALIFICATION_REPORT.md` (inside the rc7.5 archive) cites
+archive SHA `6001dd98…` — not the shipped `796437dd…`; the report's live lanes read NOT_RUN while
+run-39186297140 evidence exists; bundle `RELEASE_MANIFEST.json` still targets `0.54.0-rc.7.4-dev`.
+
+**Defect:** not proven tampering — proven that artifact identity, platform evidence, and
+qualification status were never reconciled into one authoritative record for the shipped bytes.
+
+**Fix:** regenerate the qualification report and release manifest against the exact shipped
+archive digest; bind per-lane evidence (logs/artifacts) to the same commit.
+
 ## D-RC74-1 (P0, WP1) — Fallback-discovered boot mismatch destroyed the VM and reported a definitive failure
 
 **File:** `internal/sandboxexecutor/backend_msb.go`, fallback discovery path of `MSBBackend.Dispatch()`.

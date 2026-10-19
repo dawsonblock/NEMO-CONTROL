@@ -1,0 +1,17 @@
+D-RC75-9 reproduction — embedded-manifest bypass, 2026-10-19
+================================================================
+Baseline (untampered archive):
+  verify … development.zip → "verified: NEMO-CONTROL-v0.54.0-rc7.5-development.zip (4263 entries, 796437dd80667b0f…)" exit 0
+
+Adversarial package:
+  1. rewrote embedded release-evidence/rc75-source-manifest.json root_hash
+     340150c4…3062 -> 0000…0000 (64 zeros) inside the zip member
+  2. regenerated external manifest from the tampered tree:
+       verify-rc75-release.py manifest → 4252 entries, root 22fd8e3d…
+  3. regenerated sidecar: attest → c7fd4681…
+  4. verify /tmp/rc75-adv/tampered.zip --manifest tampered-manifest.json
+       --attestation tampered-attestation.json --version 0.54.0-rc.7.5-dev
+     → "verified: tampered.zip (4252 entries, c7fd468103eaba97…)"  EXIT 0
+
+The embedded manifest (the package's own declared source commitment) is
+never parsed or compared — it is treated as opaque payload bytes.
