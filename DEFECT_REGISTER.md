@@ -237,6 +237,14 @@ hosted-macOS lane cannot boot microVMs, so apple CI evidence remains bare-metal 
 green admission run claimed only linux-kvm; the shipped zip still drops `nemo-relay` symlinks
 (D-RC75-11) — tree repaired, archive-production repair outstanding. No production claim.
 
+**Transplant note (2026-10-19):** the same repairs are applied to this repo on
+`fix/rc7.6-defect-repair` @ `a86854b1` — the repair-branch file contents were verified
+byte-identical against `nemo-rc75-qualification` `1b73f626`/`6563a6c4`/`6ceabf8e` before
+commit (the nemo-relay symlink entries were already preserved as git links here, so
+`1d9536ea` needed no action). Local verification: `go build` + `go vet` clean under
+go1.27.2 (the pinned toolchain is go1.26.5 — re-verify under the pin before citing),
+targeted `internal/sandboxexecutor` tests PASS under `-race` (186s).
+
 ## D-RC74-1 (P0, WP1) — Fallback-discovered boot mismatch destroyed the VM and reported a definitive failure
 
 **File:** `internal/sandboxexecutor/backend_msb.go`, fallback discovery path of `MSBBackend.Dispatch()`.
