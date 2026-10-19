@@ -179,6 +179,32 @@ qualification status were never reconciled into one authoritative record for the
 **Fix:** regenerate the qualification report and release manifest against the exact shipped
 archive digest; bind per-lane evidence (logs/artifacts) to the same commit.
 
+---
+
+# RC7.6 repair status (branch `fix/rc7.6-defect-repair`, over RC7.5 baseline `67bacdb3`)
+
+Repairs implemented in the extracted RC7.5 source tree; `main` remains the frozen RC7.5
+baseline. Status is source-level: each fix is verified by the package test suite (fake-runtime
+model plus real-daemon crash tests); live-lane requalification is a separate, still-open gate.
+
+| Defect | Status on `fix/rc7.6-defect-repair` | Mechanism |
+|---|---|---|
+| D-RC75-1 | **Repaired** | `ClaimRecoveryAttempt` reclaims a row whose `claim_epoch` predates the live epoch — the flock the new epoch holds proves the claimant dead; its outstanding lease is residue. Backoff still paces. `TestDaemonCrashPreservesAcknowledgedJobs` settles <1s (was >20s timeout on Linux CI); `TestRecoveryClaimDeadEpochLeaseDoesNotBlockTakeover` added. |
+| D-RC75-2 | **Repaired** | Ambiguous-dispatch test holds the stub backend's `Wait` behind an explicit gate and counts dispatches; ambiguity asserted under synchronization, `Resume`-only reconciliation verified. |
+| D-RC75-3 | Open (by design) | CI lane mapping — hosted `macos-15` cannot boot microVMs; Apple lane remains bare-metal only. Not a code defect. |
+| D-RC75-4 | **Repaired** | Refused/uncertain creates run the real identity-bound `Cleanup`; unproven absence upgrades the refusal to `ErrAmbiguousDispatch` carrying the full dispatch identity — the cleanup obligation is durable. |
+| D-RC75-5 | **Repaired (CLI-bound)** | Handles are nonce-bound (`sx-<job>-<nonce>`); `msb rm <handle>` deletes by unforgeable name — the resolve→delete window can only resolve this dispatch's record. Residual: runtime-internal catalog swap under an occupied name requires the nonce (never leaves dispatch identity); a native catalog-locked conditional delete remains the documented upgrade path. |
+| D-RC75-6 | **Repaired** | `RETAINED_BY_POLICY` discharges the cleanup obligation without claiming absence; `ProvesAbsent()` unchanged; `DischargesCleanup()` added for obligation accounting. |
+| D-RC75-7 | **Repaired** | `postCleanupCtx` = `WithTimeout(WithoutCancel(ctx), 15s)` at all post-removal verification sites; expiry → `REMOVAL_UNCERTAIN`. |
+| D-RC75-8 | **Repaired** | Generic custody boundaries (recovery drain + archive `completeCustodial`) verify the ack's signature, signer trust root, sequence, payload digest and segment binding before recording; unsigned/forged acks rejected at the boundary, covered by a dedicated negative test. |
+| D-RC75-9 | **Repaired** | Verifier extracts the embedded `release-evidence/rc75-source-manifest.json` and compares schema/version, `entry_count`, `root_hash` and the full entry list to the attested external manifest. Tampered package (zeroed embedded `root_hash`, regenerated sidecars) now fails exit 1; the real archive still verifies exit 0. The trusted-signature gap remains a design limitation — the attestation is a JSON sidecar, not a signature. |
+| D-RC75-10 | **Repaired** | In-archive report's stale `6001dd98…` cite corrected to `796437dd…` with the external attestation named as the authoritative binding; `RELEASE_MANIFEST.json` regenerated for the shipped RC7.5 artifact (was RC7.4). |
+
+**Residual release blockers (not closed by repairs):** trusted release signature (the attestation
+is hash-binding, not signing); independently controlled external custodian still NOT_RUN;
+hosted-macOS lane cannot boot microVMs (bare-metal only); full RC7.6 admission workflow not yet
+run — no qualification or production claim.
+
 ## D-RC74-1 (P0, WP1) — Fallback-discovered boot mismatch destroyed the VM and reported a definitive failure
 
 **File:** `internal/sandboxexecutor/backend_msb.go`, fallback discovery path of `MSBBackend.Dispatch()`.

@@ -1,33 +1,45 @@
 {
   "schema_version": 1,
-  "release": "0.54.0-rc.7.4-dev",
+  "release": "0.54.0-rc.7.5-dev",
   "designation": "development-candidate",
   "artifact": {
-    "filename": "NEMO-CONTROL-v0.54.0-rc7.4-development.zip",
-    "sha256": "ec25838de3e97b6d777b177c02d0607ce60916df6930cb93463e26b471592e5b",
-    "size_bytes": 18702043,
+    "filename": "NEMO-CONTROL-v0.54.0-rc7.5-development.zip",
+    "sha256": "796437dd80667b0febe63f1c272a4d45c655524081d3e1aefc23b89e0a31f6c0",
+    "size_bytes": 18420025,
     "format": "zip",
-    "prefix": "nemo-control-0.54.0-rc.7.4-dev"
+    "prefix": "nemo-control-0.54.0-rc.7.5-dev"
   },
   "source": {
-    "commit": "4a864309e4376fb1e9469420697cbe76a075085f",
-    "branch": "fix/rc7.1-closed-policy-and-recovery",
-    "packaged_from": "HEAD worktree bytes via scripts/package-source-archive.sh",
+    "commit": "67bacdb3f8965c828a60e7eb11cb93726f7cb2d6",
+    "branch": "main",
+    "packaged_from": "git ls-files membership via scripts/package-source-archive.sh",
     "extraction_verified": true,
-    "manifest_entries": 4227
+    "manifest_entries": 4263
+  },
+  "provenance": {
+    "attestation": "NEMO-CONTROL-v0.54.0-rc7.5-development.zip.attestation.json",
+    "attestation_schema": "rc75-release-attestation-v1",
+    "source_manifest_sha256": "64c00508f89f63eded7f041a0b891df159d5793022e525da8050bb25696bbab7",
+    "source_manifest_root_hash": "340150c4945ee77d06df1333d64fe5f1c1131993432298febf56cbd9a1503062",
+    "source_entry_count": 4263,
+    "note": "the attestation sidecar is hash-binding evidence, not a trusted signature — verifier embedded-manifest check repaired under D-RC75-9; packages must be re-verified with the patched scripts/verify-rc75-release.py on the RC7.6 repair branch"
   },
   "identities": {
-    "canonical_nemo_runtime_sha256": "f6229bb342d31fc1fa3224fd24b53490ceb507e4489f305605bb274947c16d0f",
-    "frozen_nemo_reference_sha256": "05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957",
-    "provenance_policy_sha256": "0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1",
     "msb_runtime_pin_manifest": "qualification/msb-runtime-pins.json",
-    "lane_image_pins": "qualification/msb-lane-image-pins.json"
+    "msb_runtime_pin_manifest_sha256": "e6bde12f337538481bf3af680a6bc727231b142be950b67e1750ebf80b7e6894",
+    "lane_image_pins": "qualification/msb-lane-image-pins.json",
+    "lane_image_pins_sha256": "f86821a73fba103d2bb70a00bba3ca71dc8e404cc75ddcae3c3a227b65a32b27",
+    "nemo_transfer_manifest_sha256": "43d8f6e69be3ad504359815bbd1ee7b44e405132c086cf8b608f850da7d57519"
   },
-  "qualification": "NOT QUALIFIED \u2014 development candidate; see QUALIFICATION_REPORT.md and KNOWN_LIMITATIONS.md",
+  "supersedes": "RC7.4 manifest record (NEMO-CONTROL-v0.54.0-rc7.4-development.zip) — this file previously named the RC7.4 artifact; it now binds the actual shipped RC7.5 bytes",
+  "qualification": "NOT QUALIFIED — development candidate; RC7.5 audit concluded NO-GO pending an RC7.6 correctness and qualification pass; see DEFECT_REGISTER.md and rc75-evidence/rc7.5-qualification/QUALIFICATION-RUN.md",
   "blockers": [
-    "linux-kvm lane NOT_RUN (needs amd64 KVM runner)",
-    "external custody service NOT_RUN (not deployed)",
-    "crabbox remote validation NOT_RUN",
-    "release-commit CI evidence not yet produced"
+    "RC7.5 confirmed defects D-RC75-1 through D-RC75-10 — repairs implemented on branch fix/rc7.6-defect-repair, pending RC7.6 qualification",
+    "recovery convergence after daemon crash (D-RC75-1) — epoch-aware takeover implemented, awaits live requalification",
+    "identity-bound destroy is nonce-name-scoped via the CLI (D-RC75-5); a native catalog-locked conditional delete remains the upgrade path",
+    "external custody service NOT_RUN — no independently-controlled custodian deployed",
+    "hosted macOS VM lane FAIL — virtualization environment incompatible; bare-metal Apple Silicon lane passed locally (13/13)",
+    "stale archive digest citation inside the shipped report (D-RC75-10) — this record is the corrected external binding",
+    "RC7.6 release admission workflow has not run — no qualification or admission claim is made here"
   ]
 }
