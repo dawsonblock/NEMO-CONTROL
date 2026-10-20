@@ -255,10 +255,33 @@ targeted `internal/sandboxexecutor` tests PASS under `-race` (186s).
 | Contradictory release identity | **Closed (annotation)** | `FINAL_QUALIFICATION_REPORT.md` (RC3-era, commit `369d2860`) now carries a supersession banner pointing at `RELEASE_MANIFEST.json` + `DEFECT_REGISTER.md` as the current identity. |
 | External independent custodian | **Open — not a code fix** | Requires an independently administered custody deployment + outage/replay/forgery drills; nothing in this tree can produce that. |
 
-`verify-rc75-release.test.py`: 20/20 PASS, including new container-symlink
-(undeclared/mismatched/escape) and signature (tamper/wrong-signer/wrong-identity/
-required-missing) adversarial cases. Shipped RC7.5 archive still verifies exit 0
-through the legacy manifest-materialization path.
+`verify-rc75-release.test.py`: 21/21 PASS, including new container-symlink
+(undeclared/mismatched/escape), signature (tamper/wrong-signer/wrong-identity/
+required-missing) and unsigned-by-default refusal cases. Shipped RC7.5 archive
+still verifies exit 0 through the legacy manifest-materialization path
+(under `--allow-unsigned`, its honest posture).
+
+## RC7.7 hardening closures (this branch, commits `329db53e` + `1f0625f9`, pending requalification)
+
+Second-round audit findings against the repaired tree:
+
+| Finding | Status | Mechanism |
+|---|---|---|
+| Custody ack `RequestCreatedAt` taken from the ack wrapper | **Closed** | `verifyRecoveryCustodyAck` reconstructs the request instance from the durable outbox row's committed `created_ms`; `RecoveryCustodian.WitnessRecoveryCheckpoint` now takes the `*RecoveryOutboxRow` so the witness request binds the same durable instance. `TestRecoveryCustodyRefusesForeignRequestInstance` pins the refusal. |
+| Recording boundary asks the ack-producing adapter for its trust root | **Closed (production path)** | `Config.CustodyTrust` → `Ledger.SetCustodyTrust` → `custodyVerifyRoot`: an operator-administered root is mandatory at server start whenever a custodian is configured, and overrides whatever the adapter declares in both archive and recovery boundaries. `sandbox-executord` wires its approved-witness root into both paths. The adapter-declared root remains only a compatibility fallback for direct ledger embedders (documented weaker model). `TestRecoveryCustodyOperatorTrustOverridesAdapterDeclared` covers both directions. |
+| Retained resource invisible to accounting (D-RC75-6 follow-through) | **Closed** | Ledger schema v13 `retained_resources`: `RETAINED_BY_POLICY` resolutions now record the live instance (job, backend, handle, nonce, reason, retained_at) before the obligation clears; `DisposeRetainedResource` closes it finally, re-recording after disposal is refused. `TestRetentionInventoryTracksPolicyKeptResource` drives the full server path. |
+| Signature enforcement opt-in | **Closed** | `verify` now requires a trusted attestation signature by default; `--allow-unsigned` is the explicit development escape — an omitted flag can never admit an unauthenticated artifact. `test_unsigned_rejected_by_default` pins the default refusal. 21/21 verifier tests pass. |
+| Deletion atomicity residual under-documented | **Closed (documentation + coverage)** | `RC75_THREAT_MODEL.md` states the exclusive-namespace assumption explicitly and scopes qualification to it; `MSB_FAKE_RM_RECREATE` adds post-remove reoccupation coverage (`TestCleanupSubstituteAfterRemovalSurvives` — the post-verify foreign occupant is reported as a surviving substitute, never silently claimed absent). Native catalog-locked conditional delete remains the tracked upgrade path. |
+| Attestation-skip was an accepted omission | **Closed** | On user-owned private repos the evidence job now produces an SSH-signature fallback (`RELEASE_EVIDENCE_SIGNING_KEY`, `rc75-qualification` namespace) or writes `attestation-status.txt: missing` — an unattested closure is machine-detectable and must not promote. `dist/attestation/` uploads with the evidence artifact (previously orphaned). |
+| Repaired tree shipped under RC7.5 identity | **Closed** | All version-carrying files bumped to `0.54.0-rc.7.6-dev` (`verify-version-consistency` OK); `RELEASE_MANIFEST.json` now binds the rc7.6 candidate: archive `71346719…`, commit `1f0625f9`, manifest root `97f5b2c3…`, 4263 entries / 12 symlinks, dev-key signature verified under the default required-signature posture. |
+
+## Still open — qualification-level, not solvable in this tree
+
+- Real crash/fault-injection campaign (kill before/after create, dispatch ack, cleanup, checkpoint, custody) — implementation and unit coverage landed, live qualification pending.
+- Trusted release-key ceremony: a separately controlled key signing the production artifact; the dev key shipped here demonstrates the mechanism only.
+- Independently administered custodian deployment + outage/replay/forgery drills.
+- Registered bare-metal Apple runner for the apple lane (the local Mac has msb 0.7.8 + cached image; a formal lane run has not been claimed).
+- Pinned-toolchain (go1.26.5) re-verification — local runs used go1.27.2.
 
 ## D-RC74-1 (P0, WP1) — Fallback-discovered boot mismatch destroyed the VM and reported a definitive failure
 
