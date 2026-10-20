@@ -280,7 +280,7 @@ Second-round audit findings against the repaired tree:
 - Real crash/fault-injection campaign (kill before/after create, dispatch ack, cleanup, checkpoint, custody) — implementation and unit coverage landed, live qualification pending.
 - Trusted release-key ceremony: a separately controlled key signing the production artifact; the dev key shipped here demonstrates the mechanism only.
 - Independently administered custodian deployment + outage/replay/forgery drills.
-- Registered bare-metal Apple runner for the apple lane (the local Mac has msb 0.7.8 + cached image; a formal lane run has not been claimed).
+- Registered bare-metal Apple runner for the apple lane — **local bare-metal probe passed**: `CRABBOX_MSB_LIVE=1 go test -run TestMSBLive` on this Mac (darwin/arm64, msb 0.7.8, cached `python:3.12`) ran 12/12 applicable tests with real microVMs — lifecycle, concurrency, preexisting-refusal, network/credential isolation, interrupted-monitor and transport-failure uncertainty, contract timeout, read-only mount, forged-contract refusal, recovery resume, substituted-VM never-adopted (`TestMSBLiveLinuxKVM` correctly skipped: not a Linux host). This is development signal under go1.27.2, not formal lane qualification (no `CRABBOX_MSB_QUALIFY` gate run, no pinned toolchain, no registered CI runner).
 - Pinned-toolchain (go1.26.5) re-verification — local runs used go1.27.2.
 
 ## D-RC74-1 (P0, WP1) — Fallback-discovered boot mismatch destroyed the VM and reported a definitive failure
