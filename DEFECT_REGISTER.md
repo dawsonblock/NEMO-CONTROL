@@ -275,6 +275,17 @@ Second-round audit findings against the repaired tree:
 | Attestation-skip was an accepted omission | **Closed** | On user-owned private repos the evidence job now produces an SSH-signature fallback (`RELEASE_EVIDENCE_SIGNING_KEY`, `rc75-qualification` namespace) or writes `attestation-status.txt: missing` — an unattested closure is machine-detectable and must not promote. `dist/attestation/` uploads with the evidence artifact (previously orphaned). |
 | Repaired tree shipped under RC7.5 identity | **Closed** | All version-carrying files bumped to `0.54.0-rc.7.6-dev` (`verify-version-consistency` OK); `RELEASE_MANIFEST.json` now binds the rc7.6 candidate: archive `71346719…`, commit `1f0625f9`, manifest root `97f5b2c3…`, 4263 entries / 12 symlinks, dev-key signature verified under the default required-signature posture. |
 
+## RC7.7 hardening round 2 (this branch, pending requalification)
+
+Residual review items from the second audit's own follow-through:
+
+| Finding | Status | Mechanism |
+|---|---|---|
+| Custody acks not bound to deployment scope — an ack minted for one ledger could replay as another's custody | **Closed** | Custody protocol v3: `WitnessRequest.deployment_id` is signed into `archive-custody-ack/v3` records; the ledger's scope is a durable per-ledger identity persisted in `executor_meta` (`custody_deployment_id`), generated once — never adapter- or ack-supplied. `AckBinding.DeploymentID` is checked at both recording boundaries; a scoped binding refuses v1/v2 records (no signed deployment field) and foreign-scope v3 records. `TestVerifyWitnessAckDeploymentScope`, `TestRecoveryCustodyRefusesForeignDeployment`, `TestCustodyDeploymentIsDurablePerLedger` cover it. |
+| `refusedCleanup` retention misclassified as ambiguous | **Closed** | `refusedCleanup` now returns the full `CleanupResult`: `ResolvesObligation()` distinguishes proven absence → clean refusal; `RETAINED_BY_POLICY` → `ErrDispatchRefused` with `RunIdentity.RetainedByPolicy` (a definite state, not uncertainty); anything unresolved stays ambiguous. The server inventories the retained instance under the dispatch identity on the refused path (`TestRetentionInventoryCoversRefusedDispatch`, `TestMSBDispatchFailedCreateRetainedLeftoverIsRefusedNotAmbiguous`). |
+| Retention inventory was write-only | **Closed** | `PendingResidue` counts live retained resources (with age) into the maintenance escalation; `sandbox-history` gains `retained LEDGER.db` (read-only inventory, safe while the executor runs) and `dispose-retained LEDGER.db JOB_ID` (takes the ledger fence — executor must be stopped, correct for terminal bookkeeping). |
+| `attestation-status.txt` written but never consumed | **Closed** | `check-release-admission.sh` now enforces the sibling `attestation/` dir: status `missing`/absent/unknown → INCONSISTENCY (refuses admission); a bundle with no attestation dir warns (pre-mechanism bundles — production closure is enforced by the workflow's new `Require attestation evidence` step, which fails the job when neither `github-actions-attest` nor `ssh-signature` was produced). |
+
 ## Still open — qualification-level, not solvable in this tree
 
 - Real crash/fault-injection campaign (kill before/after create, dispatch ack, cleanup, checkpoint, custody) — implementation and unit coverage landed, live qualification pending.
@@ -282,6 +293,7 @@ Second-round audit findings against the repaired tree:
 - Independently administered custodian deployment + outage/replay/forgery drills.
 - Registered bare-metal Apple runner for the apple lane — **local bare-metal probe passed**: `CRABBOX_MSB_LIVE=1 go test -run TestMSBLive` on this Mac (darwin/arm64, msb 0.7.8, cached `python:3.12`) ran 12/12 applicable tests with real microVMs — lifecycle, concurrency, preexisting-refusal, network/credential isolation, interrupted-monitor and transport-failure uncertainty, contract timeout, read-only mount, forged-contract refusal, recovery resume, substituted-VM never-adopted (`TestMSBLiveLinuxKVM` correctly skipped: not a Linux host). This is development signal under go1.27.2, not formal lane qualification (no `CRABBOX_MSB_QUALIFY` gate run, no pinned toolchain, no registered CI runner).
 - Pinned-toolchain (go1.26.5) re-verification — local runs used go1.27.2.
+- Worker (Vitest/oxlint/tsc) and Rust/cross-language suites — never run in this workspace; the Go and Python suites are the only verified surfaces here.
 
 ## D-RC74-1 (P0, WP1) — Fallback-discovered boot mismatch destroyed the VM and reported a definitive failure
 
