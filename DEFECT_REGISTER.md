@@ -275,9 +275,13 @@ Second-round audit findings against the repaired tree:
 | Attestation-skip was an accepted omission | **Closed** | On user-owned private repos the evidence job now produces an SSH-signature fallback (`RELEASE_EVIDENCE_SIGNING_KEY`, `rc75-qualification` namespace) or writes `attestation-status.txt: missing` — an unattested closure is machine-detectable and must not promote. `dist/attestation/` uploads with the evidence artifact (previously orphaned). |
 | Repaired tree shipped under RC7.5 identity | **Closed** | All version-carrying files bumped to `0.54.0-rc.7.6-dev` (`verify-version-consistency` OK); `RELEASE_MANIFEST.json` now binds the rc7.6 candidate: archive `71346719…`, commit `1f0625f9`, manifest root `97f5b2c3…`, 4263 entries / 12 symlinks, dev-key signature verified under the default required-signature posture. |
 
-## RC7.7 hardening round 2 (this branch, pending requalification)
+## RC7.7 hardening round 2 (this branch, commit `d870703e`, pending requalification)
 
-Residual review items from the second audit's own follow-through:
+Residual review items from the second audit's own follow-through. The bound development
+artifact was rebuilt at this commit: `RELEASE_MANIFEST.json` now binds archive
+`3d224f41…` (19,037,956 bytes, 4264 manifest entries — the manifest now also covers the
+embedded `release-evidence/source-tree-sha256.txt`), dev-key attested and verified under
+the required-signature posture.
 
 | Finding | Status | Mechanism |
 |---|---|---|

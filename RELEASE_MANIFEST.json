@@ -4,17 +4,17 @@
   "designation": "development-candidate",
   "artifact": {
     "filename": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip",
-    "sha256": "71346719158e1ef6803882a46bdb67f263ec8d46480c17947efd55880735ffb2",
-    "size_bytes": 18442813,
+    "sha256": "3d224f41c0cc20ac56a1b327344e8c1fe14559eb8bef3f3cade0a80ea8476306",
+    "size_bytes": 19037956,
     "format": "zip",
     "prefix": "nemo-control-0.54.0-rc.7.6-dev"
   },
   "source": {
-    "commit": "1f0625f926d5a0aff793dd1ec05af271157199ec",
+    "commit": "d870703ed130b06f7f8e7ccbfef2fa882738cbd6",
     "branch": "fix/rc7.6-defect-repair",
-    "packaged_from": "git ls-files membership under crabedence-V1-fix-integration-integrity/ via scripts/verify-rc75-release.py pack",
+    "packaged_from": "git ls-files membership under crabedence-V1-fix-integration-integrity/ via scripts/package-source-archive.sh --format zip",
     "extraction_verified": true,
-    "manifest_entries": 4263
+    "manifest_entries": 4264
   },
   "provenance": {
     "attestation": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip.attestation.json",
@@ -22,11 +22,11 @@
     "attestation_schema": "rc75-release-attestation-v1",
     "signature_namespace": "rc75-release",
     "signature_identity": "dev-release@nemo-control (development binding key — NOT the trusted release key; the operator release-key ceremony remains a qualification blocker)",
-    "source_manifest_sha256": "1634e1dc171de55a4037f261cadadeb09f58a9f4e2486b5f3d114aa25db9c881",
-    "source_manifest_root_hash": "97f5b2c330af7080bb74318835bbc3413f85fb4af2723ac3a70d9158c59ed3a6",
-    "source_entry_count": 4263,
+    "source_manifest_sha256": "02ae7759a460089f43c4960e6845ead1666b31d1247631ce29923950639cbc15",
+    "source_manifest_root_hash": "9cf2d827f880e3d40b4d10953483d52979297e4c08340804f0a7c4bb088d687f",
+    "source_entry_count": 4264,
     "source_symlink_count": 12,
-    "note": "the attestation is SSH-signed over the archive digest and verifies by default (signature material required; --allow-unsigned is dev-only). The dev signature demonstrates the binding mechanism — it is not production release authorization."
+    "note": "the attestation is SSH-signed over the archive digest and verifies by default (signature material required; --allow-unsigned is dev-only). The dev signature demonstrates the binding mechanism — it is not production release authorization. The source manifest now also covers the embedded release-evidence/source-tree-sha256.txt (4264 entries vs the prior 4263-entry binding, which predates its auto-embedding)."
   },
   "identities": {
     "msb_runtime_pin_manifest": "qualification/msb-runtime-pins.json",
@@ -35,12 +35,12 @@
     "lane_image_pins_sha256": "f86821a73fba103d2bb70a00bba3ca71dc8e404cc75ddcae3c3a227b65a32b27",
     "nemo_transfer_manifest_sha256": "43d8f6e69be3ad504359815bbd1ee7b44e405132c086cf8b608f850da7d57519"
   },
-  "supersedes": "RC7.5 manifest record (NEMO-CONTROL-v0.54.0-rc7.5-development.zip, sha256 796437dd…) — the RC7.5 artifact remains NO-GO; this record binds the repaired RC7.6 development candidate built from fix/rc7.6-defect-repair",
-  "qualification": "NOT QUALIFIED — development candidate containing the RC7.5-audit repairs and RC7.7 hardening; the mandatory qualification campaign (pinned toolchain, both lanes, live crash/fault injection, independent custody) has not completed for this identity; see DEFECT_REGISTER.md",
+  "supersedes": "prior RC7.6 manifest record (commit 1f0625f9, archive sha256 71346719…) — this record binds the RC7.6 development candidate at d870703e including the RC7.7 round-2 hardening (deployment-scoped custody v3, refused-dispatch retention, retention read path, enforced attestation admission); the RC7.5 artifact remains NO-GO",
+  "qualification": "NOT QUALIFIED — development candidate containing the RC7.5-audit repairs and RC7.7 hardening rounds 1-2; the mandatory qualification campaign (pinned toolchain, both lanes, live crash/fault injection, independent custody) has not completed for this identity; see DEFECT_REGISTER.md",
   "blockers": [
     "no trusted release-key signature — the artifact is dev-key signed (binding demonstrated); the separately controlled release key ceremony is outstanding",
     "exclusive sandbox-namespace ownership is a stated deployment assumption (T1 residual) — native catalog-locked conditional delete remains the upgrade path",
-    "external custody NOT_RUN — no independently administered custodian deployed; code now enforces operator-administered trust roots at the recording boundary",
+    "external custody NOT_RUN — no independently administered custodian deployed; code now enforces operator-administered trust roots at the recording boundary and binds acknowledgements to the durable per-ledger deployment ID",
     "apple-hypervisor-framework lane maps to self-hosted bare-metal macOS ARM64 — a registered runner has not been demonstrated",
     "real crash/fault-injection requalification pending — epoch takeover, ambiguous-create cleanup, and bounded verify are implemented and unit-tested but not live-qualified",
     "toolchain: local verification ran under go1.27.2; the pinned go1.26.5 lane has not re-run in this workspace"
