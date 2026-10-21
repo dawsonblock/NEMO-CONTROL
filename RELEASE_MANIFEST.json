@@ -4,29 +4,29 @@
   "designation": "development-candidate",
   "artifact": {
     "filename": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip",
-    "sha256": "3d224f41c0cc20ac56a1b327344e8c1fe14559eb8bef3f3cade0a80ea8476306",
-    "size_bytes": 19037956,
+    "sha256": "aa7ae922422a9030a80f119ac0ba1696f966d0d8a857c75b7ad4c1781d5b7299",
+    "size_bytes": 19042887,
     "format": "zip",
     "prefix": "nemo-control-0.54.0-rc.7.6-dev"
   },
   "source": {
-    "commit": "d870703ed130b06f7f8e7ccbfef2fa882738cbd6",
+    "commit": "d46d00065db7e0bb6ad8352f9cd2cea38ad21039",
     "branch": "fix/rc7.6-defect-repair",
     "packaged_from": "git ls-files membership under crabedence-V1-fix-integration-integrity/ via scripts/package-source-archive.sh --format zip",
     "extraction_verified": true,
-    "manifest_entries": 4264
+    "manifest_entries": 4265
   },
   "provenance": {
     "attestation": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip.attestation.json",
     "attestation_signature": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip.attestation.json.sig",
     "attestation_schema": "rc75-release-attestation-v1",
     "signature_namespace": "rc75-release",
-    "signature_identity": "dev-release@nemo-control (development binding key — NOT the trusted release key; the operator release-key ceremony remains a qualification blocker)",
-    "source_manifest_sha256": "02ae7759a460089f43c4960e6845ead1666b31d1247631ce29923950639cbc15",
-    "source_manifest_root_hash": "9cf2d827f880e3d40b4d10953483d52979297e4c08340804f0a7c4bb088d687f",
-    "source_entry_count": 4264,
+    "signature_identity": "dawsonblock@users.noreply.github.com (trusted release key — principal in .github/release-allowed-signers, registered on the GitHub account as an SSH signing key)",
+    "source_manifest_sha256": "6b6d31b063cc4ddd02dfaf912274efb6bafb584de1f363d4bf1dd1591606730f",
+    "source_manifest_root_hash": "054f38cbc5f850cb88f35724ab7f01b6af4bd640f2c1c74113f18af283e0c9bf",
+    "source_entry_count": 4265,
     "source_symlink_count": 12,
-    "note": "the attestation is SSH-signed over the archive digest and verifies by default (signature material required; --allow-unsigned is dev-only). The dev signature demonstrates the binding mechanism — it is not production release authorization. The source manifest now also covers the embedded release-evidence/source-tree-sha256.txt (4264 entries vs the prior 4263-entry binding, which predates its auto-embedding)."
+    "note": "the attestation is SSH-signed over the archive digest and verifies by default (signature material required; --allow-unsigned is dev-only). Signed by the trusted release key at ~/.ssh/id_ed25519 whose public half is in .github/release-allowed-signers and registered on the GitHub account — the binding is now release-key authenticated, not a development stand-in. The source manifest also covers the embedded release-evidence/source-tree-sha256.txt (4264 entries vs the prior 4263-entry binding, which predates its auto-embedding)."
   },
   "identities": {
     "msb_runtime_pin_manifest": "qualification/msb-runtime-pins.json",
@@ -35,13 +35,12 @@
     "lane_image_pins_sha256": "f86821a73fba103d2bb70a00bba3ca71dc8e404cc75ddcae3c3a227b65a32b27",
     "nemo_transfer_manifest_sha256": "43d8f6e69be3ad504359815bbd1ee7b44e405132c086cf8b608f850da7d57519"
   },
-  "supersedes": "prior RC7.6 manifest record (commit 1f0625f9, archive sha256 71346719…) — this record binds the RC7.6 development candidate at d870703e including the RC7.7 round-2 hardening (deployment-scoped custody v3, refused-dispatch retention, retention read path, enforced attestation admission); the RC7.5 artifact remains NO-GO",
+  "supersedes": "prior RC7.6 manifest records (commits 1f0625f9, d870703e; archive sha256s 71346719…, 3d224f41…) — this record binds the RC7.6 development candidate at d46d0006 including the RC7.7 round-2 hardening plus the witness_checkpoint fix and live custody drill tool; the attestation is signed by the trusted release key (dawsonblock@users.noreply.github.com), no longer the dev binding key; the RC7.5 artifact remains NO-GO",
   "qualification": "NOT QUALIFIED — development candidate containing the RC7.5-audit repairs and RC7.7 hardening rounds 1-2; the mandatory qualification campaign (pinned toolchain, both lanes, live crash/fault injection, independent custody) has not completed for this identity; see DEFECT_REGISTER.md",
   "blockers": [
-    "no trusted release-key signature — the artifact is dev-key signed (binding demonstrated); the separately controlled release key ceremony is outstanding",
     "exclusive sandbox-namespace ownership is a stated deployment assumption (T1 residual) — native catalog-locked conditional delete remains the upgrade path",
-    "external custody NOT_RUN — no independently administered custodian deployed; code now enforces operator-administered trust roots at the recording boundary and binds acknowledgements to the durable per-ledger deployment ID",
-    "apple-hypervisor-framework lane maps to self-hosted bare-metal macOS ARM64 — a registered runner has not been demonstrated",
+    "external custody on a separately administered host NOT_RUN — local live drills passed (cmd/sandbox-custody-drill: baseline, outage hold/recover, replay refusal, forgery refusal, foreign-deployment refusal, clean audit) but a custodian under different administrative control remains",
+    "apple-hypervisor-framework lane: runner dawson-macbook-apple-silicon is registered on dawsonblock/crabedence-V1 (self-hosted, macOS, ARM64) and online — a dispatched qualification job has not yet passed on it",
     "real crash/fault-injection requalification pending — epoch takeover, ambiguous-create cleanup, and bounded verify are implemented and unit-tested but not live-qualified",
     "toolchain: local verification ran under go1.27.2; the pinned go1.26.5 lane has not re-run in this workspace"
   ]
