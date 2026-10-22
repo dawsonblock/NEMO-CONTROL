@@ -1,7 +1,7 @@
 {
  "schema": "rc75-source-manifest-v1",
  "version": "0.54.0-rc.7.6-dev",
- "root_hash": "054f38cbc5f850cb88f35724ab7f01b6af4bd640f2c1c74113f18af283e0c9bf",
+ "root_hash": "e3a425497361ccc4f7be11129ea9e77f943289a12cad97f81698d13fe7d01da0",
  "entry_count": 4265,
  "entries": [
   {
@@ -590,8 +590,8 @@
   {
    "path": "cmd/sandbox-custody-drill/main.go",
    "type": "file",
-   "size": 13076,
-   "sha256": "fab4d4b79abb2ea9c0927dba4016f5bc5aa921eb852c1414c0f175cdc91a1964",
+   "size": 13044,
+   "sha256": "70eb754a886826b6183de40a74f62546b91e12c71103faecb703addb37b1323c",
    "executable": false
   },
   {
@@ -1857,8 +1857,8 @@
   {
    "path": "docs/features/sandbox-executor.md",
    "type": "file",
-   "size": 26464,
-   "sha256": "9e5424298a3bbca6d02aa6bc8da4a99af7f0f84b38d05294e69b27a694bf19b0",
+   "size": 28760,
+   "sha256": "3c0a0bce4b6e39d92593d9e2a964daad4a98b40d4a06c880cc38cf035ad1ad0b",
    "executable": false
   },
   {
@@ -14982,15 +14982,15 @@
   {
    "path": "internal/sandboxcustody/server.go",
    "type": "file",
-   "size": 20182,
-   "sha256": "34b7dee7fc73fbf1e3d8334e30ba2bf84e2710a2baff9505bddd7d26e096a6c1",
+   "size": 20467,
+   "sha256": "2ea4f5f831a91197efb1a5cfed5dd47a251eb902d8af95c776b7191767ee84d1",
    "executable": false
   },
   {
    "path": "internal/sandboxcustody/server_test.go",
    "type": "file",
-   "size": 8641,
-   "sha256": "e032f0385bf7575eb3be13817a47450bd6527aa35c55ac3927f1cba1fff5021d",
+   "size": 12325,
+   "sha256": "9f1ff67cd5069f0eab4067cc28eeb98a17d7feeeac3072ebbcc52cf8eeddc9fd",
    "executable": false
   },
   {
@@ -16005,7 +16005,7 @@
    "path": "release-evidence/source-tree-sha256.txt",
    "type": "file",
    "size": 527187,
-   "sha256": "f876d86d030eeac938ae47b8f4297ab734efdbf99834fb55c9606c235b0e3f06",
+   "sha256": "a6b7f2d7b43786e222c71ea14d48417379502a940e2a89652dd63d17f026844b",
    "executable": false
   },
   {

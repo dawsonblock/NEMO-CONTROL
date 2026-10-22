@@ -1,0 +1,11 @@
+PASS  baseline   checkpoint witnessed over unix socket, pending=0 (want 0)
+PASS  outage-hold witness killed mid-queue: pending=1 (want 1, row must outlive the crash)
+PASS  outage-recover witness restarted: pending=0 (want 0 — the queued obligation survived)
+PASS  replay     seized ack re-presented for a new row: pending=1 (want 1 — binding refusal)
+PASS  replay-clear legitimate drain after refused replay: pending=0 (want 0)
+PASS  forgery    ack from unapproved witness key: pending=1 (want 1 — trust root refusal)
+PASS  forgery-clear legitimate drain after refused forgery: pending=0 (want 0)
+PASS  foreign-mint second ledger witnessed its checkpoint: pending=0 (want 0)
+PASS  foreign    deployment-B ack replayed to ledger A: pending=1 (want 1 — scope binding refusal)
+PASS  foreign-clear legitimate drain after refused foreign ack: pending=0 (want 0)
+PASS  audit      custody store verifies against the operator trust root (custody verification: clean
