@@ -1,0 +1,7 @@
+{
+  "name": "nemo-control",
+  "private": true,
+  "devDependencies": {
+    "vitest": "^4.1.11"
+  }
+}
