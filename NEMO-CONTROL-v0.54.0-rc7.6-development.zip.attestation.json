@@ -2,9 +2,9 @@
  "schema": "rc75-release-attestation-v1",
  "version": "0.54.0-rc.7.6-dev",
  "archive_name": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip",
- "archive_sha256": "41d4f572e89087447bec3651502a98c5ce3c68a7d05ce30a07b9816c8eb54f68",
- "archive_size": 19044531,
- "source_manifest_sha256": "3f32f9a9d010d4378d1704d20d1f1657c536a8c9f20578c64f31c6914ebd3a0d",
- "source_manifest_root_hash": "e3a425497361ccc4f7be11129ea9e77f943289a12cad97f81698d13fe7d01da0",
+ "archive_sha256": "73815dbd8bad1bcd219e1b2917342b2d1fa30b789463af93b1b7a2e7d992d3fd",
+ "archive_size": 18660867,
+ "source_manifest_sha256": "5f524be5e078438dbbec1fb2a468d5d6b9d347851ba0f533e51d6341ae9f3b0e",
+ "source_manifest_root_hash": "7bd558ed6adca0d35486f58b33ff00e204fc0c936f9e9541d1229ebff57a3bd1",
  "source_entry_count": 4265
 }
