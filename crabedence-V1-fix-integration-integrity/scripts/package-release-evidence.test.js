@@ -168,6 +168,42 @@ test("an extra empty directory is packaged (directories carry no checksummable c
   });
 });
 
+test("packaging refuses a hidden scratch entry — never evidence, never shipped", (t) => {
+  const { root, dir } = evidenceFixture(t);
+  // The one inventory rule: hidden entries are refused at every stage, so
+  // a bundle that finalized before scratch landed still cannot package.
+  fs.mkdirSync(path.join(dir, ".scratch"));
+  fs.writeFileSync(path.join(dir, ".scratch", "partial.log"), "x\n");
+  fs.writeFileSync(path.join(dir, ".DS_Store"), "junk");
+  const out = path.join(root, "bundle.tar.gz");
+  const { status, stderr } = packageIt(dir, out);
+  assert.equal(status, 1);
+  assert.match(stderr, /hidden entries/);
+  assert.equal(fs.existsSync(out), false);
+});
+
+test("a sealed bundle packages: attestation members ship unchecksummed", (t) => {
+  const { root, dir } = evidenceFixture(t);
+  // attestation/ is the external seal applied after finalization — the
+  // canonical inventory tolerates it, consumers verify it with
+  // `gh attestation verify` rather than the checksum manifest.
+  fs.mkdirSync(path.join(dir, "attestation"));
+  fs.writeFileSync(
+    path.join(dir, "attestation", "attestation.json"),
+    JSON.stringify({ attestation_url: "https://example.invalid/att" }),
+  );
+  const out = path.join(root, "bundle.tar.gz");
+  const { status, stderr } = packageIt(dir, out);
+  assert.equal(status, 0, stderr);
+  const extract = path.join(root, "extracted");
+  fs.mkdirSync(extract);
+  execFileSync("tar", ["xzf", out, "-C", extract]);
+  assert.ok(
+    fs.existsSync(path.join(extract, "release-evidence", "attestation", "attestation.json")),
+    "the seal ships inside the bundle",
+  );
+});
+
 test("packaging refuses a fifo that SHA256SUMS cannot cover", (t) => {
   const { root, dir } = evidenceFixture(t);
   // A fifo is a non-regular member: it can never appear in SHA256SUMS, so it
@@ -199,6 +235,104 @@ test("packaging refuses an unfinalized evidence directory", (t) => {
   const { status, stderr } = packageIt(dir, path.join(root, "bundle.tar.gz"));
   assert.equal(status, 1);
   assert.match(stderr, /not finalized/);
+});
+
+// ─── F-012: the attestation namespace is typed ───────────────────────
+// A member is exempt from SHA256SUMS coverage only inside the single
+// root seal directory holding declared seal members. The name
+// `attestation` on anything else — a regular file, a symlink, a nested
+// entry — is never an exemption: such a member would ship inside the
+// bundle with no integrity coverage at all.
+
+test("packaging refuses a regular file named attestation at the root (F-012)", (t) => {
+  const { root, dir } = evidenceFixture(t);
+  // The F-012 defect: this file was neither hidden nor non-regular, so
+  // it passed the stray checks — and the checksum walk pruned the name,
+  // so it shipped inside the bundle with no checksum.
+  fs.writeFileSync(path.join(dir, "attestation"), "forged seal\n");
+  const out = path.join(root, "bundle.tar.gz");
+  const { status, stderr } = packageIt(dir, out);
+  assert.equal(status, 1, "a stray attestation file must fail closed");
+  assert.match(stderr, /attestation/);
+  assert.equal(fs.existsSync(out), false, "no archive may be produced");
+});
+
+test("packaging refuses attestation entries nested outside the root seal", (t) => {
+  for (const asDir of [false, true]) {
+    const { root, dir } = evidenceFixture(t);
+    const sub = path.join(dir, "gate-results");
+    if (asDir) {
+      fs.mkdirSync(path.join(sub, "attestation"));
+      fs.writeFileSync(path.join(sub, "attestation", "attestation.json"), "{}\n");
+    } else {
+      fs.writeFileSync(path.join(sub, "attestation"), "forged\n");
+    }
+    const out = path.join(root, `bundle-${asDir ? "dir" : "file"}.tar.gz`);
+    const { status, stderr } = packageIt(dir, out);
+    assert.equal(status, 1, `a nested attestation ${asDir ? "directory" : "file"} must fail closed`);
+    assert.match(stderr, /attestation/);
+    assert.equal(fs.existsSync(out), false);
+  }
+});
+
+test("packaging refuses a root attestation symlink", (t) => {
+  const { root, dir } = evidenceFixture(t);
+  fs.mkdirSync(path.join(dir, "elsewhere"));
+  fs.writeFileSync(path.join(dir, "elsewhere", "seal.json"), "{}\n");
+  fs.symlinkSync("elsewhere", path.join(dir, "attestation"));
+  const out = path.join(root, "bundle.tar.gz");
+  const { status } = packageIt(dir, out);
+  assert.equal(status, 1, "a symlink named attestation must fail closed");
+  assert.equal(fs.existsSync(out), false);
+});
+
+test("packaging refuses undeclared members inside the attestation seal", (t) => {
+  const cases = {
+    "extra.bin": (seal) => fs.writeFileSync(path.join(seal, "extra.bin"), "x"),
+    "hidden member": (seal) => fs.writeFileSync(path.join(seal, ".hidden"), "x"),
+    "nested directory": (seal) => {
+      fs.mkdirSync(path.join(seal, "nested"));
+      fs.writeFileSync(path.join(seal, "nested", "attestation.json"), "{}\n");
+    },
+    "oversized member": (seal) => fs.writeFileSync(path.join(seal, "attestation.json"), "x".repeat(70_000)),
+    "wrong extension": (seal) => fs.writeFileSync(path.join(seal, "signature.sigstore.json"), "{}"),
+  };
+  for (const [name, plant] of Object.entries(cases)) {
+    const { root, dir } = evidenceFixture(t);
+    const seal = path.join(dir, "attestation");
+    fs.mkdirSync(seal);
+    plant(seal);
+    const out = path.join(root, `bundle-${name.replace(/\W+/g, "-")}.tar.gz`);
+    const { status, stderr } = packageIt(dir, out);
+    assert.equal(status, 1, `seal member ${name} must fail closed`);
+    assert.match(stderr, /attestation|hidden entries/);
+    assert.equal(fs.existsSync(out), false, `no archive may be produced for ${name}`);
+  }
+});
+
+test("a complete declared seal packages: all workflow-emitted members ship unchecksummed", (t) => {
+  const { root, dir } = evidenceFixture(t);
+  // The release workflow's attestation step emits exactly these three
+  // members — the declared seal set.
+  fs.mkdirSync(path.join(dir, "attestation"));
+  fs.writeFileSync(
+    path.join(dir, "attestation", "attestation.json"),
+    JSON.stringify({ attestation_url: "https://example.invalid/att", subject: "release-evidence/evidence-manifest.json" }),
+  );
+  fs.writeFileSync(path.join(dir, "attestation", "attestation-id.txt"), "123456789\n");
+  fs.writeFileSync(path.join(dir, "attestation", "attestation-url.txt"), "https://example.invalid/att\n");
+  const out = path.join(root, "bundle.tar.gz");
+  const { status, stderr } = packageIt(dir, out);
+  assert.equal(status, 0, stderr);
+  const extract = path.join(root, "extracted");
+  fs.mkdirSync(extract);
+  execFileSync("tar", ["xzf", out, "-C", extract]);
+  for (const member of ["attestation.json", "attestation-id.txt", "attestation-url.txt"]) {
+    assert.ok(
+      fs.existsSync(path.join(extract, "release-evidence", "attestation", member)),
+      `seal member ${member} ships inside the bundle`,
+    );
+  }
 });
 
 test("the packager parses", () => {

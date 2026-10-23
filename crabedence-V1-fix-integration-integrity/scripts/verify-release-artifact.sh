@@ -47,6 +47,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # admission. The archive ships it next to this script.
 # shellcheck source=lib/qualification-gates.sh
 source "$SCRIPT_DIR/lib/qualification-gates.sh"
+# The evidence-bundle membership rule is the same inventory generation,
+# finalization and packaging share — verification must refuse what they
+# refuse, never accept a bundle another stage would reject.
+# shellcheck source=lib/evidence-inventory.sh
+source "$SCRIPT_DIR/lib/evidence-inventory.sh"
 
 MODE=""
 EVIDENCE_DIR=""
@@ -397,6 +402,19 @@ else
   check "Artifact checksums (missing)" "FAIL"
 fi
 
+# 1a. Bundle membership — negative as well as positive. Every member of
+# the evidence tree must be either a covered checksum member or a
+# declared seal member: hidden entries, non-regular files, an
+# `attestation` member outside the single root seal directory, and
+# undeclared seal contents are all refused — the same inventory rule the
+# generator, finalizer and packager enforce, so a rejected tree is
+# rejected for the same reason here.
+if evidence_refuse_strays "$EVIDENCE_DIR" "verification"; then
+  check "Evidence bundle membership" "PASS"
+else
+  check "Evidence bundle membership" "FAIL"
+fi
+
 # 1b. artifact.json must be COVERED by the checksum manifest, not merely
 # present next to it. The artifact binding is what ties the release
 # archive to the qualified source and the capability registry; a bundle
@@ -409,6 +427,23 @@ if [ -f "$ARTIFACT_JSON" ]; then
     check "artifact.json covered by checksums" "FAIL"
     echo "  ERROR: artifact.json is not listed in SHA256SUMS — the evidence bundle does not bind the release artifact" >&2
   fi
+fi
+
+# 1bb. The evidence root is the semantic closure: every named binding —
+# commit, source manifest, runtime and component digests, every gate's
+# log digest, the release artifact digests — is recomputed from the
+# evidence files, and root_sha256 must cover the stored document. The
+# claim "these outputs correspond to these release bytes" is machine-
+# checked here, not asserted in prose.
+if [ -f "$EVIDENCE_DIR/evidence-root.json" ]; then
+  if python3 "$SCRIPT_DIR/generate-evidence-root.py" --verify "$EVIDENCE_DIR" --repo-root "$SOURCE_DIR" >/dev/null 2>&1; then
+    check "Evidence root bindings" "PASS"
+  else
+    check "Evidence root bindings" "FAIL"
+    python3 "$SCRIPT_DIR/generate-evidence-root.py" --verify "$EVIDENCE_DIR" --repo-root "$SOURCE_DIR" >&2 || true
+  fi
+else
+  check "Evidence root (missing)" "FAIL"
 fi
 
 # 1c. Registry policy identity — the capability catalog the release was
@@ -651,9 +686,13 @@ if [ -f "$EVIDENCE_DIR/qualification.json" ]; then
   # toolchain. A mutable global `ajv` binary is only a fallback, and no
   # validator at all is a qualification failure.
   VALIDATOR_SCRIPT=""
+  # A validator materialized beside the evidence directory wins over the
+  # in-tree copy: the release pipeline installs its dependencies there,
+  # while an extracted source tree deliberately carries no node_modules —
+  # the shipped script alone cannot resolve its own pinned import.
   for candidate in \
-    "$REPO_ROOT/nemo/scripts/validate-schema.mjs" \
-    "$(dirname "$EVIDENCE_DIR")/nemo/scripts/validate-schema.mjs"; do
+    "$(dirname "$EVIDENCE_DIR")/nemo/scripts/validate-schema.mjs" \
+    "$REPO_ROOT/nemo/scripts/validate-schema.mjs"; do
     if [ -f "$candidate" ]; then
       VALIDATOR_SCRIPT="$candidate"
       break

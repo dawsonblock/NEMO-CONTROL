@@ -160,8 +160,10 @@ gate fails on drift between it and the manifest:
 | modified file | `crates/native-loader/src/bin/unix/nemo-plugin-host.rs` | |
 | modified file | `crates/native-loader/src/service.rs` | |
 | modified file | `crates/node/src/api/mod.rs` | |
+| modified file | `crates/plugin-host/Cargo.toml` | |
 | modified file | `crates/plugin-host/src/isolation_policy.rs` | |
 | modified file | `crates/plugin-host/src/lib.rs` | |
+| modified file | `crates/plugin-host/src/limits.rs` | |
 | modified file | `crates/plugin-host/src/runtime_service.rs` | |
 | modified file | `crates/plugin-host/src/supervisor.rs` | |
 | modified file | `crates/plugin-host/tests/process_backend.rs` | |
