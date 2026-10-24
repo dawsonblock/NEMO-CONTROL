@@ -770,7 +770,32 @@ CRAB-V1-027: Recovery locators are provider-specific, minimal,
              bounded, and cleared at terminal completion or retention.
 ```
 
-## 15. Acceptance conditions
+## 15. Operator control plane
+
+A running deployment MUST answer to an operator, not only to its own
+state machine. The `control/` directory beside the execution socket
+holds signed control records the kernel reads but cannot mint:
+
+- `halt.json` — a signed global halt: every new admission is DENIED
+  until `control resume` removes it.
+- `revoked/<digest>.json` — a signed per-release revocation: a service
+  bound to that release identity denies all new work until
+  `unrevoke`.
+- `staged/<digest>.json` — a signed rollout-stage record
+  (`canary`/`majority`/`full`); when `CRABEDENCE_REQUIRE_ROLLOUT_RECORD`
+  is set a service whose release has no valid stage record denies
+  admission — promotion is then an explicit operator act, never an
+  absence of prohibition.
+
+Records are Ed25519-signed by an operator key the kernel does not
+hold and verified against `CRABEDENCE_OPERATOR_TRUSTED`; a missing
+trust list honors any self-consistent record (development semantics —
+the directory is owner-only). A present record that is malformed,
+forged, or untrusted MUST fail closed: denial, never a silently open
+gate. The check runs at every admission before schema validation, so
+control acts take effect on the next request — no restart required.
+
+## 16. Acceptance conditions
 
 The artifact is not qualified until all of the following hold:
 

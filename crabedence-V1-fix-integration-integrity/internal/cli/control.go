@@ -69,8 +69,7 @@ type controlStatusCmd struct {
 	Socket string `help:"Execution service socket." required:""`
 }
 
-func operatorSigner(t *string) (*evidence.Signer, error) {
-	path := *t
+func operatorSigner(path string) (*evidence.Signer, error) {
 	if path == "" {
 		path = os.Getenv("CRABEDENCE_OPERATOR_KEY")
 	}
@@ -85,7 +84,7 @@ func operatorSigner(t *string) (*evidence.Signer, error) {
 }
 
 func (c *controlHaltCmd) Run(ctx context.Context, app App) error {
-	signer, err := operatorSigner(&c.Key)
+	signer, err := operatorSigner(c.Key)
 	if err != nil {
 		return err
 	}
@@ -109,7 +108,7 @@ func (c *controlResumeCmd) Run(ctx context.Context, app App) error {
 }
 
 func (c *controlRevokeCmd) Run(ctx context.Context, app App) error {
-	signer, err := operatorSigner(&c.Key)
+	signer, err := operatorSigner(c.Key)
 	if err != nil {
 		return err
 	}
@@ -133,7 +132,7 @@ func (c *controlUnrevokeCmd) Run(ctx context.Context, app App) error {
 }
 
 func (c *controlStageCmd) Run(ctx context.Context, app App) error {
-	signer, err := operatorSigner(&c.Key)
+	signer, err := operatorSigner(c.Key)
 	if err != nil {
 		return err
 	}
