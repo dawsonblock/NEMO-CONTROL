@@ -171,6 +171,13 @@ jobs:
         working-directory: runtimes/nemo-relay
         run: cargo test -p nemo-crabedence-bridge -p nemo-effect-router -p nemo-crabedence-runtime
 
+      # Live Go↔Rust differential: both verdict CLIs must agree on every
+      # wire input — the shared corpus plus seeded generated cases. A
+      # verdict divergence is an authority-boundary defect; error-text
+      # drift is reported but non-fatal (phrase equality is corpus-bound).
+      - name: Run the Go/Rust invocation-ABI differential
+        run: node scripts/abi-differential.mjs --random 2000 --seed ${{ github.run_id }}
+
       - name: Lint the NEMO integration crates
         working-directory: runtimes/nemo-relay
         run: cargo clippy -p nemo-crabedence-bridge -p nemo-effect-router -p nemo-crabedence-runtime --all-targets -- -D warnings
@@ -549,6 +556,9 @@ jobs:
 
       - name: Check runtime base image pins
         run: node scripts/check-docker-base-images.mjs
+
+      - name: Check execution-plane image-pin inventory
+        run: node scripts/check-image-pins.mjs
 
       - name: Build Node runtime image
         run: docker build -f worker/Dockerfile.node worker
