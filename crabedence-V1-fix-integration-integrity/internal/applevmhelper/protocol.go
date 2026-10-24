@@ -48,6 +48,13 @@ const (
 	SeedFileName        = "seed.img"
 	EFIFileName         = "efi-variable-store.bin"
 	PreparationFileName = "preparing.json"
+	// OwnershipFileName is the helper-provenance witness inside an
+	// instance directory — written exclusively at directory creation,
+	// before any other artifact, so a metadata-less remnant can still
+	// be attributed to this tool rather than to anything else that
+	// placed a directory under the state root. Same convention as the
+	// Tart and Apple Machine providers.
+	OwnershipFileName = ".crabbox-owner"
 )
 
 // HelperEntitlements is the single runtime and release-signing policy source.
@@ -227,6 +234,10 @@ func InstanceDir(stateRoot, name string) string {
 
 func MetadataPath(stateRoot, name string) string {
 	return filepath.Join(InstanceDir(stateRoot, name), MetadataFileName)
+}
+
+func OwnershipPath(stateRoot, name string) string {
+	return filepath.Join(InstanceDir(stateRoot, name), OwnershipFileName)
 }
 
 func PreparationPath(stateRoot, name string) string {

@@ -5,7 +5,9 @@ package applevmhelper
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -214,6 +216,15 @@ func runStart(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 	if err := ensurePrivateDir(instanceRoot); err != nil {
 		return fmt.Errorf("create instance root: %w", err)
+	}
+	// Identity-bound cleanup: the ownership witness lands before any
+	// other artifact so a directory this tool created is always
+	// attributable — even when a crash leaves it metadata-less. An
+	// existing well-formed marker means the remnant is already ours
+	// (a previous start crashed after creation); a malformed one is
+	// refused rather than claimed.
+	if err := writeOwnershipMarker(instanceRoot); err != nil {
+		return fmt.Errorf("write ownership marker: %w", err)
 	}
 	now := time.Now().UTC()
 	inst := Instance{
@@ -679,6 +690,26 @@ func runDelete(args []string, stdout, stderr io.Writer) error {
 				}
 				return statErr
 			}
+			// A metadata-less directory is helper debris only when it
+			// carries the ownership witness written at creation, or is
+			// empty — the narrow crash window between directory create
+			// and marker write. A non-empty directory without the
+			// marker is foreign content: refuse to remove anything this
+			// tool cannot attribute to itself, and name the path so an
+			// operator can inspect it.
+			owned, err := hasOwnershipMarker(instanceRoot)
+			if err != nil {
+				return err
+			}
+			if !owned {
+				empty, err := dirEmpty(instanceRoot)
+				if err != nil {
+					return err
+				}
+				if !empty {
+					return fmt.Errorf("instance %s directory has contents but no helper ownership marker — refusing to remove unattributable content; inspect %s manually", strings.TrimSpace(*name), instanceRoot)
+				}
+			}
 			if err := os.RemoveAll(instanceRoot); err != nil {
 				return fmt.Errorf("remove metadata-less instance directory: %w", err)
 			}
@@ -1002,6 +1033,91 @@ func readMetadata(path string) (Instance, error) {
 		return Instance{}, fmt.Errorf("decode metadata %s: %w", path, err)
 	}
 	return inst, nil
+}
+
+// writeOwnershipMarker plants the helper-provenance witness inside a
+// fresh instance directory: a random 64-hex identity written
+// exclusively. If a marker already exists it must be well-formed — a
+// remnant from a crashed start is ours to reuse; a malformed marker
+// means the directory is not attributable to this tool and is refused.
+func writeOwnershipMarker(instanceRoot string) error {
+	path := filepath.Join(instanceRoot, OwnershipFileName)
+	var random [32]byte
+	if _, err := rand.Read(random[:]); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			owned, checkErr := hasOwnershipMarker(instanceRoot)
+			if checkErr != nil {
+				return checkErr
+			}
+			if !owned {
+				return fmt.Errorf("existing ownership marker %s is malformed — refusing to claim the directory", path)
+			}
+			return nil
+		}
+		return err
+	}
+	_, writeErr := file.WriteString(hex.EncodeToString(random[:]) + "\n")
+	if writeErr == nil {
+		writeErr = file.Sync()
+	}
+	closeErr := file.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	return closeErr
+}
+
+// hasOwnershipMarker reports whether the directory carries a
+// well-formed helper ownership witness: a regular file holding exactly
+// 64 lowercase-hex characters and a trailing newline — the same shape
+// the Tart and Apple Machine providers verify.
+func hasOwnershipMarker(instanceRoot string) (bool, error) {
+	path := filepath.Join(instanceRoot, OwnershipFileName)
+	before, err := os.Lstat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	if !before.Mode().IsRegular() || before.Size() != 65 {
+		return false, nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+	opened, err := file.Stat()
+	if err != nil || !os.SameFile(before, opened) {
+		return false, fmt.Errorf("ownership marker %s changed while opening", path)
+	}
+	data, err := io.ReadAll(io.LimitReader(file, 66))
+	if err != nil {
+		return false, err
+	}
+	if len(data) != 65 || data[64] != '\n' {
+		return false, nil
+	}
+	if _, err := hex.DecodeString(string(data[:64])); err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+// dirEmpty reports whether the directory holds no entries at all —
+// the crash window between instance-dir creation and the ownership
+// marker write.
+func dirEmpty(path string) (bool, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false, err
+	}
+	return len(entries) == 0, nil
 }
 
 func writePreparationMarker(stateRoot, name string, inst Instance) error {

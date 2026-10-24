@@ -461,6 +461,72 @@ func TestRunDeleteRemovesMetadataLessInstanceDirectory(t *testing.T) {
 	}
 }
 
+func TestRunDeleteRefusesForeignInstanceDirectory(t *testing.T) {
+	stateRoot := t.TempDir()
+	name := "foreign-instance"
+	// A directory under the state root that the helper never created:
+	// contents, no ownership witness. Delete must refuse rather than
+	// remove content it cannot attribute to itself.
+	dir := InstanceDir(stateRoot, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sentinel := filepath.Join(dir, "foreign-data")
+	if err := os.WriteFile(sentinel, []byte("not ours\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := runDelete([]string{"--state-root", stateRoot, "--name", name}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "no helper ownership marker") {
+		t.Fatalf("runDelete error=%v, want foreign-content refusal", err)
+	}
+	if _, statErr := os.Stat(sentinel); statErr != nil {
+		t.Fatalf("foreign content removed: %v", statErr)
+	}
+}
+
+func TestRunDeleteRefusesMalformedOwnershipMarker(t *testing.T) {
+	stateRoot := t.TempDir()
+	name := "bad-marker-instance"
+	dir := InstanceDir(stateRoot, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A marker-shaped file that is not a valid witness — a
+	// coincidental or planted file must not count as provenance.
+	if err := os.WriteFile(filepath.Join(dir, OwnershipFileName), []byte("not-a-real-identity\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "sentinel"), []byte("data\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := runDelete([]string{"--state-root", stateRoot, "--name", name}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "no helper ownership marker") {
+		t.Fatalf("runDelete error=%v, want malformed-marker refusal", err)
+	}
+}
+
+func TestRunDeleteRemovesEmptyMetadataLessDirectory(t *testing.T) {
+	stateRoot := t.TempDir()
+	name := "pre-marker-crash"
+	// The crash window between directory creation and the ownership
+	// write leaves an empty directory — it is safe to remove because
+	// nothing inside could be foreign content.
+	if err := os.MkdirAll(InstanceDir(stateRoot, name), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	if err := runDelete([]string{"--state-root", stateRoot, "--name", name}, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	var response DeleteResponse
+	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if !response.Deleted {
+		t.Fatalf("empty pre-marker directory not removed: %+v", response)
+	}
+}
+
 func TestRunDeleteRejectsActivePreparation(t *testing.T) {
 	stateRoot := t.TempDir()
 	name := "active-preparation"
@@ -1080,6 +1146,11 @@ func mustCreateInstanceDir(t *testing.T, root, name string) {
 	t.Helper()
 	if err := os.MkdirAll(InstanceDir(root, name), 0o755); err != nil {
 		t.Fatalf("create instance dir: %v", err)
+	}
+	// Every directory the real create path produces now carries the
+	// ownership witness before any other artifact.
+	if err := writeOwnershipMarker(InstanceDir(root, name)); err != nil {
+		t.Fatalf("write ownership marker: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(InstanceDir(root, name), "sentinel"), []byte("created by start\n"), 0o644); err != nil {
 		t.Fatalf("write sentinel: %v", err)
