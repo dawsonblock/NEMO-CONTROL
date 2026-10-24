@@ -1,128 +1,160 @@
 {
-  "schema_version": 1,
-  "suite": "rc8-integration",
-  "description": "RC8 reviewer-maintained inventory of mandatory tests beyond the live-microVM suite (which remains governed by required-tests.json). A gate is qualified only when every case in the gate's list executed exactly once and passed for the candidate commit. Absent, skipped, duplicated, or failed cases fail the gate; evidence from another source commit, toolchain, image-pin manifest, deployment identity, or trust root is rejected. Changes to this file require review and a signed note in the PR that lands them.",
-  "gates": {
-    "g1-trust-repair": {
-      "package": ["internal/history", "internal/experience", "internal/research"],
-      "required_tests": [
-        "TestTrustBlankIsUnverified",
-        "TestTrustInvalidSignature",
-        "TestTrustStalePolicyInvalid",
-        "TestTrustContradictoryAssessment",
-        "TestTrustMixedSignatures",
-        "TestTrustSupersededEvidence",
-        "TestForgedAssessmentRejected",
-        "TestTrustReplayRejected",
-        "TestLegacyStoreMigrationKeepsUntrusted",
-        "TestTrustedTaskSetExcludesUnassessed",
-        "TestUnverifiedNotPromoted"
-      ]
-    },
-    "g2-authority-abi": {
-      "package": ["internal/execution", "internal/capability", "internal/idempotency", "internal/reconcile", "cmd/abi-verdict"],
-      "required_tests": [
-        "TestAuthorityKernelAssignedFields",
-        "TestGrantScopeEnforced",
-        "TestRequestDigestBinding",
-        "TestNemoCannotMintCapability",
-        "TestUnknownNotRetried",
-        "TestAmbiguousRequiresAbsenceProof",
-        "TestDispatchCrashBeforeCommit",
-        "TestDispatchCrashAfterCommit",
-        "TestABIDifferentialCorpusAgreement",
-        "TestABIMalformedDeniedConsistently"
-      ],
-      "differential": {
-        "driver": "scripts/abi-differential.mjs",
-        "requirement": "Go and Rust implementations must agree on every normative corpus case; Node-wrapper mocks do not satisfy this gate"
-      }
-    },
-    "g3-release-controls": {
-      "package": ["internal/releasectl", "internal/cli"],
-      "required_tests": [
-        "TestVerifyEmptyAllowlistFailsClosed",
-        "TestVerifySelfSignedRejected",
-        "TestResumeUnsignedRejected",
-        "TestHaltSurvivesFileDeletion",
-        "TestControlLedgerRollbackFailsClosed",
-        "TestStaleEpochRejected",
-        "TestRogueDaemonCannotClear",
-        "TestCorruptRecordFailsClosed",
-        "TestReplicaMismatchFailsClosed",
-        "TestRestartPreservesState",
-        "TestOutageFailsClosed",
-        "TestTwoStepRecovery"
-      ]
-    },
-    "g4-custody": {
-      "package": ["internal/witness", "internal/sandboxcustody", "internal/custody"],
-      "required_tests": [
-        "TestWitnessForgedAckRejected",
-        "TestWitnessWrongKeyRejected",
-        "TestWitnessReplayRejected",
-        "TestWitnessDuplicateIdempotent",
-        "TestWitnessSequenceGapDetected",
-        "TestWitnessForeignDeploymentRejected",
-        "TestContradictoryCheckpointRejected",
-        "TestSameHashDifferentPayloadRejected",
-        "TestCustodyOutageNoTerminalSuccess",
-        "TestCustodyReconnectReconciles",
-        "TestColdRestoreReconciles",
-        "TestWitnessKeyRotation",
-        "TestWitnessCrossFamilyConfusion"
-      ]
-    },
-    "g5-sandbox-lifecycle": {
-      "package": ["internal/sandboxexecutor"],
-      "required_tests": [
-        "TestCleanupReplacementSandboxSafe",
-        "TestCleanupLabelCollisionRejected",
-        "TestVerifiedAbsentNeverFalse",
-        "TestKillAtEveryCommitBoundary",
-        "TestIncompleteCreateRecovered",
-        "TestOrphanedVMInventoried",
-        "TestStaleOwnershipRejected",
-        "TestConcurrentRetargetedDeletion",
-        "TestSlowInspectBounded",
-        "TestRetainedResourcesAccounted",
-        "TestCredentialIsolationPreserved",
-        "TestSandboxRecreationSafe"
-      ],
-      "live_note": "G5 unit/integration coverage does not substitute for the TestMSBLive* lanes in required-tests.json"
-    },
-    "g6-research-boundary": {
-      "package": ["internal/research", "internal/dream", "internal/experience"],
-      "required_tests": [
-        "TestProposalImmutable",
-        "TestPromotionRequiresOperatorSignature",
-        "TestSelfReportedDeltaInsufficient",
-        "TestBoundedExperimentBudget",
-        "TestEvalLeakageDetected",
-        "TestForgedOutcomeRejected",
-        "TestReceiptReplayRejected",
-        "TestUnverifiedEvidenceExcluded",
-        "TestFalseImprovementDetected",
-        "TestBudgetExhaustionBounded",
-        "TestNonAuthorizedPromotionRejected"
-      ]
-    },
-    "g7-packaging": {
-      "package": ["scripts", "qualification"],
-      "required_tests": [
-        "TestEvidenceBoundToCommit",
-        "TestForeignCommitEvidenceRejected",
-        "TestChangedPinsInvalidate",
-        "TestTransferManifestRecomputed"
-      ],
-      "script_gates": [
-        "scripts/qualify-repository.sh",
-        "scripts/qualify-source-distribution.sh",
-        "scripts/rc8-preflight.sh",
-        "scripts/rc8-evidence-verify.sh",
-        "scripts/verify-version-consistency.mjs",
-        "scripts/verify-nemo-provenance.sh"
-      ]
-    }
+ "schema_version": 2,
+ "suite": "rc8.1-integration",
+ "description": "RC8.1 reviewer-maintained mandatory-test inventory. Reconciled per the RC8.1 plan §2.6: for status=executed gates, required_tests names the ACTUAL test functions providing coverage (previous aspirational identifiers were replaced with their real covering tests — equivalence in the requirements map); for status=specified gates, required_tests is the normative forward spec — the owning PR must create tests with exactly these names. A gate qualifies only when every required test executed exactly once and passed for the candidate commit under the pinned toolchains; absent, skipped, duplicated, failed, NOT_RUN, or identity-mismatched evidence fails. Changes to this file require review and a signed note in the landing PR.",
+ "gates": {
+  "g1-trust-repair": {
+   "status": "executed",
+   "package": ["internal/history", "internal/experience", "internal/research"],
+   "required_tests": [
+    "TestTrustBlankIsUnverified",
+    "TestTrustInvalidSignature",
+    "TestTrustStalePolicyInvalid",
+    "TestTrustContradictoryAssessment",
+    "TestTrustMixedSignatures",
+    "TestTrustSupersededEvidence",
+    "TestForgedAssessmentRejected",
+    "TestTrustReplayRejected",
+    "TestLegacyStoreMigrationKeepsUntrusted",
+    "TestTrustedTaskSetExcludesUnassessed",
+    "TestUnverifiedNotPromoted"
+   ],
+   "requirements": {
+    "blank-or-unknown-trust-untrusted": ["TestTrustBlankIsUnverified"],
+    "forged-or-invalid-verdict-untrusted": ["TestTrustInvalidSignature", "TestForgedAssessmentRejected"],
+    "cross-policy-verdicts-do-not-inherit": ["TestTrustStalePolicyInvalid", "TestTrustContradictoryAssessment"],
+    "no-laundering-via-clean-later-node": ["TestTrustMixedSignatures"],
+    "superseded-state-not-trusted": ["TestTrustSupersededEvidence"],
+    "replayed-assessment-rejected": ["TestTrustReplayRejected"],
+    "legacy-unassessed-store-stays-untrusted": ["TestLegacyStoreMigrationKeepsUntrusted"],
+    "unassessed-excluded-from-task-set": ["TestTrustedTaskSetExcludesUnassessed"],
+    "no-promotion-on-unverified-basis": ["TestUnverifiedNotPromoted"]
+   }
+  },
+  "g2-authority-abi": {
+   "status": "executed",
+   "package": ["internal/execution", "internal/capability", "internal/idempotency", "internal/reconcile"],
+   "required_tests": [
+    "TestServiceBindsResolvedAuthorityIntoRequestDigest",
+    "TestCallerCannotForgeAuthorityBinding",
+    "TestBrokeredAuthorityBindsResolvedGrant",
+    "TestVerifyGrantDigest",
+    "TestComputeGrantDigestIsCanonicalOverConstraints",
+    "TestValidateIssuanceScopeConcreteAndAcknowledged",
+    "TestDescriptorDigestBindsPolicy",
+    "TestINV003UnknownCapabilityIsDeniedAtAdmission",
+    "TestINV001MutationCannotUseLocalRoute",
+    "TestINV006PostDispatchAmbiguityIsNeverFailed",
+    "TestClientUnknownWireStatusIsProtocol",
+    "TestNoopResolverReturnsUnknown",
+    "TestGitHubConnResetIsAmbiguous",
+    "TestReadCeilingCountsAsAmbiguousNotSuccess",
+    "TestSupervisorDegradedOnUnknownBacklogAge",
+    "TestProcessCrashMatrix",
+    "TestCrashPointMatrix",
+    "TestProcessCrashRecoveryCompletion",
+    "TestInvocationABIConformanceCorpus",
+    "FuzzParseInvocationRequest"
+   ],
+   "requirements": {
+    "authority-kernel-assigned-fields": ["TestServiceBindsResolvedAuthorityIntoRequestDigest", "TestCallerCannotForgeAuthorityBinding"],
+    "grant-scope-enforced": ["TestVerifyGrantDigest", "TestComputeGrantDigestIsCanonicalOverConstraints", "TestValidateIssuanceScopeConcreteAndAcknowledged", "TestBrokeredAuthorityBindsResolvedGrant"],
+    "request-digest-binding": ["TestServiceBindsResolvedAuthorityIntoRequestDigest", "TestDescriptorDigestBindsPolicy"],
+    "nemo-cannot-mint-capability": ["TestINV003UnknownCapabilityIsDeniedAtAdmission", "TestINV001MutationCannotUseLocalRoute"],
+    "unknown-not-retried": ["TestINV006PostDispatchAmbiguityIsNeverFailed", "TestClientUnknownWireStatusIsProtocol", "TestNoopResolverReturnsUnknown"],
+    "ambiguous-requires-absence-proof": ["TestGitHubConnResetIsAmbiguous", "TestReadCeilingCountsAsAmbiguousNotSuccess", "TestSupervisorDegradedOnUnknownBacklogAge"],
+    "dispatch-crash-before-commit": ["TestCrashPointMatrix"],
+    "dispatch-crash-after-commit": ["TestProcessCrashMatrix", "TestProcessCrashRecoveryCompletion"],
+    "abi-corpus-agreement": ["TestInvocationABIConformanceCorpus"],
+    "abi-malformed-denied-consistently": ["TestInvocationABIConformanceCorpus", "FuzzParseInvocationRequest"]
+   },
+   "differential": {
+    "driver": "scripts/abi-differential.mjs",
+    "requirement": "Go and Rust implementations must agree on every normative corpus case under the pinned toolchains; Node-wrapper mocks do not satisfy this gate. Executed 2026-10-24 under Go 1.26.5 + Rust 1.96.1: 68/68 corpus + 2000 seeded cases, verdicts identical."
+   }
+  },
+  "g3-release-controls": {
+   "status": "specified",
+   "package": ["internal/releasectl", "internal/cli"],
+   "required_tests": [
+    "TestVerifyEmptyAllowlistFailsClosed",
+    "TestVerifySelfSignedRejected",
+    "TestResumeUnsignedRejected",
+    "TestHaltSurvivesFileDeletion",
+    "TestControlLedgerRollbackFailsClosed",
+    "TestStaleEpochRejected",
+    "TestRogueDaemonCannotClear",
+    "TestCorruptRecordFailsClosed",
+    "TestReplicaMismatchFailsClosed",
+    "TestRestartPreservesState",
+    "TestOutageFailsClosed",
+    "TestTwoStepRecovery"
+   ]
+  },
+  "g4-custody": {
+   "status": "specified",
+   "package": ["internal/custody", "internal/witness", "internal/sandboxcustody", "internal/evidence"],
+   "required_tests": [
+    "TestWitnessForgedAckRejected",
+    "TestWitnessWrongKeyRejected",
+    "TestWitnessReplayRejected",
+    "TestWitnessDuplicateIdempotent",
+    "TestWitnessSequenceGapDetected",
+    "TestWitnessForeignDeploymentRejected",
+    "TestContradictoryCheckpointRejected",
+    "TestSameHashDifferentPayloadRejected",
+    "TestCustodyOutageNoTerminalSuccess",
+    "TestCustodyReconnectReconciles",
+    "TestColdRestoreReconciles",
+    "TestWitnessKeyRotation",
+    "TestWitnessCrossFamilyConfusion"
+   ]
+  },
+  "g5-sandbox-lifecycle": {
+   "status": "specified",
+   "package": ["internal/sandboxexecutor", "internal/applevmhelper", "internal/reconcile"],
+   "required_tests": [
+    "TestCleanupReplacementSandboxSafe",
+    "TestCleanupLabelCollisionRejected",
+    "TestVerifiedAbsentNeverFalse",
+    "TestKillAtEveryCommitBoundary",
+    "TestIncompleteCreateRecovered",
+    "TestOrphanedVMInventoried",
+    "TestStaleOwnershipRejected",
+    "TestConcurrentRetargetedDeletion",
+    "TestSlowInspectBounded",
+    "TestRetainedResourcesAccounted",
+    "TestCredentialIsolationPreserved",
+    "TestSandboxRecreationSafe"
+   ]
+  },
+  "g6-research-boundary": {
+   "status": "specified",
+   "package": ["internal/history", "internal/experience", "internal/research", "internal/dream"],
+   "required_tests": [
+    "TestProposalImmutable",
+    "TestPromotionRequiresOperatorSignature",
+    "TestSelfReportedDeltaInsufficient",
+    "TestBoundedExperimentBudget",
+    "TestEvalLeakageDetected",
+    "TestForgedOutcomeRejected",
+    "TestReceiptReplayRejected",
+    "TestUnverifiedEvidenceExcluded",
+    "TestFalseImprovementDetected",
+    "TestBudgetExhaustionBounded",
+    "TestNonAuthorizedPromotionRejected"
+   ]
+  },
+  "g7-packaging": {
+   "status": "specified",
+   "package": ["scripts"],
+   "required_tests": [
+    "TestEvidenceBoundToCommit",
+    "TestForeignCommitEvidenceRejected",
+    "TestChangedPinsInvalidate",
+    "TestTransferManifestRecomputed"
+   ],
+   "note": "PR-00 implements the evidence-verifier adversarial suite (scripts/rc8_evidence_verify_test.py, 31 cases) covering nonexistent/modified artifact, wrong commit, unsigned/wrong-signer manifest, unknown schema, duplicate/skipped/absent cases, traversal, symlink swap, replay, and the artifact-hash-equals-commit defect. The four names above remain the packaging-gate forward spec for PR-07."
   }
+ }
 }
