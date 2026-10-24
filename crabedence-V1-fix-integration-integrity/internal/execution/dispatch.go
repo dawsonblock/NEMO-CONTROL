@@ -154,6 +154,14 @@ type DispatchExecutor struct {
 	// database, panic, os.Exit); the executor makes no guarantees
 	// after it runs.
 	crashHook func(CrashPoint)
+	// custodyGate, when set, is consulted before a CRITICAL execution is
+	// admitted — the fail-closed custody policy (a mandated witness that
+	// is unreachable or behind backlog refuses new CRITICAL work rather
+	// than producing evidence that cannot reach the custody boundary).
+	custodyGate func() error
+	// custodySink, when set, receives each terminalized record's receipt
+	// for durable enqueue toward the independent evidence witness.
+	custodySink func(executionID, receiptDigest string, payload []byte)
 	// timeouts bound each durability stage of the post-dispatch path.
 	// See ExecutorTimeouts.
 	timeouts ExecutorTimeouts
@@ -303,6 +311,20 @@ func (e *DispatchExecutor) SetEvidenceSigner(s *evidence.Signer) {
 	e.signer = s
 }
 
+// SetCustodyGate installs the fail-closed admission check consulted
+// before a CRITICAL execution under a mandated evidence witness.
+func (e *DispatchExecutor) SetCustodyGate(g func() error) {
+	e.custodyGate = g
+}
+
+// SetCustodySink installs the terminal-receipt custody enqueue hook.
+// It fires after every successful Finalize — dispatch and recovery
+// resolutions both — so the custody boundary sees every terminal
+// outcome the kernel commits.
+func (e *DispatchExecutor) SetCustodySink(sink func(executionID, receiptDigest string, payload []byte)) {
+	e.custodySink = sink
+}
+
 // ExecuteWithIdempotency executes a request with durable idempotency.
 func (e *DispatchExecutor) ExecuteWithIdempotency(ctx context.Context, req Request, desc capability.ResolvedDescriptor) Response {
 	// For PURE and READ, skip idempotency (no side effects). The
@@ -331,6 +353,19 @@ func (e *DispatchExecutor) ExecuteWithIdempotency(ctx context.Context, req Reque
 	// terminal state after post-dispatch ambiguity.
 	if denied := checkCriticalProviderCapability(e.handler, desc); denied != nil {
 		return *denied
+	}
+
+	// Independent evidence custody: when a witness is mandated and the
+	// custody path is degraded, CRITICAL work is refused admission
+	// rather than producing evidence that cannot reach custody.
+	if desc.ExecutionClass == capability.ClassCritical && e.custodyGate != nil {
+		if err := e.custodyGate(); err != nil {
+			return Response{
+				Status:      StatusDenied,
+				FailureCode: string(capability.FailureAdmissionDenied),
+				Error:       fmt.Sprintf("evidence custody unavailable: %v", err),
+			}
+		}
 	}
 
 	// Compute request digest. The resolved authority generation and
@@ -1020,6 +1055,16 @@ func (e *DispatchExecutor) ExecuteWithIdempotency(ctx context.Context, req Reque
 		}
 	}
 	e.fireCrashPoint(CrashAfterFinalize)
+
+	// Evidence custody: enqueue the terminal receipt toward the
+	// independent witness. The sink is the durable outbox — a failure
+	// there is the store's own failure domain; the sink records it and
+	// the custody gate surfaces it at the next CRITICAL admission.
+	if e.custodySink != nil {
+		if receiptDigest, err := receipt.Digest(); err == nil {
+			e.custodySink(executionID, receiptDigest, receipt.EvidenceReceipt)
+		}
+	}
 
 	// Add execution metadata
 	if resp.Execution == nil {

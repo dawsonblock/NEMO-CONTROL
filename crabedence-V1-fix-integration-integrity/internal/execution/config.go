@@ -31,6 +31,27 @@ type ServiceConfig struct {
 	EvidenceKeyPath        string
 	EvidenceTrustedSigners []string
 
+	// Independent evidence custody. WitnessSocket is the unix socket of
+	// the separately administered custody witness; empty disables
+	// custody. WitnessOutbox is the kernel-side durable outbox path
+	// (default: custody-outbox.db beside the store). WitnessRequired
+	// adds the fail-closed gate: CRITICAL work is refused admission
+	// while the custody path is degraded.
+	WitnessSocket   string
+	WitnessOutbox   string
+	WitnessRequired bool
+
+	// OperatorTrustedSigners is the control-plane trust root: the
+	// operator signer fingerprints allowed to countersign halt/revoke
+	// records (CRABEDENCE_OPERATOR_TRUSTED, comma-separated). Empty
+	// honors any self-consistent record — development semantics.
+	OperatorTrustedSigners map[string]bool
+	// RequireRolloutRecord makes a signed rollout-stage record a
+	// precondition of admission for this service's release
+	// (CRABEDENCE_REQUIRE_ROLLOUT_RECORD): promotion is then an
+	// explicit operator act, not an absence of prohibition.
+	RequireRolloutRecord bool
+
 	// Peer authentication and execution budgets.
 	PeerPrincipals   PeerPrincipalMap
 	TrustedProxyUIDs map[uint32]struct{}
@@ -143,6 +164,34 @@ func LoadServiceConfig(opts ServeOptions) (*ServiceConfig, error) {
 		return nil, err
 	}
 	cfg.EvidenceTrustedSigners = trusted
+
+	// Independent evidence custody: CRABEDENCE_WITNESS_SOCKET points at
+	// the witness's unix socket; CRABEDENCE_WITNESS_REQUIRED=1 mandates
+	// the fail-closed admission gate for CRITICAL work. Requiring a
+	// witness without a socket is contradictory — fail closed at load.
+	cfg.WitnessSocket = strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_SOCKET"))
+	cfg.WitnessOutbox = strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_OUTBOX"))
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_REQUIRED"))) {
+	case "true", "1", "yes":
+		cfg.WitnessRequired = true
+	}
+	if cfg.WitnessRequired && cfg.WitnessSocket == "" {
+		return nil, fmt.Errorf("CRABEDENCE_WITNESS_REQUIRED is set but CRABEDENCE_WITNESS_SOCKET is empty: a mandated custody witness needs a reachable socket")
+	}
+	if raw := strings.TrimSpace(os.Getenv("CRABEDENCE_OPERATOR_TRUSTED")); raw != "" {
+		cfg.OperatorTrustedSigners = map[string]bool{}
+		for _, fp := range strings.Split(raw, ",") {
+			fp = strings.TrimSpace(strings.ToLower(fp))
+			if len(fp) != 64 {
+				return nil, fmt.Errorf("CRABEDENCE_OPERATOR_TRUSTED entry %q is not a 64-hex signer fingerprint", fp)
+			}
+			cfg.OperatorTrustedSigners[fp] = true
+		}
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("CRABEDENCE_REQUIRE_ROLLOUT_RECORD"))) {
+	case "true", "1", "yes":
+		cfg.RequireRolloutRecord = true
+	}
 
 	peerMap, err := ParsePeerPrincipalMap(os.Getenv("CRABEDENCE_PEER_PRINCIPALS"))
 	if err != nil {

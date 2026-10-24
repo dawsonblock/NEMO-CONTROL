@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -21,6 +22,8 @@ import (
 	"github.com/openclaw/crabbox/internal/idempotency"
 	"github.com/openclaw/crabbox/internal/providertransport"
 	"github.com/openclaw/crabbox/internal/reconcile"
+	"github.com/openclaw/crabbox/internal/releasectl"
+	"github.com/openclaw/crabbox/internal/witness"
 )
 
 // ServeOptions configures the execution service.
@@ -270,6 +273,10 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	var handler Handler
 	var durable Handler
 	var providerGate *ProviderGate
+	// custodySink is shared by the executor's terminal path and the
+	// reconciliation worker's resolve path — both are wired below when
+	// a custody witness is configured.
+	var custodySink func(executionID, receiptDigest string, payload []byte)
 	handlers := map[string]Handler{
 		"system":       echoHandler,
 		"test-counter": counterHandler,
@@ -332,6 +339,47 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		providerGate = NewProviderGate(cfg.ProviderGate)
 		executor.SetProviderGate(providerGate)
 		durable = executor
+
+		// Independent evidence custody: terminal receipts enqueue into
+		// the durable outbox before responses return; the sender drains
+		// them to the separately administered witness and realigns on
+		// reconnect via the checkpoint exchange. With WitnessRequired
+		// the custody gate refuses CRITICAL admissions while custody is
+		// degraded — a kernel that cannot reach its witness does not
+		// get to mint uncustodied evidence.
+		if cfg.WitnessSocket != "" {
+			outboxPath := cfg.WitnessOutbox
+			if outboxPath == "" {
+				outboxPath = filepath.Join(filepath.Dir(opts.SocketPath), "custody-outbox.db")
+			}
+			outbox, err := witness.OpenOutbox(outboxPath)
+			if err != nil {
+				return fmt.Errorf("custody outbox: %w", err)
+			}
+			defer outbox.Close()
+			custodyLog := slog.New(slog.NewTextHandler(os.Stderr, nil))
+			sender := witness.NewSender(witness.NewClient(cfg.WitnessSocket), outbox, signer.Fingerprint(), custodyLog)
+			custodySink = func(executionID, receiptDigest string, payload []byte) {
+				if _, err := outbox.Enqueue(context.Background(), executionID, receiptDigest, payload); err != nil {
+					sender.MarkDegraded(fmt.Sprintf("custody outbox enqueue: %v", err))
+				}
+			}
+			executor.SetCustodySink(custodySink)
+			if cfg.WitnessRequired {
+				executor.SetCustodyGate(func() error {
+					if sender.CustodyHealthy(context.Background()) {
+						return nil
+					}
+					if lastErr := sender.LastError(); lastErr != "" {
+						return fmt.Errorf("custody witness degraded: %s", lastErr)
+					}
+					return fmt.Errorf("custody backlog pending delivery to witness")
+				})
+			}
+			go sender.Run(ctx, 2*time.Second)
+			defer sender.Stop()
+			fmt.Fprintf(os.Stderr, "Evidence custody: witness at %s (required=%v, outbox %s)\n", cfg.WitnessSocket, cfg.WitnessRequired, outboxPath)
+		}
 	} else {
 		// No store — fail closed for MUTATION/CRITICAL
 		durable = NewFailClosedHandler(multiHandler)
@@ -362,6 +410,9 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	handler = dispatcher
 
 	service := NewService(registry, handler, opts.SocketPath)
+	// Operator control plane: halt/resume/revoke records in the runtime
+	// dir, signed by an operator key the kernel does not hold.
+	service.SetReleaseControl(releasectl.Dir(opts.SocketPath), opts.Release, cfg.OperatorTrustedSigners, cfg.RequireRolloutRecord)
 	// The deployment boundary owns availability: the service refuses a
 	// known capability whose adapter this deployment did not wire, with
 	// CAPABILITY_UNAVAILABLE (never CAPABILITY_NOT_FOUND, never a
@@ -433,6 +484,9 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 			worker.RegisterResolver(QualificationCapabilityID, providerGate.ObserveResolver(QualificationAdapterID, qualAdapter))
 		}
 		worker.SetEvidenceSigner(signer)
+		if custodySink != nil {
+			worker.SetCustodySink(custodySink)
+		}
 		// Reconciliation runs under a supervisor with an explicit
 		// readiness policy: cycle timing, consecutive failures, and the
 		// UNKNOWN backlog age are observable, and readiness transitions

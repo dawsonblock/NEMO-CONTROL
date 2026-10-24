@@ -25,6 +25,9 @@ type crabboxKongCLI struct {
 	Exec        execKongCmd        `cmd:"" passthrough:"" help:"Execute a capability via JSON stdin/stdout (NeMo bridge)."`
 	ServeExec   serveExecKongCmd   `cmd:"" help:"Start the persistent execution service (Unix socket)."`
 	Invoke      invokeKongCmd      `cmd:"" help:"Invoke a capability via the execution service (planner-agnostic client)."`
+	Recovery    recoveryKongCmd    `cmd:"" help:"Inspect and resolve durable-effect UNKNOWN records; drive cluster recovery fencing."`
+	Witness     witnessKongCmd     `cmd:"" help:"Run the independent evidence-custody witness service."`
+	Control     controlKongCmd     `cmd:"" help:"Operator control plane: halt, resume, and release revocation for a running deployment."`
 	Watch       watchKongCmd       `cmd:"" passthrough:"" help:"Re-run a command on a warm lease when local files change."`
 	Shard       shardKongCmd       `cmd:"" passthrough:"" help:"Fork a checkpoint into parallel shards and merge their test results."`
 	Bench       benchKongCmd       `cmd:"" help:"Record and report local benchmark timings."`
@@ -183,6 +186,12 @@ type execKongCmd struct {
 }
 type serveExecKongCmd struct {
 	Socket string `help:"Unix socket path (default: the canonical per-user execution socket)" default:"${execution_socket}"`
+}
+type witnessKongCmd struct {
+	Socket       string `help:"Unix socket the custody witness listens on" required:""`
+	Store        string `help:"Custody ledger path (SQLite, append-only)" required:""`
+	Key          string `help:"Witness Ed25519 signing key (PEM); created when absent" required:""`
+	DeploymentFP string `help:"Pin the deployment evidence-signer fingerprint (empty = bind first-seen)"`
 }
 type invokeKongCmd struct {
 	Socket         string        `help:"Unix socket path (default: the canonical per-user execution socket)" default:"${execution_socket}"`
@@ -695,6 +704,9 @@ func (c *execKongCmd) Run(ctx context.Context, app App) error {
 }
 func (c *serveExecKongCmd) Run(ctx context.Context, app App) error {
 	return app.serveExecCommand(ctx, c.Socket)
+}
+func (c *witnessKongCmd) Run(ctx context.Context, app App) error {
+	return app.witnessCommand(ctx, c.Socket, c.Store, c.Key, c.DeploymentFP)
 }
 func (c *invokeKongCmd) Run(ctx context.Context, app App) error {
 	return app.invokeCommand(ctx, c.Socket, c.Capability, c.Principal, c.IdempotencyKey, c.Arguments, c.ExecutionClass, c.Deadline, c.Timeout)

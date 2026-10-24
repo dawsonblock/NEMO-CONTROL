@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/openclaw/crabbox/internal/capability"
+	"github.com/openclaw/crabbox/internal/releasectl"
 )
 
 // Request is the wire-format capability invocation.
@@ -239,6 +240,26 @@ type Service struct {
 	// means attestation is disabled (a non-required deployment); the
 	// handshake messages are refused rather than answered.
 	attestation *attestationRegistry
+	// releaseControl is the operator control plane: the control-record
+	// directory and this service's release identity. Set at startup;
+	// empty dir disables the check.
+	releaseControlDir          string
+	releaseControlRelease      string
+	releaseControlTrusted      map[string]bool
+	releaseControlRequireStage bool
+}
+
+// SetReleaseControl binds the operator control plane: dir is the
+// control-record directory (beside the socket), release is this
+// service's declared release identity for per-release revocation, and
+// trusted is the set of operator signer fingerprints that may
+// countersign halt/revoke records (empty = honor any self-consistent
+// record, development semantics).
+func (s *Service) SetReleaseControl(dir, release string, trusted map[string]bool, requireStage bool) {
+	s.releaseControlDir = dir
+	s.releaseControlRelease = release
+	s.releaseControlTrusted = trusted
+	s.releaseControlRequireStage = requireStage
 }
 
 // NewService creates a new execution service.
@@ -557,6 +578,22 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn) {
 				Status:      StatusDenied,
 				FailureCode: string(capability.FailureAdmissionDenied),
 				Error:       "deadline expired",
+			}, "")
+			return
+		}
+	}
+
+	// ─── Operator control plane ────────────────────────────────────────
+	// A halted deployment or a revoked release denies every new
+	// admission. The record lives outside the kernel — the operator
+	// writes it, the service only reads and verifies — and a malformed
+	// or untrusted record fails closed rather than opening the gate.
+	if s.releaseControlDir != "" {
+		if denial := releasectl.Check(s.releaseControlDir, s.releaseControlRelease, s.releaseControlTrusted, s.releaseControlRequireStage); denial != "" {
+			s.writeResponse(conn, Response{
+				Status:      StatusDenied,
+				FailureCode: string(capability.FailureAdmissionDenied),
+				Error:       fmt.Sprintf("release control: %s", denial),
 			}, "")
 			return
 		}

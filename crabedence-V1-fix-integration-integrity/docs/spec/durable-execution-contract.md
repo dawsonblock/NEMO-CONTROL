@@ -607,7 +607,79 @@ the side-effect-free contract makes any residual overlap harmless.
 `NoopResolver` returns `UNKNOWN`. It must not cause retries or
 terminal rewrites.
 
-## 9. Retry policy
+### Manual intervention
+
+`crabbox recovery` is the approved manual-intervention path — the only
+supported way an operator resolves a record no resolver can prove. It
+opens the same env-selected store the service uses
+(`CRABEDENCE_STORE_BACKEND`/`CRABEDENCE_DATABASE_URL`/
+`CRABEDENCE_STORE_PATH`) and every mutation runs through the store's own
+CAS, epoch fencing, and terminal-proof policy:
+
+- `recovery list` — the UNKNOWN backlog with entered-unknown time,
+  reconcile attempts, ambiguity cause, and last resolver error.
+- `recovery show <id>` — the record plus its recovery locator (what a
+  resolver or operator would use to find the provider-side operation).
+- `recovery resolve <id> --expected-version N --decision committed|failed
+  --evidence <file>` — a terminal resolution. `--expected-version` binds
+  the review to the exact record version the operator inspected; the
+  evidence file is required, stored verbatim, sha256-bound as the
+  recovery evidence digest, and ledgered as a provider observation.
+  Provider identity flags (`--provider-id`, `--provider-run-id`) must
+  agree with any stored observation — a contradiction is refused.
+  CRITICAL records additionally require a signed receipt verifiable by
+  `CRABBOX_EVIDENCE_TRUSTED_SIGNERS`, identical to resolver-produced
+  resolutions.
+
+Cluster-disaster fencing is operator-driven on the same surface:
+`recovery advance-epoch --expected N --reason <text>` permanently fences
+stores admitted under the old epoch and declares recovery mode (reconcil-
+iation stays open, new-effect admission closes), and
+`recovery complete --expected N --resolution <text>` reopens admission —
+epoch-guarded so a stale operator cannot clear a newer restore's mode.
+
+## 9. Independent evidence custody
+
+The kernel MUST NOT be the sole author of the evidence that qualifies
+it. When a custody witness is configured (`CRABEDENCE_WITNESS_SOCKET`),
+every terminal transition — dispatch `Finalize` and recovery
+`ResolveRecovery` alike — is enqueued into the kernel's durable outbox
+before the outcome can be treated as evidenced, and a sender drains the
+outbox to the separately administered witness.
+
+Custody boundary rules:
+
+- The witness is a separately administered identity (`crabbox
+  witness`): its own Ed25519 key, its own append-only ledger under a
+  0700 directory, bound to one deployment signer fingerprint — pinned
+  by configuration or bound to the first deployment seen.
+- The custody sequence is a per-deployment contiguous head: a
+  submission MUST extend the head by exactly one. Replays of an
+  identical stored row return the stored acknowledgement; divergent
+  reuse of a consumed sequence, gaps, foreign deployments, and
+  receipts whose signature does not verify under the bound deployment
+  signer are refused.
+- A signed payload (a ReceiptV3 for CRITICAL outcomes) MUST verify
+  under the deployment signer and MUST name the same execution as the
+  submission — a forged or repurposed receipt never reaches custody.
+- The witness's acknowledgement is itself signed; it verifies only
+  under the witness key that countersigned it, so custody proof is
+  bound to the witness identity.
+- On reconnect the sender checkpoints the witness's head and resends
+  every outbox row from head+1 forward: crash loss never drops queued
+  evidence, and a witness restored to an older checkpoint is
+  re-custodied rather than silently diverging.
+- `CRABEDENCE_WITNESS_REQUIRED` adds the fail-closed gate: while the
+  custody path is degraded (witness unreachable or outbox backlog
+  undelivered) new CRITICAL admissions are DENIED — a kernel that
+  cannot reach its witness does not get to mint uncustodied evidence.
+
+Custody attests that a specific receipt reached independent custody at
+a specific position — it does not re-judge the terminal decision.
+Local commit remains the authority of record; custody is the
+independent proof that the record exists and was reported as such.
+
+## 10. Retry policy
 
 Retries require proof that the provider invocation boundary was never
 crossed, or provider-specific idempotency semantics strong enough to
@@ -622,7 +694,7 @@ Default policy:
 | IN_FLIGHT expired | no (without reconciliation) |
 | UNKNOWN | no (by default) |
 
-## 10. Lease configuration
+## 11. Lease configuration
 
 ```go
 type LeaseConfig struct {
@@ -635,7 +707,7 @@ type LeaseConfig struct {
 Zero, negative, or excessive requested lease durations are rejected.
 Callers may not silently accept arbitrary lease values.
 
-## 11. Typed lease failures
+## 12. Typed lease failures
 
 ```go
 type LeaseError string
@@ -653,7 +725,7 @@ const (
 These are distinguishable by callers and tests. Generic
 `sql.ErrNoRows` or boolean returns are not used for lease failures.
 
-## 12. Acquire result
+## 13. Acquire result
 
 ```go
 type AcquireResultKind string
@@ -670,7 +742,7 @@ const (
 
 Code must not infer semantics from state names.
 
-## 13. Release invariants
+## 14. Release invariants
 
 ```
 CRAB-V1-017: Expired IN_FLIGHT work is never blindly redispatched.
@@ -698,7 +770,7 @@ CRAB-V1-027: Recovery locators are provider-specific, minimal,
              bounded, and cleared at terminal completion or retention.
 ```
 
-## 14. Acceptance conditions
+## 15. Acceptance conditions
 
 The artifact is not qualified until all of the following hold:
 
