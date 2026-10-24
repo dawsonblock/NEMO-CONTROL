@@ -1,0 +1,600 @@
+{
+  "schema": "nemo-control/msb-lane-image-pins/v1",
+  "description": "Canonical execution-plane image-pin inventory for the sandbox/microVM lanes. Every entry declares the reference exactly as it appears in source, the pin class that binds it, and its qualification status. scripts/check-image-pins.mjs re-derives each reference from the listed source files and fails on drift or on any undeclared unpinned execution-plane default. Classes: registry-digest (immutable OCI digest), oci-manifest-bound (digest plus content verification against an embedded manifest), immutable-url-sha256 (date-pinned artifact URL plus checksum), local-operator-image (built and trusted by the operator, no upstream identity), provider-catalog-name (resolved at provision time by the provider API; not OCI-pinnable), mutable-tag (registry pullable but tag-bound; a defect unless declared), development (outside the execution plane).",
+  "images": [
+    {
+      "id": "tart-macos-sequoia-base",
+      "lane": "macos-microvm",
+      "provider": "tart",
+      "platforms": ["darwin/arm64"],
+      "reference": "ghcr.io/cirruslabs/macos-sequoia-base@sha256:785c3acb40fa5af6dd5aab96cd60408372c26125e173c14ea417498d086f829c",
+      "digest": "sha256:785c3acb40fa5af6dd5aab96cd60408372c26125e173c14ea417498d086f829c",
+      "pin_class": "oci-manifest-bound",
+      "status": "pinned",
+      "sources": ["internal/cli/config_types.go"],
+      "bound_artifacts": [
+        "internal/providers/tart/images/sequoia.manifest.json",
+        "internal/providers/tart/images/sequoia.config.json"
+      ],
+      "notes": "The embedded sequoia.manifest.json is the digest the reference pins: verifyDefaultTartImage recomputes sha256 over the embedded manifest and refuses the default image when the pin suffix does not match, then verifies pulled layer bytes against per-layer and uncompressed-content digests. sequoia.config.json pins arch=arm64, 4 CPU, 8 GiB."
+    },
+    {
+      "id": "lume-macos-golden",
+      "lane": "macos-microvm",
+      "provider": "lume",
+      "platforms": ["darwin/arm64"],
+      "reference": "crabbox-macos-golden",
+      "pin_class": "local-operator-image",
+      "status": "finding",
+      "finding": "F-PIN-002",
+      "sources": ["internal/providers/lume/backend.go"],
+      "notes": "Local golden image minted by scripts/mint-macos-devtools-image.sh. Identity/ownership markers fence the VM lifecycle, but the image bytes themselves carry no upstream content binding."
+    },
+    {
+      "id": "applevm-ubuntu-24.04-cloudimg",
+      "lane": "apple-microvm-guest",
+      "provider": "applevm",
+      "platforms": ["linux/arm64 guest on darwin/arm64 host"],
+      "reference": "https://cloud-images.ubuntu.com/releases/noble/release-20260518/ubuntu-24.04-server-cloudimg-arm64.img",
+      "digest": "sha256:6a61b967ba4a27dd1966f835a67643073ed55c2860ce3dc1cb0517282e6b8bec",
+      "pin_class": "immutable-url-sha256",
+      "status": "pinned",
+      "sources": [
+        "recipes/bootstrap/v1/os-catalog.json",
+        "internal/cli/os_image.go"
+      ],
+      "notes": "scripts/apple-vm-image-source verifies the canonical release path and checks the declared checksum against the published SHA256SUMS. Guest image; downloads to the Apple VM host."
+    },
+    {
+      "id": "applevm-ubuntu-26.04-cloudimg",
+      "lane": "apple-microvm-guest",
+      "provider": "applevm",
+      "platforms": ["linux/arm64 guest on darwin/arm64 host"],
+      "reference": "https://cloud-images.ubuntu.com/releases/resolute/release-20260731/ubuntu-26.04-server-cloudimg-arm64.img",
+      "digest": "sha256:3e113fdd41f39e13729375173bb2ae793f87dc6db4294e5251ff2476971788ba",
+      "pin_class": "immutable-url-sha256",
+      "status": "pinned",
+      "sources": [
+        "recipes/bootstrap/v1/os-catalog.json",
+        "internal/cli/os_image.go",
+        "internal/providers/applevm/backend.go"
+      ],
+      "notes": "Declared in the os-catalog source of truth and regenerated into internal/cli/os_image.go; applevm/backend.go:106 carries the same URL+checksum as the compiled fallback."
+    },
+    {
+      "id": "applecontainer-ubuntu-24.04",
+      "lane": "apple-microvm-guest",
+      "provider": "applecontainer",
+      "platforms": ["linux/arm64 guest on darwin/arm64 host"],
+      "reference": "docker.io/library/ubuntu@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517",
+      "digest": "sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"],
+      "notes": "ContainerName is the resolved execution reference (os_image_resolve.go); the Apple Container adapter requires a validImageDigest on the stored image descriptor."
+    },
+    {
+      "id": "applecontainer-ubuntu-26.04",
+      "lane": "apple-microvm-guest",
+      "provider": "applecontainer",
+      "platforms": ["linux/arm64 guest on darwin/arm64 host"],
+      "reference": "docker.io/library/ubuntu@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b",
+      "digest": "sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"],
+      "notes": "ContainerName is the resolved execution reference (os_image_resolve.go)."
+    },
+    {
+      "id": "aws-lambda-microvm-build",
+      "lane": "linux-microvm",
+      "provider": "awslambdamicrovm",
+      "platforms": ["linux/arm64"],
+      "reference": "golang:1.26-alpine@sha256:5d9aa9fa75b776600e0972ac9d324bb260fdb403b8905202c7576d103a450361",
+      "digest": "sha256:5d9aa9fa75b776600e0972ac9d324bb260fdb403b8905202c7576d103a450361",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": ["runtimes/aws-lambda-microvm/Dockerfile"],
+      "notes": "Build stage. Guarded by scripts/check-docker-base-images.mjs in CI."
+    },
+    {
+      "id": "aws-lambda-microvm-runtime",
+      "lane": "linux-microvm",
+      "provider": "awslambdamicrovm",
+      "platforms": ["linux/arm64"],
+      "reference": "ubuntu:24.04@sha256:ea0b2b8607a61f981b2461f21edc27c0b37ddd53d23d4d350936480adf5de28c",
+      "digest": "sha256:ea0b2b8607a61f981b2461f21edc27c0b37ddd53d23d4d350936480adf5de28c",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": ["runtimes/aws-lambda-microvm/Dockerfile"],
+      "notes": "Runtime stage of the Lambda microVM image."
+    },
+    {
+      "id": "smolvm-alpine",
+      "lane": "linux-microvm",
+      "provider": "smolvm",
+      "platforms": ["linux/arm64", "linux/amd64"],
+      "reference": "alpine",
+      "pin_class": "mutable-tag",
+      "status": "finding",
+      "finding": "F-PIN-001",
+      "sources": ["internal/cli/config.go", "internal/providers/smolvm/backend.go"],
+      "notes": "Default guest image is the mutable 'alpine' tag, sent to the smolvm API as Source.Reference. Digest pinning is the resolution but requires confirming the smolvm API accepts name@digest references."
+    },
+    {
+      "id": "docker-runtime-ubuntu-24.04-tag",
+      "lane": "container-runtime",
+      "provider": "islo",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "reference": "docker.io/library/ubuntu:24.04",
+      "pin_class": "mutable-tag",
+      "status": "finding",
+      "finding": "F-PIN-003",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"],
+      "notes": "Consumed as the islo provider's default (os_image_resolve.go maps spec.DockerImage into cfg.Islo.Image). localcontainer and applecontainer resolve the digest-bound ContainerName instead; the tag alias is retained for operator selection."
+    },
+    {
+      "id": "docker-runtime-ubuntu-26.04-tag",
+      "lane": "container-runtime",
+      "provider": "islo",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "reference": "docker.io/library/ubuntu:26.04",
+      "pin_class": "mutable-tag",
+      "status": "finding",
+      "finding": "F-PIN-003",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"],
+      "notes": "Consumed as the islo provider's default (os_image_resolve.go maps spec.DockerImage into cfg.Islo.Image). localcontainer and applecontainer resolve the digest-bound ContainerName instead; the tag alias is retained for operator selection."
+    },
+    {
+      "id": "worker-cloudflare-container-golang",
+      "lane": "coordinator",
+      "provider": "cloudflare",
+      "platforms": ["linux/amd64"],
+      "reference": "docker.io/library/golang:1.26-bookworm@sha256:5f68ec6805843bd3981a951ffada82a26a0bd2631045c8f7dba483fa868f5ec5",
+      "digest": "sha256:5f68ec6805843bd3981a951ffada82a26a0bd2631045c8f7dba483fa868f5ec5",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": ["worker/cloudflare-container.Dockerfile"],
+      "notes": "Used by both build and go-runtime stages."
+    },
+    {
+      "id": "worker-cloudflare-container-node",
+      "lane": "coordinator",
+      "provider": "cloudflare",
+      "platforms": ["linux/amd64"],
+      "reference": "docker.io/library/node:24-bookworm@sha256:40ad9f3064e67d6860b4bc3fe1880b2953934fd6320ada990e45fe0efa6badd7",
+      "digest": "sha256:40ad9f3064e67d6860b4bc3fe1880b2953934fd6320ada990e45fe0efa6badd7",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": ["worker/cloudflare-container.Dockerfile"]
+    },
+    {
+      "id": "worker-azure-dynamic-sessions-build",
+      "lane": "coordinator",
+      "provider": "azuredynamicsessions",
+      "platforms": ["linux/amd64"],
+      "reference": "mcr.microsoft.com/devcontainers/go:1.26-bookworm@sha256:de99286e746c99e359edddaf0c47cbfbed34f4d6a3cd6310c99c87fa27c3c341",
+      "digest": "sha256:de99286e746c99e359edddaf0c47cbfbed34f4d6a3cd6310c99c87fa27c3c341",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": ["worker/azure-dynamic-sessions.Dockerfile"]
+    },
+    {
+      "id": "worker-azure-dynamic-sessions-runtime",
+      "lane": "coordinator",
+      "provider": "azuredynamicsessions",
+      "platforms": ["linux/amd64"],
+      "reference": "mcr.microsoft.com/dotnet/runtime-deps:9.0-bookworm-slim@sha256:608b519f61bce1ad7496a2544041d6c1538a5c48d056adf55af7fdc35f924283",
+      "digest": "sha256:608b519f61bce1ad7496a2544041d6c1538a5c48d056adf55af7fdc35f924283",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": ["worker/azure-dynamic-sessions.Dockerfile"]
+    },
+    {
+      "id": "worker-node",
+      "lane": "coordinator",
+      "provider": "worker",
+      "platforms": ["linux/amd64"],
+      "reference": "node:22-bookworm-slim@sha256:e21fc383b50d5347dc7a9f1cae45b8f4e2f0d39f7ade28e4eef7d2934522b752",
+      "digest": "sha256:e21fc383b50d5347dc7a9f1cae45b8f4e2f0d39f7ade28e4eef7d2934522b752",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": ["worker/Dockerfile.node"],
+      "notes": "Used by both build and runtime stages."
+    },
+    {
+      "id": "postgres-qualification",
+      "lane": "ci",
+      "provider": "ci-services",
+      "platforms": ["linux/amd64"],
+      "reference": "postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94",
+      "digest": "sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/release-qualification.yml",
+        ".github/workflows/release-rc.yml",
+        ".github/workflows/stage-b.yml"
+      ],
+      "notes": "Live-PostgreSQL qualification service image. stage-b.yml previously carried the mutable postgres:16 tag; pinned in this cycle (F-PIN-000 resolved)."
+    },
+    {
+      "id": "os-catalog-ubuntu-24.04-aws-amd64",
+      "lane": "cloud-vm",
+      "provider": "aws",
+      "platforms": ["linux/amd64"],
+      "reference": "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"],
+      "notes": "EC2 name-pattern resolved at provision time via DescribeImages; provider image APIs do not accept content digests. Resolution-time binding is inherent to the class."
+    },
+    {
+      "id": "os-catalog-ubuntu-24.04-aws-arm64",
+      "lane": "cloud-vm",
+      "provider": "aws",
+      "platforms": ["linux/arm64"],
+      "reference": "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"]
+    },
+    {
+      "id": "os-catalog-ubuntu-26.04-aws-amd64",
+      "lane": "cloud-vm",
+      "provider": "aws",
+      "platforms": ["linux/amd64"],
+      "reference": "ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-amd64-server-*",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"]
+    },
+    {
+      "id": "os-catalog-ubuntu-26.04-aws-arm64",
+      "lane": "cloud-vm",
+      "provider": "aws",
+      "platforms": ["linux/arm64"],
+      "reference": "ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-arm64-server-*",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"]
+    },
+    {
+      "id": "os-catalog-ubuntu-24.04-azure-amd64",
+      "lane": "cloud-vm",
+      "provider": "azure",
+      "platforms": ["linux/amd64"],
+      "reference": "Canonical:ubuntu-24_04-lts:server:latest",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"]
+    },
+    {
+      "id": "os-catalog-ubuntu-24.04-azure-arm64",
+      "lane": "cloud-vm",
+      "provider": "azure",
+      "platforms": ["linux/arm64"],
+      "reference": "Canonical:ubuntu-24_04-lts:server-arm64:latest",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"]
+    },
+    {
+      "id": "os-catalog-ubuntu-26.04-azure-amd64",
+      "lane": "cloud-vm",
+      "provider": "azure",
+      "platforms": ["linux/amd64"],
+      "reference": "Canonical:ubuntu-26_04-lts:server:latest",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"]
+    },
+    {
+      "id": "os-catalog-ubuntu-26.04-azure-arm64",
+      "lane": "cloud-vm",
+      "provider": "azure",
+      "platforms": ["linux/arm64"],
+      "reference": "Canonical:ubuntu-26_04-lts:server-arm64:latest",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"]
+    },
+    {
+      "id": "os-catalog-ubuntu-24.04-gcp",
+      "lane": "cloud-vm",
+      "provider": "gcp",
+      "platforms": ["linux/amd64"],
+      "reference": "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"]
+    },
+    {
+      "id": "os-catalog-ubuntu-26.04-gcp",
+      "lane": "cloud-vm",
+      "provider": "gcp",
+      "platforms": ["linux/amd64"],
+      "reference": "projects/ubuntu-os-cloud/global/images/family/ubuntu-2604-lts-amd64",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"]
+    },
+    {
+      "id": "os-catalog-ubuntu-24.04-hetzner",
+      "lane": "cloud-vm",
+      "provider": "hetzner",
+      "platforms": ["linux/amd64"],
+      "reference": "ubuntu-24.04",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"],
+      "notes": "Hetzner image name for both ubuntu:24.04 and ubuntu:26.04 selectors; the 26.04 selector resolves to the 24.04 image because no 26.04 Hetzner image exists."
+    },
+    {
+      "id": "os-catalog-ubuntu-24.04-linode",
+      "lane": "cloud-vm",
+      "provider": "linode",
+      "platforms": ["linux/amd64"],
+      "reference": "linode/ubuntu24.04",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json", "internal/cli/os_image.go"]
+    },
+    {
+      "id": "ovh-ubuntu-24.04",
+      "lane": "cloud-vm",
+      "provider": "ovh",
+      "platforms": ["linux/amd64"],
+      "reference": "Ubuntu 24.04",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["internal/cli/config.go"]
+    },
+    {
+      "id": "scaleway-ubuntu-noble",
+      "lane": "cloud-vm",
+      "provider": "scaleway",
+      "platforms": ["linux/amd64"],
+      "reference": "ubuntu_noble",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["internal/cli/config.go"]
+    },
+    {
+      "id": "incus-ubuntu-24.04-cloud",
+      "lane": "cloud-vm",
+      "provider": "incus",
+      "platforms": ["linux/amd64"],
+      "reference": "images:ubuntu/24.04/cloud",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["internal/cli/config.go"],
+      "notes": "Incus image-server remote:alias reference; resolved by the images: remote, not an OCI registry."
+    },
+    {
+      "id": "namespace-builtin-base",
+      "lane": "cloud-vm",
+      "provider": "namespace",
+      "platforms": ["linux/amd64"],
+      "reference": "builtin:base",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["internal/cli/config.go"]
+    },
+    {
+      "id": "multipass-release-alias",
+      "lane": "cloud-vm",
+      "provider": "multipass",
+      "platforms": ["linux/arm64", "linux/amd64"],
+      "reference": "26.04",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["recipes/bootstrap/v1/os-catalog.json"],
+      "notes": "Multipass release alias derived from the os-catalog Selector (osImageDefaultMultipassImage strips the 'ubuntu:' prefix); resolved by the multipass daemon's own image catalog."
+    },
+    {
+      "id": "multipass-loaded",
+      "lane": "cloud-vm",
+      "provider": "multipass",
+      "platforms": ["linux/arm64", "linux/amd64"],
+      "reference": "ubuntu-24-04-loaded",
+      "pin_class": "provider-catalog-name",
+      "status": "finding",
+      "finding": "F-PIN-004",
+      "sources": ["internal/cli/config.go"],
+      "notes": "Locally prepared Multipass image name (the loaded image produced by the bootstrap path), not a registry reference."
+    },
+    {
+      "id": "runpod-pytorch",
+      "lane": "cloud-vm",
+      "provider": "runpod",
+      "platforms": ["linux/amd64"],
+      "reference": "runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04",
+      "pin_class": "mutable-tag",
+      "status": "finding",
+      "finding": "F-PIN-005",
+      "sources": ["internal/cli/config.go"],
+      "notes": "Docker Hub-pullable template image passed to the RunPod API; tag-bound default."
+    },
+    {
+      "id": "vast-cuda",
+      "lane": "cloud-vm",
+      "provider": "vast",
+      "platforms": ["linux/amd64"],
+      "reference": "nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04",
+      "pin_class": "mutable-tag",
+      "status": "finding",
+      "finding": "F-PIN-006",
+      "sources": ["internal/cli/config.go"]
+    },
+    {
+      "id": "cua-ubuntu",
+      "lane": "container-runtime",
+      "provider": "cua",
+      "platforms": ["linux/amd64"],
+      "reference": "ubuntu:24.04",
+      "pin_class": "mutable-tag",
+      "status": "finding",
+      "finding": "F-PIN-007",
+      "sources": ["internal/cli/config.go"]
+    },
+    {
+      "id": "opensandbox-ubuntu",
+      "lane": "container-runtime",
+      "provider": "opensandbox",
+      "platforms": ["linux/amd64"],
+      "reference": "ubuntu:24.04",
+      "pin_class": "mutable-tag",
+      "status": "finding",
+      "finding": "F-PIN-008",
+      "sources": ["internal/cli/config.go"]
+    },
+    {
+      "id": "nomad-ubuntu",
+      "lane": "container-runtime",
+      "provider": "nomad",
+      "platforms": ["linux/amd64"],
+      "reference": "ubuntu:24.04",
+      "pin_class": "mutable-tag",
+      "status": "finding",
+      "finding": "F-PIN-009",
+      "sources": ["internal/cli/config.go"]
+    },
+    {
+      "id": "blaxel-ubuntu",
+      "lane": "container-runtime",
+      "provider": "blaxel",
+      "platforms": ["linux/amd64"],
+      "reference": "ubuntu:24.04",
+      "pin_class": "mutable-tag",
+      "status": "finding",
+      "finding": "F-PIN-010",
+      "sources": ["internal/cli/config.go"]
+    },
+    {
+      "id": "modal-python",
+      "lane": "container-runtime",
+      "provider": "modal",
+      "platforms": ["linux/amd64"],
+      "reference": "python:3.13-slim",
+      "pin_class": "mutable-tag",
+      "status": "finding",
+      "finding": "F-PIN-011",
+      "sources": ["internal/cli/config.go"]
+    },
+    {
+      "id": "daytona-snapshot-base",
+      "lane": "ci",
+      "provider": "daytona",
+      "platforms": ["linux/amd64"],
+      "reference": "workflow-input:baseImage",
+      "pin_class": "registry-digest",
+      "status": "pinned",
+      "sources": [".github/workflows/daytona-snapshot-bootstrap.yml"],
+      "notes": "The bootstrap workflow requires a sha256-pinned base image input; no default tag path exists."
+    },
+    {
+      "id": "nemo-devcontainer-base",
+      "lane": "development",
+      "provider": "devcontainer",
+      "platforms": ["linux/amd64"],
+      "reference": "mcr.microsoft.com/devcontainers/base:bookworm",
+      "pin_class": "development",
+      "status": "out-of-scope",
+      "sources": ["runtimes/nemo-relay/.devcontainer/Dockerfile"],
+      "notes": "Development environment image, not part of the qualified execution plane."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-PIN-000",
+      "status": "resolved",
+      "summary": "stage-b.yml amd64 staging lane ran the postgres service on the mutable postgres:16 tag while every other workflow pinned the digest.",
+      "resolution": "Pinned postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94 in .github/workflows/stage-b.yml."
+    },
+    {
+      "id": "F-PIN-001",
+      "status": "open",
+      "summary": "smolvm default guest image is the mutable 'alpine' tag.",
+      "resolution": "Pending: confirm the smolvm API accepts name@digest Source.Reference values, then pin the index digest."
+    },
+    {
+      "id": "F-PIN-002",
+      "status": "accepted-limitation",
+      "summary": "Lume golden image is a local operator-built image with no upstream content binding.",
+      "resolution": "Documented trust class; lifecycle ownership is enforced by identity markers rather than image digest."
+    },
+    {
+      "id": "F-PIN-003",
+      "status": "accepted-limitation",
+      "summary": "os-catalog DockerImage entries are mutable tags; the islo provider consumes them as its default image.",
+      "resolution": "localcontainer and applecontainer resolve the digest-bound ContainerName; islo remains tag-bound pending verification that the islo API accepts digest references."
+    },
+    {
+      "id": "F-PIN-004",
+      "status": "accepted-limitation",
+      "summary": "Cloud provider images resolve through provider catalog names/family patterns at provision time and cannot carry content digests.",
+      "resolution": "Resolution-time binding is inherent to provider image APIs; recorded as the provider-catalog-name class."
+    },
+    {
+      "id": "F-PIN-005",
+      "status": "open",
+      "summary": "RunPod default template image is a mutable Docker Hub tag.",
+      "resolution": "Pending per-provider digest-reference support verification."
+    },
+    {
+      "id": "F-PIN-006",
+      "status": "open",
+      "summary": "Vast default image is a mutable Docker Hub tag.",
+      "resolution": "Pending per-provider digest-reference support verification."
+    },
+    {
+      "id": "F-PIN-007",
+      "status": "open",
+      "summary": "Cua default image is a mutable Docker Hub tag.",
+      "resolution": "Pending per-provider digest-reference support verification."
+    },
+    {
+      "id": "F-PIN-008",
+      "status": "open",
+      "summary": "OpenSandbox default image is a mutable Docker Hub tag.",
+      "resolution": "Pending per-provider digest-reference support verification."
+    },
+    {
+      "id": "F-PIN-009",
+      "status": "open",
+      "summary": "Nomad default image is a mutable Docker Hub tag.",
+      "resolution": "Pending per-provider digest-reference support verification."
+    },
+    {
+      "id": "F-PIN-010",
+      "status": "open",
+      "summary": "Blaxel default image is a mutable Docker Hub tag.",
+      "resolution": "Pending per-provider digest-reference support verification."
+    },
+    {
+      "id": "F-PIN-011",
+      "status": "open",
+      "summary": "Modal default image is a mutable Docker Hub tag.",
+      "resolution": "Pending per-provider digest-reference support verification."
+    }
+  ]
+}
