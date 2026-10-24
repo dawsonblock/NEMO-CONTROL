@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "suite": "rc8-integration",
+  "description": "RC8 reviewer-maintained inventory of mandatory tests beyond the live-microVM suite (which remains governed by required-tests.json). A gate is qualified only when every case in the gate's list executed exactly once and passed for the candidate commit. Absent, skipped, duplicated, or failed cases fail the gate; evidence from another source commit, toolchain, image-pin manifest, deployment identity, or trust root is rejected. Changes to this file require review and a signed note in the PR that lands them.",
+  "gates": {
+    "g1-trust-repair": {
+      "package": ["internal/history", "internal/experience", "internal/research"],
+      "required_tests": [
+        "TestTrustBlankIsUnverified",
+        "TestTrustInvalidSignature",
+        "TestTrustStalePolicyInvalid",
+        "TestTrustContradictoryAssessment",
+        "TestTrustMixedSignatures",
+        "TestTrustSupersededEvidence",
+        "TestForgedAssessmentRejected",
+        "TestTrustReplayRejected",
+        "TestLegacyStoreMigrationKeepsUntrusted",
+        "TestTrustedTaskSetExcludesUnassessed",
+        "TestUnverifiedNotPromoted"
+      ]
+    },
+    "g2-authority-abi": {
+      "package": ["internal/execution", "internal/capability", "internal/idempotency", "internal/reconcile", "cmd/abi-verdict"],
+      "required_tests": [
+        "TestAuthorityKernelAssignedFields",
+        "TestGrantScopeEnforced",
+        "TestRequestDigestBinding",
+        "TestNemoCannotMintCapability",
+        "TestUnknownNotRetried",
+        "TestAmbiguousRequiresAbsenceProof",
+        "TestDispatchCrashBeforeCommit",
+        "TestDispatchCrashAfterCommit",
+        "TestABIDifferentialCorpusAgreement",
+        "TestABIMalformedDeniedConsistently"
+      ],
+      "differential": {
+        "driver": "scripts/abi-differential.mjs",
+        "requirement": "Go and Rust implementations must agree on every normative corpus case; Node-wrapper mocks do not satisfy this gate"
+      }
+    },
+    "g3-release-controls": {
+      "package": ["internal/releasectl", "internal/cli"],
+      "required_tests": [
+        "TestVerifyEmptyAllowlistFailsClosed",
+        "TestVerifySelfSignedRejected",
+        "TestResumeUnsignedRejected",
+        "TestHaltSurvivesFileDeletion",
+        "TestControlLedgerRollbackFailsClosed",
+        "TestStaleEpochRejected",
+        "TestRogueDaemonCannotClear",
+        "TestCorruptRecordFailsClosed",
+        "TestReplicaMismatchFailsClosed",
+        "TestRestartPreservesState",
+        "TestOutageFailsClosed",
+        "TestTwoStepRecovery"
+      ]
+    },
+    "g4-custody": {
+      "package": ["internal/witness", "internal/sandboxcustody", "internal/custody"],
+      "required_tests": [
+        "TestWitnessForgedAckRejected",
+        "TestWitnessWrongKeyRejected",
+        "TestWitnessReplayRejected",
+        "TestWitnessDuplicateIdempotent",
+        "TestWitnessSequenceGapDetected",
+        "TestWitnessForeignDeploymentRejected",
+        "TestContradictoryCheckpointRejected",
+        "TestSameHashDifferentPayloadRejected",
+        "TestCustodyOutageNoTerminalSuccess",
+        "TestCustodyReconnectReconciles",
+        "TestColdRestoreReconciles",
+        "TestWitnessKeyRotation",
+        "TestWitnessCrossFamilyConfusion"
+      ]
+    },
+    "g5-sandbox-lifecycle": {
+      "package": ["internal/sandboxexecutor"],
+      "required_tests": [
+        "TestCleanupReplacementSandboxSafe",
+        "TestCleanupLabelCollisionRejected",
+        "TestVerifiedAbsentNeverFalse",
+        "TestKillAtEveryCommitBoundary",
+        "TestIncompleteCreateRecovered",
+        "TestOrphanedVMInventoried",
+        "TestStaleOwnershipRejected",
+        "TestConcurrentRetargetedDeletion",
+        "TestSlowInspectBounded",
+        "TestRetainedResourcesAccounted",
+        "TestCredentialIsolationPreserved",
+        "TestSandboxRecreationSafe"
+      ],
+      "live_note": "G5 unit/integration coverage does not substitute for the TestMSBLive* lanes in required-tests.json"
+    },
+    "g6-research-boundary": {
+      "package": ["internal/research", "internal/dream", "internal/experience"],
+      "required_tests": [
+        "TestProposalImmutable",
+        "TestPromotionRequiresOperatorSignature",
+        "TestSelfReportedDeltaInsufficient",
+        "TestBoundedExperimentBudget",
+        "TestEvalLeakageDetected",
+        "TestForgedOutcomeRejected",
+        "TestReceiptReplayRejected",
+        "TestUnverifiedEvidenceExcluded",
+        "TestFalseImprovementDetected",
+        "TestBudgetExhaustionBounded",
+        "TestNonAuthorizedPromotionRejected"
+      ]
+    },
+    "g7-packaging": {
+      "package": ["scripts", "qualification"],
+      "required_tests": [
+        "TestEvidenceBoundToCommit",
+        "TestForeignCommitEvidenceRejected",
+        "TestChangedPinsInvalidate",
+        "TestTransferManifestRecomputed"
+      ],
+      "script_gates": [
+        "scripts/qualify-repository.sh",
+        "scripts/qualify-source-distribution.sh",
+        "scripts/rc8-preflight.sh",
+        "scripts/rc8-evidence-verify.sh",
+        "scripts/verify-version-consistency.mjs",
+        "scripts/verify-nemo-provenance.sh"
+      ]
+    }
+  }
+}

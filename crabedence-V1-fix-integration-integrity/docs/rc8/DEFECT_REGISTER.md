@@ -1,0 +1,27 @@
+# RC8 Defect Register
+
+Living register. Status values: `open`, `in-progress`, `fixed-unverified`,
+`fixed` (gate evidence bound), `accepted-risk` (requires ADR). Severity P0 =
+blocks integration GO; P1 = blocks qualification GO; P2 = rollout concern.
+
+| ID | Sev | Owning PR | Status | Defect |
+|---|---|---|---|---|
+| D-01 | P0 | PR-01 | open | Adaptive-evidence trust accepts unassessed records: `graph.Trusted()` permits `Trust == ""`; `Diagnose()` sets trusted for `""` or `VERIFIED`; `TrustedTaskSet()` excludes only explicitly adverse statuses, admitting never-assessed rows into trusted retrieval/task-set/promotion paths. Owning files: `internal/history/*`, `internal/experience/{graph,retrieve}.go`, `internal/research/{research,eval}.go`. Fix: shared verifier-backed `IsTrustedObservation` predicate; blank/unknown → UNVERIFIED; stale/contradictory/superseded evidence invalidated; legacy stores stay untrusted until reverified. |
+| D-02 | P0 | PR-03 | open | `internal/releasectl` (Main) verifies any cryptographically valid embedded key when the trusted-fingerprint map is empty — self-signed operator accepted in production-capable mode. Fix: nonempty separately-provisioned allowlist required; dev unsigned mode explicit and unreachable in production. |
+| D-03 | P0 | PR-03 | open | `internal/releasectl` resume/unrevoke/clear-stage = unsigned file deletion. A halt can be made to vanish by any process with filesystem write access, including a compromised kernel-side process. Fix: append-only operator-signed control-event ledger binding release digest, deployment/tenant, sequence/epoch, previous-state digest, signer role, reason, policy version; effective state from verified events + monotonic checkpoint; fail closed on missing/corrupt/rolled-back/equivocal state. |
+| D-04 | P0 | PR-04 | open | Two distinct custody protocols risk domain confusion: `internal/sandboxcustody` (NDJSON payload archives/recovery checkpoints, RC7.6) vs `internal/witness` (length-prefixed JSON per-execution receipt custody, Main). Not wire-compatible. Fix: versioned typed `custody-envelope-v1` contract with domain-separated signature preimages and independent sequence domains; explicit adapters, never implicit conversion. |
+| D-05 | P0 | PR-04 | open | Witness/custodian key pinning from received records; local UDS transport treated as sufficient for separate-host custody. Fix: keys pinned from external config only; custodian signer separate from kernel and release-operator keys; mutually-authenticated encrypted transport for remote custody; outage never yields unverified terminal success. |
+| D-06 | P0 | PR-05 | open | Sandbox cleanup `msb rm` resolves-by-label then removes — non-atomic check-and-destroy permits deleting a replacement/foreign-deployment sandbox. Fix: identity-conditional delete if the runtime offers one; otherwise retain cleanup item as uncertain, document exclusive-namespace-ownership as interim constraint, mark production NO-GO absent reviewed isolation. |
+| D-07 | P1 | PR-02 | open | Overlapping execution/capability/idempotency/reconcile changes on both lines risk silent semantic loss in a directory-level merge. Fix: hunk-level three-way semantic merge + Go/Rust corpus differential (`cmd/abi-verdict`, `scripts/abi-differential.mjs`, fuzz) proving agreement on normative corpus. |
+| D-08 | P1 | PR-07 | open | Two divergent `qualification/msb-lane-image-pins.json` identities: signed candidate `f86821a7…` (@ `13566f1a`) vs branch-tip refresh `b8d63c04…/065c2422…` digests (@ `b501963`) vs main's copy (`f923d14f…`). Fix: ADR-0001 decision; signed candidate wins until pin refresh is requalified. |
+| D-09 | P1 | PR-07 | open | Version identity: branch diverges from rc7.6 lineage; resolved in PR-00 by freezing `0.55.0-rc8-dev` across VERSION/worker/nemo/lockfiles/RELEASE_VERSION (`verify-version-consistency.mjs` PASS). Closed at PR-00; remains listed for traceability. |
+| D-10 | P1 | PR-06 | open | Research/eval can consume contaminated or leaked task sets and self-reported outcomes as promotion evidence. Fix: sealed independent outcome verification, repo/task-family split, immutable holdouts, equal-budget baseline vs memory-assisted arms, operator-signed promotion gate. |
+| D-11 | P2 | PR-09 | open | No prospective effectiveness evidence for adaptive memory; G9 requires preregistered arms, power analysis, independent end-to-end scoring. |
+| D-12 | P2 | PR-07 | open | Inherited from the signed candidate: `scripts/check-provenance-docs.sh` reports `runtimes/nemo-relay/README.md` delta summary stale vs the frozen source (80 modified / 29 added / 1 removed). Runtime digest + transfer checks pass; this is a docs-summarization gap, not a provenance mismatch. Fix by regenerating the declared delta summary in the transfer-docs pass; any README change inside `runtimes/nemo-relay` must go through the transfer-manifest recomputation path (INV-7). |
+| E-01 | env | PR-00 | noted | Local macOS host has Go 1.27.2 installed; release gate pins Go 1.26.5 (`verify-go-toolchain.sh` strict-equality fails closed). Development builds work (toolchain directive is a minimum), but no gate evidence may be generated on this machine until the pinned toolchain is installed. |
+
+## Inherited statuses (reference, not RC8 defects)
+
+- RC7.5 artifact: **NO-GO** (superseded per RC7.6 manifest).
+- RC7.6 candidate `73815dbd…` @ `13566f1a`: **NOT QUALIFIED** — mandatory
+  campaign incomplete; evidence does not carry forward to RC8 bytes (INV-6).
