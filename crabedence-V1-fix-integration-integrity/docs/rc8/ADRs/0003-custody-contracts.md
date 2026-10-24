@@ -1,6 +1,6 @@
 # ADR-0003: Distinct Custody Protocols Behind a Versioned Evidence Contract
 
-- Status: Proposed (PR-00 record; implementation PR-04)
+- Status: Implemented (PR-04)
 - Date: 2026-10-24
 - Related: INV-3, INV-4, D-04, D-05, G4, `docs/spec/custody-envelope-v1.md`
 
@@ -53,3 +53,41 @@ and collapse their independent audit trails.
   produce terminal verified state.
 - Independent custody in G8 means a separately administered host with
   separately controlled keys — local-mode deployments stay development-only.
+
+## Implementation notes (PR-04)
+
+- `internal/custody` holds the contract: `Envelope`, canonical JSON
+  (RFC 8785-profile serialization for this schema), domain-separated
+  `SigningBytes`, the §8 `Verify` pipeline with typed rejections, and
+  `TrustSet` — role- and deployment-scoped pinned keys with
+  sequence-index validity windows. Rotation successors must carry the
+  incumbent's `custody-key-rotation-v1` authorization; the trust file
+  loader is owner-only and refuses silent succession.
+- `internal/witness` is the receipt family: length-prefixed framed ops
+  (`submit`/`checkpoint`/`status`), an append-only SQLite custody log
+  (`PRIMARY KEY (deployment_id, seq)`, `UNIQUE (deployment_id,
+  execution_id)`), signed acknowledgements under
+  `custody-witness-ack-v1`, and signed checkpoint heads under
+  `custody-witness-checkpoint-v1` — a forged or replayed realignment
+  cannot truncate the sender. Idempotent resend returns the stored ack;
+  a divergent record at a custodied index is a contradictory checkpoint
+  and fails closed.
+- The kernel-side `Outbox` builds, chains, and signs each envelope
+  inside the enqueue transaction (`previous_checkpoint_hash` links each
+  record to the prior head), so signed position equals durable
+  position. `Sender` drains with verified-checkpoint realignment and
+  boundary ack verification; `CustodyHealthy` feeds the fail-closed
+  CRITICAL admission gate. Provider-terminal state and custody-ack
+  state stay distinct — an outage delays custody, it never fabricates
+  it.
+- Separate-host custody is mutually authenticated TLS where each peer's
+  certificate carries its Ed25519 custody key and the peer's key
+  fingerprint is pinned (`witness.ServerTLSConfig`/`ClientTLSConfig`);
+  unix sockets remain local-only. `cmd/witnessd` is the standalone
+  service entrypoint; `CRABEDENCE_WITNESS_*` envs wire the kernel side
+  (`config.go`, `serve.go`). Configured custody is complete-or-refused
+  at load.
+- A configured boundary mandates the custody gate for every CRITICAL
+  admission; sandbox-archive and recovery-checkpoint envelope adapters
+  for `internal/sandboxcustody` remain the tracked follow-on — the
+  envelope contract supports them without touching either wire format.

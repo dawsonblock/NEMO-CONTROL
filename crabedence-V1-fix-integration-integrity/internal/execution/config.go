@@ -65,6 +65,13 @@ type ServiceConfig struct {
 	// hatch (refused under CRABBOX_MODE=production).
 	ControlLedger ControlLedgerConfig
 
+	// Witness configures independent receipt custody (ADR-0003):
+	// terminal receipts are wrapped in custody-envelope-v1 records and
+	// drained to a separately administered witness through the durable
+	// outbox. When enabled, the custody gate is mandatory — a CRITICAL
+	// admission while the custody path is degraded is refused.
+	Witness WitnessConfig
+
 	// CheckpointPath, when set, is where the service writes its
 	// periodically emitted signed evidence checkpoint — the latest
 	// emission (replaced atomically) beside a retained append-only
@@ -277,6 +284,12 @@ func LoadServiceConfig(opts ServeOptions) (*ServiceConfig, error) {
 	}
 	cfg.ControlLedger = controlCfg
 
+	witnessCfg, err := witnessConfigFromEnv(cfg.production, cfg.ControlLedger.Deployment)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Witness = witnessCfg
+
 	return cfg, nil
 }
 
@@ -301,6 +314,106 @@ type ControlLedgerConfig struct {
 
 // Enabled reports whether the dispatch gate should be installed.
 func (c ControlLedgerConfig) Enabled() bool { return c.LedgerPath != "" }
+
+// WitnessConfig is the resolved evidence-custody configuration — the
+// receipt-family custody boundary (ADR-0003). The witness is a
+// separately administered service; the kernel side holds a durable
+// outbox, a pinned custodian trust set, and the deployment identity.
+type WitnessConfig struct {
+	// Socket is the local unix transport — same-host custody only.
+	Socket string
+	// TLSAddr is the mutually authenticated separate-host transport
+	// (host:port); TLSKeyFP pins the witness's custody key.
+	TLSAddr  string
+	TLSKeyFP string
+	// OutboxPath is the kernel-side durable custody queue (sqlite).
+	OutboxPath string
+	// TrustRootsPath is the externally maintained custodian trust set
+	// (custody.LoadTrustSet file) — the only authority on which
+	// witness keys may vouch.
+	TrustRootsPath string
+	// Deployment is the custody scope the envelopes bind — shared with
+	// the release-control deployment identity.
+	Deployment string
+	// PolicyDigest optionally binds envelopes to the active policy.
+	PolicyDigest string
+	// DrainInterval bounds outbox retry cadence (default 2s).
+	DrainInterval time.Duration
+}
+
+// Enabled reports whether the custody boundary is configured.
+func (c WitnessConfig) Enabled() bool { return c.Socket != "" || c.TLSAddr != "" }
+
+// witnessConfigFromEnv resolves the evidence-custody posture.
+//
+//	CRABEDENCE_WITNESS_SOCKET — local unix transport path.
+//	CRABEDENCE_WITNESS_TLS — separate-host mTLS address (host:port);
+//	  requires CRABEDENCE_WITNESS_TLS_KEY.
+//	CRABEDENCE_WITNESS_TLS_KEY — pinned witness key fingerprint for the
+//	  TLS transport — the peer's certificate must carry this exact key.
+//	CRABEDENCE_WITNESS_OUTBOX — kernel custody outbox path (sqlite).
+//	CRABEDENCE_WITNESS_TRUST_ROOTS — custodian trust set file
+//	  (custody-envelope trust format); the only authority on which
+//	  witness keys may vouch.
+//	CRABEDENCE_DEPLOYMENT — shared deployment identity (required when
+//	  custody is configured).
+//	CRABEDENCE_POLICY_DIGEST — optional envelope policy binding.
+//	CRABEDENCE_WITNESS_DRAIN_INTERVAL — retry cadence (default 2s).
+//
+// When custody is configured at all, the tuple is complete or startup
+// fails — a half-configured custody boundary is worse than none
+// because it looks like custody while verifying nothing. A configured
+// boundary always installs the fail-closed CRITICAL gate.
+func witnessConfigFromEnv(production bool, deployment string) (WitnessConfig, error) {
+	cfg := WitnessConfig{
+		Socket:         strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_SOCKET")),
+		TLSAddr:        strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TLS")),
+		TLSKeyFP:       strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TLS_KEY")),
+		OutboxPath:     strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_OUTBOX")),
+		TrustRootsPath: strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TRUST_ROOTS")),
+		Deployment:     deployment,
+		PolicyDigest:   strings.TrimSpace(os.Getenv("CRABEDENCE_POLICY_DIGEST")),
+		DrainInterval:  2 * time.Second,
+	}
+	if raw := strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_DRAIN_INTERVAL")); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d <= 0 {
+			return cfg, fmt.Errorf("CRABEDENCE_WITNESS_DRAIN_INTERVAL %q is not a positive Go duration", raw)
+		}
+		cfg.DrainInterval = d
+	}
+	declared := cfg.Socket != "" || cfg.TLSAddr != "" || cfg.OutboxPath != "" ||
+		cfg.TrustRootsPath != "" || cfg.TLSKeyFP != ""
+	if !declared {
+		return cfg, nil
+	}
+	var missing []string
+	if cfg.Socket == "" && cfg.TLSAddr == "" {
+		missing = append(missing, "CRABEDENCE_WITNESS_SOCKET or CRABEDENCE_WITNESS_TLS")
+	}
+	if cfg.Socket != "" && cfg.TLSAddr != "" {
+		return cfg, fmt.Errorf("configure exactly one custody transport: CRABEDENCE_WITNESS_SOCKET (local) xor CRABEDENCE_WITNESS_TLS (separate-host)")
+	}
+	if cfg.TLSAddr != "" && cfg.TLSKeyFP == "" {
+		missing = append(missing, "CRABEDENCE_WITNESS_TLS_KEY (pinned witness key for the mTLS channel)")
+	}
+	if cfg.TLSKeyFP != "" && cfg.TLSAddr == "" {
+		return cfg, fmt.Errorf("CRABEDENCE_WITNESS_TLS_KEY is set but CRABEDENCE_WITNESS_TLS is not")
+	}
+	if cfg.OutboxPath == "" {
+		missing = append(missing, "CRABEDENCE_WITNESS_OUTBOX")
+	}
+	if cfg.TrustRootsPath == "" {
+		missing = append(missing, "CRABEDENCE_WITNESS_TRUST_ROOTS")
+	}
+	if cfg.Deployment == "" {
+		missing = append(missing, "CRABEDENCE_DEPLOYMENT")
+	}
+	if len(missing) > 0 {
+		return cfg, fmt.Errorf("incomplete evidence-custody configuration: set %s", strings.Join(missing, ", "))
+	}
+	return cfg, nil
+}
 
 // controlLedgerConfigFromEnv resolves the release-control posture.
 //

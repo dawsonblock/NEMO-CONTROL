@@ -17,10 +17,12 @@ import (
 
 	"github.com/openclaw/crabbox/internal/authority"
 	"github.com/openclaw/crabbox/internal/capability"
+	"github.com/openclaw/crabbox/internal/custody"
 	"github.com/openclaw/crabbox/internal/evidence"
 	"github.com/openclaw/crabbox/internal/idempotency"
 	"github.com/openclaw/crabbox/internal/providertransport"
 	"github.com/openclaw/crabbox/internal/reconcile"
+	"github.com/openclaw/crabbox/internal/witness"
 )
 
 // ServeOptions configures the execution service.
@@ -337,6 +339,11 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	}
 	fmt.Fprint(os.Stderr, report.String())
 
+	// custodySinkFn, when custody is configured, is shared by the
+	// dispatch executor and the reconciliation worker — both commit
+	// terminal state, so both owe custody obligations into the same
+	// durable outbox.
+	var custodySinkFn func(executionID, receiptDigest string, payload []byte)
 	if store != nil {
 		// Use DispatchExecutor for durable idempotency. The
 		// provider-invocation ceiling and the provider gate policy were
@@ -356,6 +363,15 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 				return fmt.Errorf("operator release controls: %w", err)
 			}
 			executor.SetControlGate(controlGateProbe(controlGate, 5*time.Second))
+		}
+		if cfg.Witness.Enabled() {
+			enqueue, err := wireCustodyBoundary(ctx, cfg.Witness, signer, opts.Release)
+			if err != nil {
+				return fmt.Errorf("evidence custody: %w", err)
+			}
+			executor.SetCustodySink(enqueue.sink)
+			executor.SetCustodyGate(enqueue.gate)
+			custodySinkFn = enqueue.sink
 		}
 		durable = executor
 	} else {
@@ -451,6 +467,9 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	// closed: UNKNOWN stays UNKNOWN unless a resolver proves otherwise).
 	if store != nil && opts.ReconcileInterval > 0 {
 		worker := reconcile.NewWorker(store, reconcile.NoopResolver{})
+		if custodySinkFn != nil {
+			worker.SetCustodySink(custodySinkFn)
+		}
 		// Reconciliation resolvers are wrapped so lookup outcomes are
 		// counted on the provider gate. The wrapper never acquires
 		// dispatch capacity: the provider failure that strands a
@@ -866,4 +885,86 @@ func isSHA256Hex(s string) bool {
 		}
 	}
 	return true
+}
+
+// custodyHooks is the dispatch/worker boundary the custody wiring
+// installs: the sink every terminal receipt flows through, the
+// fail-closed gate CRITICAL admissions consult, and a wake the sink
+// pulses after each enqueue so the drain runs promptly.
+type custodyHooks struct {
+	sink func(executionID, receiptDigest string, payload []byte)
+	gate func() error
+	wake func()
+}
+
+// wireCustodyBoundary builds the kernel side of the receipt-custody
+// contract (ADR-0003): the durable outbox that wraps terminal receipts
+// in signed custody-envelope-v1 records, the sender that drains to the
+// pinned witness with checkpoint realignment, and the fail-closed
+// admission gate that refuses CRITICAL work while custody is degraded.
+// The witness is independently administered — its keys resolve only
+// from the configured trust set, never from anything it sends.
+func wireCustodyBoundary(ctx context.Context, wc WitnessConfig, signer *evidence.Signer, release string) (*custodyHooks, error) {
+	trust, err := custody.LoadTrustSet(wc.TrustRootsPath)
+	if err != nil {
+		return nil, fmt.Errorf("custodian trust set: %w", err)
+	}
+	outbox, err := witness.OpenOutbox(wc.OutboxPath)
+	if err != nil {
+		return nil, fmt.Errorf("custody outbox: %w", err)
+	}
+	var client *witness.Client
+	if wc.TLSAddr != "" {
+		tlsCfg, err := witness.ClientTLSConfig(signer, wc.TLSKeyFP)
+		if err != nil {
+			outbox.Close()
+			return nil, fmt.Errorf("custody tls identity: %w", err)
+		}
+		client = witness.NewTLSClient(wc.TLSAddr, tlsCfg)
+	} else {
+		client = witness.NewClient(wc.Socket)
+	}
+	producer := witness.Producer{
+		DeploymentID: wc.Deployment,
+		Release:      custody.ReleaseIdentity{Version: release},
+		PolicyDigest: wc.PolicyDigest,
+		Signer:       signer,
+	}
+	sender := witness.NewSender(client, outbox, wc.Deployment, trust, nil)
+	sink := func(executionID, receiptDigest string, payload []byte) {
+		if _, err := outbox.Enqueue(ctx, producer, executionID, receiptDigest, payload); err != nil {
+			// An enqueue failure never rewinds committed terminal
+			// state — it degrades custody health so the next mandated
+			// admission fails closed instead of accumulating silent
+			// evidence loss.
+			sender.MarkDegraded(fmt.Sprintf("custody enqueue %s: %v", executionID, err))
+			fmt.Fprintf(os.Stderr, "custody enqueue %s failed: %v\n", executionID, err)
+			return
+		}
+		sender.Wake()
+	}
+	gate := func() error {
+		if !sender.CustodyHealthy(ctx) {
+			reason := sender.LastError()
+			if reason == "" {
+				reason = "custody backlog pending — witness has not acknowledged queued receipts"
+			}
+			return fmt.Errorf("evidence custody degraded: %s", reason)
+		}
+		return nil
+	}
+	go func() {
+		sender.Run(ctx, wc.DrainInterval)
+		outbox.Close()
+	}()
+	fmt.Fprintf(os.Stderr, "Evidence custody: outbox %s → witness %s (deployment %s)\n",
+		wc.OutboxPath, orElseStr(wc.Socket, wc.TLSAddr), wc.Deployment)
+	return &custodyHooks{sink: sink, gate: gate, wake: sender.Wake}, nil
+}
+
+func orElseStr(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }

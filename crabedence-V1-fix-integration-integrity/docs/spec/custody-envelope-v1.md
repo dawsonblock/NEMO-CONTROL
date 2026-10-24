@@ -1,6 +1,7 @@
 # custody-envelope-v1 — Versioned Custody Evidence Contract (proposed)
 
-Status: proposed at PR-00; normative once PR-04 lands. Governs evidence
+Status: implemented at PR-04 (`internal/custody`, `internal/witness`,
+`cmd/witnessd`, `internal/execution` custody wiring). Governs evidence
 exchange between the Crabedence kernel, receipt witnesses, and sandbox
 custodians.
 

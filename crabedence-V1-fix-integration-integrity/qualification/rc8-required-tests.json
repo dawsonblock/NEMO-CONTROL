@@ -92,7 +92,7 @@
    ]
   },
   "g4-custody": {
-   "status": "specified",
+   "status": "executed",
    "package": ["internal/custody", "internal/witness", "internal/sandboxcustody", "internal/evidence"],
    "required_tests": [
     "TestWitnessForgedAckRejected",
