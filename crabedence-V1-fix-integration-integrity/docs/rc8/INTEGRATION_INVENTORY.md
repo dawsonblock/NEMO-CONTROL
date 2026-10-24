@@ -1,6 +1,33 @@
 # RC8 Integration Inventory — Main-side Import Ledger
 
-Status: PR-00 inventory. Every candidate import from `main`
+Status: PR-02 executed (topic `codex/rc8-pr02-authority-abi`). Outcomes:
+
+- **Landed clean:** `internal/execution/invocation_abi.go` (scanner
+  enforces mediation/session fields + digest shapes in wire order),
+  `internal/execution/dispatch.go` (inert `SetCustodyGate`/`SetCustodySink`
+  hooks; no `internal/witness` dependency — PR-04 wires them),
+  `internal/reconcile/worker.go` (recovery-resolution receipts to the same
+  sink), `internal/evidence/evidence.go` merge (kept RC7.6 `SignRecord`
+  domain separation **and** added Main's raw `SignBytes`), all of import
+  set B except `check-image-pins*`/`generate-source-inventory.mjs` (PR-07).
+- **Rejected as clean takes:** `internal/cli/run_test.go` and
+  `internal/cli/checkpoint_capture_binary_test.go` are *true* three-way
+  merges — both sides fixed the umbrella-repo layout differently, and
+  RC7.6's resolution (`checkpointTestModuleRoot` + `git rev-parse`
+  toplevel, fixture-repo hydration) subsumes Main's. RC7.6 versions kept.
+- **Deferred by design:** `internal/execution/service.go`,
+  `internal/execution/serve.go`, `internal/execution/config.go` (Main's
+  delta is releasectl/witness wiring → PR-03/PR-04);
+  `docs/spec/durable-execution-contract.md` (recovery+custody content →
+  PR-03/PR-04); `qualification/*`, `.github/workflows/*`,
+  `scripts/package-source-archive*`, `internal/applevmhelper/*` → PR-05/07.
+- **Provenance impact:** `abi_verdict.rs` lands inside the shipped
+  `runtimes/nemo-relay` tree under declared addition `bridges/`; shipped
+  identity recomputed to `14fc142e…` (1467 files, delta 30 added) via the
+  declared `nemo-runtime-digest -update` path; dependent umbrella docs
+  restated and `check-nemo-transfer-manifest.sh` green.
+
+Every candidate import from `main`
 (`655d4e2b4f88474e2f97bb564eef29157684f18d`, subtree tree
 `cc850485ea64b52635c9b55dffc5f3de7c7c686d`) into
 `codex/rc8-authority-integration` (parent `13566f1a`, subtree tree

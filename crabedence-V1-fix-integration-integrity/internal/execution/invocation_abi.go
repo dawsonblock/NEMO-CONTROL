@@ -124,57 +124,6 @@ func parseInvocationRequest(data []byte) (Request, error) {
 	if _, err := dec.Token(); err != io.EOF {
 		return req, fmt.Errorf("trailing data after the invocation object")
 	}
-	// R9: a present mediation object must carry both required digests.
-	// The structural scan validates present fields but cannot enforce
-	// presence, and encoding/json cannot distinguish a missing field
-	// from an empty one — so presence is probed on the raw object.
-	// This mirrors the Rust ABI, where serde rejects a mediation
-	// object that omits either required field.
-	if req.Mediation != nil {
-		var envelope struct {
-			Mediation map[string]json.RawMessage `json:"mediation"`
-		}
-		if err := json.Unmarshal(data, &envelope); err != nil {
-			return req, fmt.Errorf("invalid mediation object: %w", err)
-		}
-		if _, ok := envelope.Mediation["middleware_set_digest"]; !ok {
-			return req, fmt.Errorf("request.mediation.middleware_set_digest is required")
-		}
-		if _, ok := envelope.Mediation["original_args_digest"]; !ok {
-			return req, fmt.Errorf("request.mediation.original_args_digest is required")
-		}
-		// Every digest key carries a declared SHA-256 in canonical form.
-		// The structural scan has already refused null and non-strings, so
-		// each surviving value is a string that must carry the full digest —
-		// an empty field declares evidence it cannot name.
-		for name, raw := range envelope.Mediation {
-			var value string
-			if err := json.Unmarshal(raw, &value); err != nil {
-				continue
-			}
-			if !abiSHA256Digest.MatchString(value) {
-				return req, fmt.Errorf(
-					"request.mediation.%s must be a 64-character lowercase SHA-256 hex digest", name)
-			}
-		}
-	}
-	// A present session object must carry both binding fields: a
-	// session ID without a proof is a bare claim, and a proof without
-	// a session ID binds nothing.
-	if req.Session != nil {
-		var envelope struct {
-			Session map[string]json.RawMessage `json:"session"`
-		}
-		if err := json.Unmarshal(data, &envelope); err != nil {
-			return req, fmt.Errorf("invalid session object: %w", err)
-		}
-		if _, ok := envelope.Session["id"]; !ok {
-			return req, fmt.Errorf("request.session.id is required")
-		}
-		if _, ok := envelope.Session["proof"]; !ok {
-			return req, fmt.Errorf("request.session.proof is required")
-		}
-	}
 	return req, nil
 }
 
@@ -298,6 +247,24 @@ func scanInvocationStructure(data []byte) error {
 				if top.object && top.pending {
 					return fmt.Errorf("key %q in %s has no value", top.key, top.path)
 				}
+				// R9: presence is enforced at close, in wire order, so a
+				// missing required field is reported before anything that
+				// follows the object — the same point the Rust validator
+				// applies check_required_fields.
+				if delim == '}' {
+					var required []string
+					switch top.kind {
+					case abiFrameMediation:
+						required = []string{"middleware_set_digest", "original_args_digest"}
+					case abiFrameSession:
+						required = []string{"id", "proof"}
+					}
+					for _, name := range required {
+						if _, ok := top.keys[name]; !ok {
+							return fmt.Errorf("%s.%s is required", top.path, name)
+						}
+					}
+				}
 				stack = stack[:len(stack)-1]
 				if len(stack) == 0 {
 					completed = true
@@ -311,6 +278,13 @@ func scanInvocationStructure(data []byte) error {
 			if top.object && top.pending {
 				if err := validateABIField(top, abiKindString, ""); err != nil {
 					return err
+				}
+				// Every known mediation field is a digest field: a present
+				// value must carry the full canonical SHA-256, checked here
+				// in wire order so the first malformed digest is reported
+				// deterministically like the Rust scanner does.
+				if top.kind == abiFrameMediation && !abiSHA256Digest.MatchString(value) {
+					return fmt.Errorf("%s.%s must be a 64-character lowercase SHA-256 hex digest", top.path, top.key)
 				}
 				top.pending = false
 				continue

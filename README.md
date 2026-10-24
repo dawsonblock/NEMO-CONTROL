@@ -194,7 +194,9 @@ NEMO-CONTROL/
 > **One NEMO source.** The NEMO code that builds, ships, and is qualified lives in
 > `crabedence-V1-fix-integration-integrity/runtimes/nemo-relay/`. The outer
 > `NEMO-feat-native-plugin-isolation/` tree is a frozen provenance baseline — nothing in the
-> distribution compiles from it.
+> distribution compiles from it. The declared source→runtime delta is
+> 80 modified / 30 added / 1 removed files, all declared in
+> `crabedence-V1-fix-integration-integrity/runtimes/nemo-transfer-manifest.json`.
 
 ## Development
 
