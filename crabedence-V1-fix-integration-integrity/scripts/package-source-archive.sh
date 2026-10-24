@@ -38,6 +38,22 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# The deterministic archive stream requires GNU tar (--format=gnu). The
+# system `tar` on macOS is bsdtar, which rejects that format; prefer an
+# explicit CRABBOX_SOURCE_TAR override, then a `tar` that passes a
+# capability probe, then `gtar` (Homebrew gnu-tar). Whatever resolves is
+# used for every tar invocation below.
+TAR_BIN="${CRABBOX_SOURCE_TAR:-}"
+if [ -z "$TAR_BIN" ]; then
+  if tar --format=gnu -cf /dev/null -T /dev/null 2>/dev/null; then
+    TAR_BIN="tar"
+  elif command -v gtar >/dev/null 2>&1; then
+    TAR_BIN="gtar"
+  else
+    TAR_BIN="tar"
+  fi
+fi
+
 FORMAT="tar.gz"
 OUTPUT=""
 PREFIX=""
@@ -97,10 +113,10 @@ fi
 
 stage="$work/stage"
 mkdir -p "$stage/$prefix"
-tar --format=gnu -cf - -T "$list" | tar -xf - -C "$stage/$prefix"
+"$TAR_BIN" --format=gnu -cf - -T "$list" | "$TAR_BIN" -xf - -C "$stage/$prefix"
 
 case "$FORMAT" in
-  tar.gz) tar --format=gnu -czf "$work/archive.tar.gz" -C "$stage" "$prefix" ;;
+  tar.gz) "$TAR_BIN" --format=gnu -czf "$work/archive.tar.gz" -C "$stage" "$prefix" ;;
   # -y keeps symlink entries instead of dereferencing them — a plain
   # `zip -r` silently stores the target's contents or drops the entry,
   # which is how the .claude/skills link went missing previously.
@@ -109,7 +125,7 @@ esac
 
 mkdir -p "$work/extract"
 case "$FORMAT" in
-  tar.gz) tar -xzf "$work/archive.tar.gz" -C "$work/extract" ;;
+  tar.gz) "$TAR_BIN" -xzf "$work/archive.tar.gz" -C "$work/extract" ;;
   zip)    unzip -q "$work/archive.zip" -d "$work/extract" ;;
 esac
 

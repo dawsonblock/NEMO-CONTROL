@@ -91,7 +91,22 @@ test("tar packaging uses GNU format with the system tar implementation", { skip:
   const wrapperDir = path.join(out, "bin");
   const tarLog = path.join(out, "tar-args.log");
   fs.mkdirSync(wrapperDir);
-  const systemTar = execFileSync("which", ["tar"], { encoding: "utf8" }).trim();
+  // The wrapper delegates to a GNU-capable tar: `--format=gnu` creation
+  // fails on bsdtar (macOS system tar), so probe for the capability and
+  // fall back to gtar — the same resolution the packager performs.
+  const gnuCapable = (bin) => {
+    try {
+      execFileSync(bin, ["--format=gnu", "-cf", "/dev/null", "-T", "/dev/null"], { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const whichOrNull = (bin) => {
+    try { return execFileSync("which", [bin], { encoding: "utf8" }).trim(); } catch { return null; }
+  };
+  const systemTar = [whichOrNull("tar"), whichOrNull("gtar")].filter(Boolean).find(gnuCapable)
+    ?? whichOrNull("tar");
   const wrapper = path.join(wrapperDir, "tar");
   fs.writeFileSync(
     wrapper,
