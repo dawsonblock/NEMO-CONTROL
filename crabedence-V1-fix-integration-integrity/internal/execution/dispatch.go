@@ -162,6 +162,14 @@ type DispatchExecutor struct {
 	// custodySink, when set, receives each terminalized record's receipt
 	// for durable enqueue toward the independent evidence witness.
 	custodySink func(executionID, receiptDigest string, payload []byte)
+	// controlGate, when set, is consulted before MUTATION/CRITICAL work
+	// is admitted — the operator release-control ledger's folded state.
+	// A halt or revoke denies new external effects while PURE/READ
+	// (evidence and recovery paths) continue to run. The gate consults
+	// the ledger on every admission so an operator's halt takes effect
+	// without a service restart; the kernel cannot grant itself a
+	// bypass.
+	controlGate func() error
 	// timeouts bound each durability stage of the post-dispatch path.
 	// See ExecutorTimeouts.
 	timeouts ExecutorTimeouts
@@ -325,6 +333,12 @@ func (e *DispatchExecutor) SetCustodySink(sink func(executionID, receiptDigest s
 	e.custodySink = sink
 }
 
+// SetControlGate installs the operator release-control admission check
+// consulted before MUTATION/CRITICAL dispatch — nil admits all.
+func (e *DispatchExecutor) SetControlGate(g func() error) {
+	e.controlGate = g
+}
+
 // ExecuteWithIdempotency executes a request with durable idempotency.
 func (e *DispatchExecutor) ExecuteWithIdempotency(ctx context.Context, req Request, desc capability.ResolvedDescriptor) Response {
 	// For PURE and READ, skip idempotency (no side effects). The
@@ -344,6 +358,20 @@ func (e *DispatchExecutor) ExecuteWithIdempotency(ctx context.Context, req Reque
 			Status:      StatusFailed,
 			FailureCode: string(capability.FailureInternalError),
 			Error:       "durable idempotency unavailable: MUTATION/CRITICAL operations require a database connection",
+		}
+	}
+
+	// Operator release controls — a halt or revoke denies new external
+	// effects. This runs before any dispatch work so the folded ledger
+	// state is the only input; the kernel cannot grant itself a
+	// bypass, and an unsigned marker deletion cannot clear the check.
+	if e.controlGate != nil {
+		if err := e.controlGate(); err != nil {
+			return Response{
+				Status:      StatusDenied,
+				FailureCode: string(capability.FailureAdmissionDenied),
+				Error:       fmt.Sprintf("operator release control: %v", err),
+			}
 		}
 	}
 

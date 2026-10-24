@@ -8,6 +8,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/openclaw/crabbox/internal/execution"
+	"github.com/openclaw/crabbox/internal/releasectl"
 )
 
 type crabboxKongCLI struct {
@@ -80,6 +81,7 @@ type crabboxKongCLI struct {
 	Pool        poolKongCmd        `cmd:"" help:"Alias commands for machine pools."`
 	Machine     machineKongCmd     `cmd:"" help:"Alias commands for direct-provider machines."`
 	Pond        pondKongCmd        `cmd:"" help:"Pond bridge plane: peer discovery for delegated providers."`
+	Control     controlKongCmd     `cmd:"" help:"Operator release controls: signed halt/resume/revoke/stage ledger."`
 }
 
 type kongExit struct {
@@ -1007,4 +1009,52 @@ func stripKongCommandPath(args []string, path ...string) []string {
 		out = out[1:]
 	}
 	return out
+}
+
+// ─── Operator release controls (internal/releasectl) ────────────────
+
+type controlKongCmd struct {
+	Halt       controlHaltKongCmd       `cmd:"" help:"Record an operator halt — emergency stop, unsigned allowed (tightening only)."`
+	Revoke     controlRevokeKongCmd     `cmd:"" help:"Record an operator revoke — unsigned allowed (tightening only)."`
+	Resume     controlResumeKongCmd     `cmd:"" help:"Record a signed operator resume clearing a halt."`
+	Unrevoke   controlUnrevokeKongCmd   `cmd:"" name:"unrevoke" help:"Record a signed operator unrevoke clearing a revocation."`
+	Stage      controlStageKongCmd      `cmd:"" help:"Record a signed stage transition bound to qualification evidence."`
+	StageClear controlStageClearKongCmd `cmd:"" name:"stage-clear" help:"Record a signed stage-clear."`
+	Status     controlStatusKongCmd     `cmd:"" help:"Verify the ledger chain and report folded control state."`
+}
+
+type controlHaltKongCmd struct{ controlFlags }
+type controlRevokeKongCmd struct{ controlFlags }
+type controlResumeKongCmd struct{ controlFlags }
+type controlUnrevokeKongCmd struct{ controlFlags }
+type controlStageClearKongCmd struct{ controlFlags }
+
+type controlStageKongCmd struct {
+	controlFlags
+	Stage    int      `name:"stage" required:"" help:"Stage level being entered."`
+	Evidence []string `name:"evidence" required:"" help:"Qualification-evidence reference bound to the transition."`
+}
+
+type controlStatusKongCmd struct{ controlStatusFlags }
+
+func (c *controlHaltKongCmd) Run(ctx context.Context, app App) error {
+	return app.controlTransition(ctx, releasectl.KindHalt, c.controlFlags, 0, nil)
+}
+func (c *controlRevokeKongCmd) Run(ctx context.Context, app App) error {
+	return app.controlTransition(ctx, releasectl.KindRevoke, c.controlFlags, 0, nil)
+}
+func (c *controlResumeKongCmd) Run(ctx context.Context, app App) error {
+	return app.controlTransition(ctx, releasectl.KindResume, c.controlFlags, 0, nil)
+}
+func (c *controlUnrevokeKongCmd) Run(ctx context.Context, app App) error {
+	return app.controlTransition(ctx, releasectl.KindUnrevoke, c.controlFlags, 0, nil)
+}
+func (c *controlStageKongCmd) Run(ctx context.Context, app App) error {
+	return app.controlTransition(ctx, releasectl.KindStage, c.controlFlags, c.Stage, c.Evidence)
+}
+func (c *controlStageClearKongCmd) Run(ctx context.Context, app App) error {
+	return app.controlTransition(ctx, releasectl.KindStageClear, c.controlFlags, 0, nil)
+}
+func (c *controlStatusKongCmd) Run(ctx context.Context, app App) error {
+	return app.controlStatus(ctx, c.controlStatusFlags)
 }

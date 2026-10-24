@@ -55,6 +55,16 @@ type ServiceConfig struct {
 	MaxConnections          int
 	MaxHandshakeConnections int
 
+	// ControlLedger configures the operator release-control ledger
+	// (internal/releasectl). In production all three paths plus the
+	// deployment identity are required — startup fails closed without
+	// them. In development the ledger is optional; when LedgerPath is
+	// set, the dispatch gate enforces folded halt/revoke state.
+	// TrustRootsPath is the externally provisioned signer allowlist;
+	// AllowUnverified is an explicit development-only escape hatch
+	// (refused under CRABBOX_MODE=production).
+	ControlLedger ControlLedgerConfig
+
 	// CheckpointPath, when set, is where the service writes its
 	// periodically emitted signed evidence checkpoint — the latest
 	// emission (replaced atomically) beside a retained append-only
@@ -261,6 +271,91 @@ func LoadServiceConfig(opts ServeOptions) (*ServiceConfig, error) {
 	}
 	cfg.ProviderGate = gateCfg
 
+	controlCfg, err := controlLedgerConfigFromEnv(cfg.production)
+	if err != nil {
+		return nil, err
+	}
+	cfg.ControlLedger = controlCfg
+
+	return cfg, nil
+}
+
+// ControlLedgerConfig is the resolved operator release-control
+// configuration — paths plus the deployment identity the dispatch gate
+// enforces.
+type ControlLedgerConfig struct {
+	// LedgerPath is the append-only event store; CheckpointPath is the
+	// monotonic anchor (deployments should hold it outside the writable
+	// runtime's authority); TrustRootsPath is the externally
+	// provisioned operator signer allowlist.
+	LedgerPath     string
+	CheckpointPath string
+	TrustRootsPath string
+	// Deployment scopes the control state this service enforces.
+	Deployment string
+	// AllowUnverified is the explicit development-only escape hatch for
+	// unsigned relaxations. Refused in production.
+	AllowUnverified bool
+}
+
+// Enabled reports whether the dispatch gate should be installed.
+func (c ControlLedgerConfig) Enabled() bool { return c.LedgerPath != "" }
+
+// controlLedgerConfigFromEnv resolves the release-control posture.
+//
+//	CRABEDENCE_CONTROL_LEDGER — append-only event store path.
+//	CRABEDENCE_CONTROL_CHECKPOINT — monotonic checkpoint path
+//	  (default <ledger>.checkpoint).
+//	CRABEDENCE_CONTROL_TRUST_ROOTS — operator signer allowlist file.
+//	CRABEDENCE_DEPLOYMENT — deployment identity the gate enforces.
+//	CRABEDENCE_CONTROL_ALLOW_UNSIGNED — development-only escape hatch
+//	  for unsigned relaxations; refused in production.
+//
+// Production requires the full tuple — a deployment that cannot be
+// halted cannot be trusted with effects. Development tolerates absence
+// but enforces whatever is configured: an empty trust root denies all
+// relaxations while tightening stays unauthenticated.
+func controlLedgerConfigFromEnv(production bool) (ControlLedgerConfig, error) {
+	cfg := ControlLedgerConfig{
+		LedgerPath:      strings.TrimSpace(os.Getenv("CRABEDENCE_CONTROL_LEDGER")),
+		CheckpointPath:  strings.TrimSpace(os.Getenv("CRABEDENCE_CONTROL_CHECKPOINT")),
+		TrustRootsPath:  strings.TrimSpace(os.Getenv("CRABEDENCE_CONTROL_TRUST_ROOTS")),
+		Deployment:      strings.TrimSpace(os.Getenv("CRABEDENCE_DEPLOYMENT")),
+		AllowUnverified: envTruthy("CRABEDENCE_CONTROL_ALLOW_UNSIGNED"),
+	}
+	if cfg.LedgerPath != "" && cfg.CheckpointPath == "" {
+		cfg.CheckpointPath = cfg.LedgerPath + ".checkpoint"
+	}
+	if production {
+		if cfg.AllowUnverified {
+			return cfg, fmt.Errorf("CRABEDENCE_CONTROL_ALLOW_UNSIGNED is refused in production mode")
+		}
+		var missing []string
+		if cfg.LedgerPath == "" {
+			missing = append(missing, "CRABEDENCE_CONTROL_LEDGER")
+		}
+		if cfg.TrustRootsPath == "" {
+			missing = append(missing, "CRABEDENCE_CONTROL_TRUST_ROOTS")
+		}
+		if cfg.Deployment == "" {
+			missing = append(missing, "CRABEDENCE_DEPLOYMENT")
+		}
+		if len(missing) > 0 {
+			return cfg, fmt.Errorf("production mode requires operator release controls: set %s", strings.Join(missing, ", "))
+		}
+		return cfg, nil
+	}
+	// Development: all-or-nothing except trust roots (empty roots are
+	// themselves a valid deny-all-relaxations posture).
+	if cfg.LedgerPath == "" {
+		if cfg.TrustRootsPath != "" || cfg.Deployment != "" {
+			return cfg, fmt.Errorf("CRABEDENCE_CONTROL_LEDGER is required when control trust roots or a deployment are configured")
+		}
+		return cfg, nil
+	}
+	if cfg.Deployment == "" {
+		return cfg, fmt.Errorf("CRABEDENCE_DEPLOYMENT is required when CRABEDENCE_CONTROL_LEDGER is set")
+	}
 	return cfg, nil
 }
 
