@@ -74,7 +74,7 @@
    }
   },
   "g3-release-controls": {
-   "status": "specified",
+   "status": "executed",
    "package": ["internal/releasectl", "internal/cli"],
    "required_tests": [
     "TestVerifyEmptyAllowlistFailsClosed",

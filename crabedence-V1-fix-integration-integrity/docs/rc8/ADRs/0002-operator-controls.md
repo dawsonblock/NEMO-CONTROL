@@ -1,6 +1,6 @@
 # ADR-0002: Operator Release Controls as a Signed Append-Only Ledger
 
-- Status: Proposed (decision record authored at PR-00; implementation PR-03)
+- Status: Implemented (PR-03 — `internal/releasectl`, dispatch gate, `crabbox control` CLI)
 - Date: 2026-10-24
 - Related: INV-3, INV-4, D-02, D-03, G3
 

@@ -350,6 +350,13 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		executor.SetTimeouts(cfg.ExecutorTimeouts)
 		providerGate = NewProviderGate(cfg.ProviderGate)
 		executor.SetProviderGate(providerGate)
+		if cfg.ControlLedger.Enabled() {
+			controlGate, err := newControlGate(cfg.ControlLedger)
+			if err != nil {
+				return fmt.Errorf("operator release controls: %w", err)
+			}
+			executor.SetControlGate(controlGateProbe(controlGate, 5*time.Second))
+		}
 		durable = executor
 	} else {
 		// No store — fail closed for MUTATION/CRITICAL
