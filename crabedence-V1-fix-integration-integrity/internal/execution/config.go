@@ -61,8 +61,8 @@ type ServiceConfig struct {
 	// them. In development the ledger is optional; when LedgerPath is
 	// set, the dispatch gate enforces folded halt/revoke state.
 	// TrustRootsPath is the externally provisioned signer allowlist;
-	// AllowUnverified is an explicit development-only escape hatch
-	// (refused under CRABBOX_MODE=production).
+	// AllowUntrustedSigners is an explicit development-only escape
+	// hatch (refused under CRABBOX_MODE=production).
 	ControlLedger ControlLedgerConfig
 
 	// CheckpointPath, when set, is where the service writes its
@@ -293,9 +293,10 @@ type ControlLedgerConfig struct {
 	TrustRootsPath string
 	// Deployment scopes the control state this service enforces.
 	Deployment string
-	// AllowUnverified is the explicit development-only escape hatch for
-	// unsigned relaxations. Refused in production.
-	AllowUnverified bool
+	// AllowUntrustedSigners is the explicit development-only escape
+	// hatch: relaxations still require a valid signature, but the
+	// signer need not be allowlisted. Refused in production.
+	AllowUntrustedSigners bool
 }
 
 // Enabled reports whether the dispatch gate should be installed.
@@ -304,12 +305,21 @@ func (c ControlLedgerConfig) Enabled() bool { return c.LedgerPath != "" }
 // controlLedgerConfigFromEnv resolves the release-control posture.
 //
 //	CRABEDENCE_CONTROL_LEDGER — append-only event store path.
-//	CRABEDENCE_CONTROL_CHECKPOINT — monotonic checkpoint path
-//	  (default <ledger>.checkpoint).
-//	CRABEDENCE_CONTROL_TRUST_ROOTS — operator signer allowlist file.
+//	CRABEDENCE_CONTROL_CHECKPOINT — monotonic checkpoint path; in
+//	  development it defaults to <ledger>.checkpoint, while production
+//	  requires an explicit value — the deployment must place it
+//	  outside the writable runtime's authority (separate storage,
+//	  ownership, or an operator-held host). A co-located checkpoint is
+//	  deletable with the ledger, which is precisely the loss a halt is
+//	  meant to survive.
+//	CRABEDENCE_CONTROL_TRUST_ROOTS — operator signer allowlist file
+//	  (fingerprint per line, or <epoch>:<fingerprint> for epoch-scoped
+//	  roots); loaded once at startup, so root-set changes take effect
+//	  on service restart.
 //	CRABEDENCE_DEPLOYMENT — deployment identity the gate enforces.
-//	CRABEDENCE_CONTROL_ALLOW_UNSIGNED — development-only escape hatch
-//	  for unsigned relaxations; refused in production.
+//	CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS — development-only
+//	  escape hatch accepting relaxations signed by non-allowlisted
+//	  keys (signatures still verify); refused in production.
 //
 // Production requires the full tuple — a deployment that cannot be
 // halted cannot be trusted with effects. Development tolerates absence
@@ -317,22 +327,25 @@ func (c ControlLedgerConfig) Enabled() bool { return c.LedgerPath != "" }
 // relaxations while tightening stays unauthenticated.
 func controlLedgerConfigFromEnv(production bool) (ControlLedgerConfig, error) {
 	cfg := ControlLedgerConfig{
-		LedgerPath:      strings.TrimSpace(os.Getenv("CRABEDENCE_CONTROL_LEDGER")),
-		CheckpointPath:  strings.TrimSpace(os.Getenv("CRABEDENCE_CONTROL_CHECKPOINT")),
-		TrustRootsPath:  strings.TrimSpace(os.Getenv("CRABEDENCE_CONTROL_TRUST_ROOTS")),
-		Deployment:      strings.TrimSpace(os.Getenv("CRABEDENCE_DEPLOYMENT")),
-		AllowUnverified: envTruthy("CRABEDENCE_CONTROL_ALLOW_UNSIGNED"),
+		LedgerPath:            strings.TrimSpace(os.Getenv("CRABEDENCE_CONTROL_LEDGER")),
+		CheckpointPath:        strings.TrimSpace(os.Getenv("CRABEDENCE_CONTROL_CHECKPOINT")),
+		TrustRootsPath:        strings.TrimSpace(os.Getenv("CRABEDENCE_CONTROL_TRUST_ROOTS")),
+		Deployment:            strings.TrimSpace(os.Getenv("CRABEDENCE_DEPLOYMENT")),
+		AllowUntrustedSigners: envTruthy("CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS"),
 	}
 	if cfg.LedgerPath != "" && cfg.CheckpointPath == "" {
 		cfg.CheckpointPath = cfg.LedgerPath + ".checkpoint"
 	}
 	if production {
-		if cfg.AllowUnverified {
-			return cfg, fmt.Errorf("CRABEDENCE_CONTROL_ALLOW_UNSIGNED is refused in production mode")
+		if cfg.AllowUntrustedSigners {
+			return cfg, fmt.Errorf("CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS is refused in production mode")
 		}
 		var missing []string
 		if cfg.LedgerPath == "" {
 			missing = append(missing, "CRABEDENCE_CONTROL_LEDGER")
+		}
+		if cfg.CheckpointPath == "" || cfg.CheckpointPath == cfg.LedgerPath+".checkpoint" {
+			missing = append(missing, "CRABEDENCE_CONTROL_CHECKPOINT (explicit, outside the ledger's write authority)")
 		}
 		if cfg.TrustRootsPath == "" {
 			missing = append(missing, "CRABEDENCE_CONTROL_TRUST_ROOTS")

@@ -41,6 +41,26 @@ kernel-level compromise cannot erase an authorized halt.
    its own strong authorization — never unsigned deletion.
 7. Stage transitions (canary→majority→full) bind qualification evidence and
    release identity; absent records never read as approval.
+8. **Trust-root rotation is epoch-scoped.** An event is authorized against
+   the root set of its own epoch, so a rotation retires an epoch of signers
+   without invalidating the history that generation signed (`<epoch>:
+   <fingerprint>` entries in the allowlist; bare fingerprints trust at
+   every epoch). Removing a fingerprint altogether remains a deliberate
+   freeze: every relaxation that key ever signed fails verification on
+   next open — recovery is a new epoch event signed by a surviving or
+   newly-epoch'd root, never truncation of history. New events are
+   rejected below the chain's maximum epoch.
+9. **The checkpoint is the operator-held anchor.** It must be configured
+   explicitly in production and placed outside the writable runtime's
+   authority (separate storage, ownership, or an operator-held host) — a
+   checkpoint deletable with the ledger is precisely the loss a halt is
+   meant to survive. Production also refuses to mint a missing ledger at
+   startup: delete-then-restart must never read as "no restrictions".
+10. **Checkpoint advance is deliberate.** An append advances the
+    checkpoint over the entire chain, so the CLI warns when a pending
+    relaxation written by another operator would be authorized by the
+    append — checkpoint writes are the authorization act, not a side
+    effect.
 
 ## Consequences
 
@@ -51,3 +71,10 @@ kernel-level compromise cannot erase an authorized halt.
 - Ledger storage choice is deployment-pluggable behind a small interface;
   the default local implementation must still verify signatures on read, so
   tampering is detected rather than trusted.
+- Production deployments provision the ledger (`crabbox control`) and the
+  checkpoint path *before* first boot — the service never creates either.
+- Signer rotation = bump the epoch and re-scope roots; no ledger rewrite,
+  no downtime beyond a service restart to reload the allowlist.
+- Concurrent writers serialize on an O_EXCL lockfile; a stale lock denies
+  appends (fail closed) and is removed manually — deletion can only deny,
+  never clear restrictions.

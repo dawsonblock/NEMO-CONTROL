@@ -50,6 +50,10 @@ import (
 // SchemaVersion is the only accepted control-event schema version.
 const SchemaVersion = 1
 
+// maxEventRecordSize bounds one stored record. ParseEvent and Append
+// share it — nothing durable may be unverifiable.
+const maxEventRecordSize = 64 * 1024
+
 // SigningDomain is the domain-separation prefix for event signatures.
 // It is deliberately distinct from every other signed object in the
 // system — a control signature can never be presented as an evidence
@@ -263,6 +267,17 @@ func (e Event) validateSchema() error {
 	if _, err := time.Parse(time.RFC3339Nano, e.Timestamp); err != nil {
 		return fmt.Errorf("invalid timestamp")
 	}
+	for _, ref := range e.EvidenceRefs {
+		if strings.TrimSpace(ref) == "" {
+			return fmt.Errorf("evidence_refs must not contain empty entries")
+		}
+		// \x1f is the signature-preimage join separator: allowing it
+		// inside a ref would let two distinct ref lists collide under
+		// one signature.
+		if strings.ContainsRune(ref, '\x1f') {
+			return fmt.Errorf("evidence_refs must not contain unit separators")
+		}
+	}
 	if e.Kind == KindStage {
 		if e.Stage <= 0 {
 			return fmt.Errorf("stage event requires stage level")
@@ -286,8 +301,8 @@ func ParseEvent(data []byte) (Event, error) {
 	if len(data) == 0 {
 		return e, fmt.Errorf("empty event record")
 	}
-	if len(data) > 64*1024 {
-		return e, fmt.Errorf("event record exceeds 64KiB")
+	if len(data) > maxEventRecordSize {
+		return e, fmt.Errorf("event record exceeds %d bytes", maxEventRecordSize)
 	}
 	if dup, err := hasDuplicateKeys(bytes.NewReader(data)); err != nil {
 		return e, err

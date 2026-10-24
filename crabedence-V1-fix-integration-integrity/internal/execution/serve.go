@@ -351,7 +351,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		providerGate = NewProviderGate(cfg.ProviderGate)
 		executor.SetProviderGate(providerGate)
 		if cfg.ControlLedger.Enabled() {
-			controlGate, err := newControlGate(cfg.ControlLedger)
+			controlGate, err := newControlGate(cfg.ControlLedger, cfg.Production())
 			if err != nil {
 				return fmt.Errorf("operator release controls: %w", err)
 			}

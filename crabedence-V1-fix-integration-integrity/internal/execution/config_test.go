@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -32,6 +33,9 @@ func clearServiceEnv(t *testing.T) {
 		"CRABEDENCE_APPROVED_ABI",
 		"CRABEDENCE_CHECKPOINT_PATH", "CRABEDENCE_CHECKPOINT_CUSTODY_PATH",
 		"CRABEDENCE_CHECKPOINT_INTERVAL",
+		"CRABEDENCE_CONTROL_LEDGER", "CRABEDENCE_CONTROL_CHECKPOINT",
+		"CRABEDENCE_CONTROL_TRUST_ROOTS", "CRABEDENCE_DEPLOYMENT",
+		"CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS",
 		"CRABBOX_ALLOW_INSECURE_TEST_PROVIDER_ORIGIN",
 	} {
 		t.Setenv(name, "")
@@ -220,6 +224,11 @@ func TestProductionRequiresAuthenticatedPrincipals(t *testing.T) {
 	t.Setenv("CRABEDENCE_PEER_PRINCIPALS", "1000:alice@example.com")
 	t.Setenv("CRABEDENCE_ATTESTATION_REQUIRED", "true")
 	t.Setenv("CRABEDENCE_APPROVED_RUNTIME_KEYS", testApprovedRuntimeKey(t))
+	controlDir := t.TempDir()
+	t.Setenv("CRABEDENCE_CONTROL_LEDGER", filepath.Join(controlDir, "control.jsonl"))
+	t.Setenv("CRABEDENCE_CONTROL_CHECKPOINT", filepath.Join(controlDir, "ext", "control.checkpoint"))
+	t.Setenv("CRABEDENCE_CONTROL_TRUST_ROOTS", filepath.Join(controlDir, "roots.txt"))
+	t.Setenv("CRABEDENCE_DEPLOYMENT", "test-deployment")
 	cfg, err := LoadServiceConfig(ServeOptions{})
 	if err != nil {
 		t.Fatalf("production with a peer map and attestation must load: %v", err)

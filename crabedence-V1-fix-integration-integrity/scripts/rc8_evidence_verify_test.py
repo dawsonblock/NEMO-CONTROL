@@ -200,6 +200,31 @@ class ManifestMode(VerifierCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("QUALIFIED", r.stderr)
 
+    def test_inventory_binding_passes(self):
+        self.manifest()
+        r = self.run_manifest(inventory=self.inventory)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(self.inv_sha, r.stdout)
+
+    def test_swapped_inventory_fails(self):
+        other = wfile(os.path.join(self.dir, "other-inv.json"),
+                      json.dumps({"gates": {"x": {}}}))
+        self.manifest()
+        r = self.run_manifest(inventory=other)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("inventory sha256", r.stderr)
+
+    def test_missing_inventory_file_fails(self):
+        self.manifest()
+        r = self.run_manifest(inventory=os.path.join(self.dir, "gone.json"))
+        self.assertEqual(r.returncode, 1)
+
+    def test_full_digest_printed(self):
+        self.manifest()
+        r = self.run_manifest()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(self.art_sha, r.stdout)
+
 
 class SignatureMode(VerifierCase):
     """Real ssh-keygen signing — skipped when ssh-keygen is absent."""
@@ -351,6 +376,49 @@ class EvidenceMode(VerifierCase):
                             "source_commit": COMMIT}])
         r = self.run_evidence(e)
         self.assertEqual(r.returncode, 1)
+
+    def _gate_inventory(self, tests):
+        wfile(self.inventory, json.dumps(
+            {"schema_version": 2, "suite": "t",
+             "gates": {"g1": {"status": "executed",
+                              "required_tests": tests}}}))
+
+    def test_require_gate_passes_when_covered(self):
+        self._gate_inventory([TEST, "TestTwo"])
+        e = self.evidence([self.rec(), self.rec(test="TestTwo")])
+        r = self.run_evidence(e, require_gate="g1")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_require_gate_fails_on_missing_case(self):
+        self._gate_inventory([TEST, "TestAbsent"])
+        e = self.evidence([self.rec()])
+        r = self.run_evidence(e, require_gate="g1")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("absent", r.stderr)
+
+    def test_require_gate_fails_on_failed_case(self):
+        self._gate_inventory([TEST])
+        e = self.evidence([self.rec(outcome="FAIL")])
+        r = self.run_evidence(e, require_gate="g1")
+        self.assertEqual(r.returncode, 1)
+
+    def test_require_gate_unknown_gate_fails(self):
+        e = self.evidence([self.rec()])
+        r = self.run_evidence(e, require_gate="g9-nope")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("no such gate", r.stderr)
+
+    def test_bool_field_rejected(self):
+        e = self.evidence([self.rec(duration_ms=True)])
+        r = self.run_evidence(e, require_test=TEST)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("wrong type", r.stderr)
+
+    def test_full_inventory_digest_printed(self):
+        e = self.evidence([self.rec()])
+        r = self.run_evidence(e, require_test=TEST)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(sha256(self.inventory), r.stdout)
 
 
 if __name__ == "__main__":

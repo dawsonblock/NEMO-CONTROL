@@ -262,6 +262,37 @@ UID alone. Deployment controls:
 `CRABEDENCE_ATTESTATION_RELAXED`. Attestation supplements peer
 authentication; it never replaces it.
 
+### Operator release controls
+
+Independently of attestation, the dispatch boundary consults the
+operator release-control ledger (`internal/releasectl`, ADR-0002)
+before any `MUTATION`/`CRITICAL` invocation reaches a provider;
+`PURE`/`READ` invocations are never gated so evidence and recovery
+paths continue during a halt. The ledger is an append-only event
+chain folded on every admission — `halt`/`revoke` tighten without
+authentication, while `resume`/`unrevoke`/`stage`/`stage-clear`
+require an Ed25519 signature (`nemo/releasectl/v1` domain) from the
+externally provisioned signer allowlist and checkpoint coverage of
+the relaxing event. Deployment controls, all required in production:
+
+- `CRABEDENCE_CONTROL_LEDGER` — append-only event store path. In
+  production the file must already exist (provisioned by
+  `crabbox control`); a missing store refuses startup rather than
+  minting an empty admit-all ledger. Development auto-provisions.
+- `CRABEDENCE_CONTROL_CHECKPOINT` — monotonic checkpoint path.
+  Production requires an explicit value placed outside the writable
+  runtime's authority; the development default is
+  `<ledger>.checkpoint`.
+- `CRABEDENCE_CONTROL_TRUST_ROOTS` — operator signer allowlist file:
+  one lowercase-hex fingerprint per line (`#` comments allowed), or
+  `<epoch>:<fingerprint>` to scope a signer to one trust generation
+  so rotation retires an epoch without freezing history. Loaded once
+  at startup; changes take effect on restart.
+- `CRABEDENCE_DEPLOYMENT` — the deployment identity the gate enforces.
+- `CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS` — development-only
+  escape hatch accepting relaxations signed by non-allowlisted keys
+  (signatures still verify); refused under `CRABBOX_MODE=production`.
+
 ## Why `authority_ref` instead of `grant_id`
 
 Today, authority is a grant. Tomorrow it may be a delegated

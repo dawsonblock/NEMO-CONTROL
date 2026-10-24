@@ -25,6 +25,14 @@ func loadProductionConfig(t *testing.T, extra func(t *testing.T)) *ServiceConfig
 	t.Setenv("CRABEDENCE_PEER_PRINCIPALS", "1000:alice@example.com")
 	t.Setenv("CRABEDENCE_ATTESTATION_REQUIRED", "true")
 	t.Setenv("CRABEDENCE_APPROVED_RUNTIME_KEYS", testApprovedRuntimeKey(t))
+	// Production requires the operator release-control tuple; the
+	// ledger itself is exercised by the control-gate tests — here it
+	// only needs to satisfy load-time validation.
+	dir := t.TempDir()
+	t.Setenv("CRABEDENCE_CONTROL_LEDGER", filepath.Join(dir, "control.jsonl"))
+	t.Setenv("CRABEDENCE_CONTROL_CHECKPOINT", filepath.Join(dir, "ext", "control.checkpoint"))
+	t.Setenv("CRABEDENCE_CONTROL_TRUST_ROOTS", filepath.Join(dir, "roots.txt"))
+	t.Setenv("CRABEDENCE_DEPLOYMENT", "test-deployment")
 	if extra != nil {
 		extra(t)
 	}

@@ -13,17 +13,17 @@ import (
 // file is the externally provisioned signer allowlist — the CLI never
 // treats an event's embedded key as a trust source.
 type controlFlags struct {
-	Ledger      string `name:"ledger" required:"" help:"Append-only control ledger path."`
-	Checkpoint  string `name:"checkpoint" help:"Monotonic checkpoint path (default <ledger>.checkpoint)."`
-	TrustRoots  string `name:"trust-roots" required:"" help:"Operator signer allowlist file (fingerprints, one per line)."`
-	Deployment  string `name:"deployment" required:"" help:"Deployment identity the event binds."`
-	Reason      string `name:"reason" required:"" help:"Operator-attested reason for the transition."`
-	Release     string `name:"release" help:"Release/artifact digest (64 hex)."`
-	Policy      string `name:"policy" help:"Policy digest (64 hex)."`
-	Epoch       uint64 `name:"epoch" help:"Trust-root epoch (default: ledger maximum)."`
-	Key         string `name:"key" help:"Operator private key PEM (required for resume/unrevoke/stage/stage-clear; optional for halt/revoke)."`
-	BreakGlass  bool   `name:"break-glass" help:"Sign with the breakglass signer role."`
-	DevUnsigned bool   `name:"dev-unsigned" help:"Development only: permit unsigned relaxations."`
+	Ledger       string `name:"ledger" required:"" help:"Append-only control ledger path."`
+	Checkpoint   string `name:"checkpoint" help:"Monotonic checkpoint path (default <ledger>.checkpoint)."`
+	TrustRoots   string `name:"trust-roots" required:"" help:"Operator signer allowlist file (fingerprints, one per line)."`
+	Deployment   string `name:"deployment" required:"" help:"Deployment identity the event binds."`
+	Reason       string `name:"reason" required:"" help:"Operator-attested reason for the transition."`
+	Release      string `name:"release" help:"Release/artifact digest (64 hex)."`
+	Policy       string `name:"policy" help:"Policy digest (64 hex)."`
+	Epoch        uint64 `name:"epoch" help:"Trust-root epoch (default: ledger maximum)."`
+	Key          string `name:"key" help:"Operator private key PEM (required for resume/unrevoke/stage/stage-clear; optional for halt/revoke)."`
+	BreakGlass   bool   `name:"break-glass" help:"Sign with the breakglass signer role."`
+	DevUntrusted bool   `name:"dev-untrusted-signers" help:"Development only: accept relaxations signed by non-allowlisted keys (signatures still verify; refused in production)."`
 }
 
 func (f controlFlags) checkpoint() string {
@@ -38,7 +38,7 @@ func (f controlFlags) verifier() (*releasectl.Verifier, error) {
 	if err != nil {
 		return nil, fmt.Errorf("trust roots: %w", err)
 	}
-	return releasectl.NewVerifier(roots, f.DevUnsigned), nil
+	return releasectl.NewVerifier(roots, f.DevUntrusted), nil
 }
 
 // controlTransition appends one control event. kind is fixed by the
@@ -53,6 +53,12 @@ func (a App) controlTransition(ctx context.Context, kind string, f controlFlags,
 	l, err := releasectl.Create(f.Ledger, f.checkpoint(), v)
 	if err != nil {
 		return fmt.Errorf("control ledger: %w", err)
+	}
+	// Appending advances the checkpoint over the entire chain —
+	// pending relaxations recorded by another writer are authorized by
+	// this append. Surface that before committing, not after.
+	if pending := l.PendingRelaxations(); pending > 0 {
+		fmt.Fprintf(a.Stderr, "warning: this append's checkpoint advance authorizes %d pending relaxation(s) across all deployments\n", pending)
 	}
 	e := l.NewEvent(kind, f.Deployment, f.Reason)
 	e.ReleaseDigest = f.Release

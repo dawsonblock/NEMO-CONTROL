@@ -85,7 +85,7 @@ func TestControlGateLedgerFlow(t *testing.T) {
 		TrustRootsPath: rootsPath,
 		Deployment:     "dep-a",
 	}
-	gate, err := newControlGate(cfg)
+	gate, err := newControlGate(cfg, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestControlGateLedgerFlow(t *testing.T) {
 	}
 
 	// Operator halts — unsigned emergency event through the ledger API.
-	v := releasectl.NewVerifier(releasectl.TrustRoots{op.Fingerprint(): true}, false)
+	v := releasectl.NewVerifier(releasectl.AnyRoots(op.Fingerprint()), false)
 	l, err := releasectl.Create(ledgerPath, ckptPath, v)
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestControlGateTamperedLedgerFailsClosed(t *testing.T) {
 	op, _ := evidence.GenerateSigner()
 	writeTextFile(rootsPath, op.Fingerprint()+"\n")
 
-	v := releasectl.NewVerifier(releasectl.TrustRoots{op.Fingerprint(): true}, false)
+	v := releasectl.NewVerifier(releasectl.AnyRoots(op.Fingerprint()), false)
 	l, err := releasectl.Create(ledgerPath, ckptPath, v)
 	if err != nil {
 		t.Fatal(err)
@@ -164,7 +164,7 @@ func TestControlGateTamperedLedgerFailsClosed(t *testing.T) {
 	}
 
 	cfg := ControlLedgerConfig{LedgerPath: ledgerPath, CheckpointPath: ckptPath, TrustRootsPath: rootsPath, Deployment: "dep-a"}
-	gate, err := newControlGate(cfg)
+	gate, err := newControlGate(cfg, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,6 +183,36 @@ func TestControlGateTamperedLedgerFailsClosed(t *testing.T) {
 	}
 }
 
+// TestControlGateProductionMissingLedgerFailsClosed: in production the
+// service must never mint a fresh admit-all ledger — a missing store
+// at startup is refuse-to-boot, not "no restrictions recorded". A
+// delete-then-restart cannot silently clear a halt.
+func TestControlGateProductionMissingLedgerFailsClosed(t *testing.T) {
+	dir := t.TempDir()
+	cfg := ControlLedgerConfig{
+		LedgerPath:     filepath.Join(dir, "control.jsonl"),
+		CheckpointPath: filepath.Join(dir, "ext", "control.checkpoint"),
+		TrustRootsPath: filepath.Join(dir, "roots.txt"),
+		Deployment:     "dep-a",
+	}
+	if _, err := newControlGate(cfg, true); err == nil {
+		t.Fatal("production startup must refuse a missing ledger")
+	}
+	if _, err := os.Stat(cfg.LedgerPath); !os.IsNotExist(err) {
+		t.Fatal("production startup must not create the ledger")
+	}
+	// Development keeps the create-on-boot convenience.
+	if err := writeTextFile(cfg.TrustRootsPath, "\n"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newControlGate(cfg, false); err != nil {
+		t.Fatalf("development must auto-provision an empty ledger: %v", err)
+	}
+	if _, err := os.Stat(cfg.LedgerPath); err != nil {
+		t.Fatal("development startup must create the empty ledger")
+	}
+}
+
 // ─── Config resolution ──────────────────────────────────────────────
 
 func TestControlLedgerConfigFromEnv(t *testing.T) {
@@ -192,7 +222,8 @@ func TestControlLedgerConfigFromEnv(t *testing.T) {
 		set("CRABEDENCE_CONTROL_LEDGER", "")
 		set("CRABEDENCE_CONTROL_TRUST_ROOTS", "")
 		set("CRABEDENCE_DEPLOYMENT", "")
-		set("CRABEDENCE_CONTROL_ALLOW_UNSIGNED", "")
+		set("CRABEDENCE_CONTROL_CHECKPOINT", "")
+		set("CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS", "")
 		if _, err := controlLedgerConfigFromEnv(true); err == nil {
 			t.Fatal("production without control config must fail closed")
 		}
@@ -201,31 +232,42 @@ func TestControlLedgerConfigFromEnv(t *testing.T) {
 		set("CRABEDENCE_CONTROL_LEDGER", "/var/lib/ctl/ledger.jsonl")
 		set("CRABEDENCE_CONTROL_TRUST_ROOTS", "/etc/ctl/roots.txt")
 		set("CRABEDENCE_DEPLOYMENT", "prod-a")
-		set("CRABEDENCE_CONTROL_CHECKPOINT", "")
-		set("CRABEDENCE_CONTROL_ALLOW_UNSIGNED", "")
+		set("CRABEDENCE_CONTROL_CHECKPOINT", "/operator-held/ctl.checkpoint")
+		set("CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS", "")
 		cfg, err := controlLedgerConfigFromEnv(true)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if cfg.CheckpointPath != "/var/lib/ctl/ledger.jsonl.checkpoint" {
-			t.Fatalf("default checkpoint = %q", cfg.CheckpointPath)
+		if cfg.CheckpointPath != "/operator-held/ctl.checkpoint" {
+			t.Fatalf("explicit checkpoint = %q", cfg.CheckpointPath)
 		}
 	})
-	t.Run("production refuses unsigned mode", func(t *testing.T) {
+	t.Run("production refuses default checkpoint placement", func(t *testing.T) {
+		set("CRABEDENCE_CONTROL_LEDGER", "/var/lib/ctl/ledger.jsonl")
+		set("CRABEDENCE_CONTROL_TRUST_ROOTS", "/etc/ctl/roots.txt")
+		set("CRABEDENCE_DEPLOYMENT", "prod-a")
+		set("CRABEDENCE_CONTROL_CHECKPOINT", "")
+		set("CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS", "")
+		if _, err := controlLedgerConfigFromEnv(true); err == nil ||
+			!strings.Contains(err.Error(), "CRABEDENCE_CONTROL_CHECKPOINT") {
+			t.Fatal("production must require an explicitly placed checkpoint")
+		}
+	})
+	t.Run("production refuses untrusted-signer mode", func(t *testing.T) {
 		set("CRABEDENCE_CONTROL_LEDGER", "/x")
 		set("CRABEDENCE_CONTROL_TRUST_ROOTS", "/y")
 		set("CRABEDENCE_DEPLOYMENT", "d")
-		set("CRABEDENCE_CONTROL_CHECKPOINT", "")
-		set("CRABEDENCE_CONTROL_ALLOW_UNSIGNED", "1")
+		set("CRABEDENCE_CONTROL_CHECKPOINT", "/elsewhere/ckpt")
+		set("CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS", "1")
 		if _, err := controlLedgerConfigFromEnv(true); err == nil {
-			t.Fatal("ALLOW_UNSIGNED must be refused in production")
+			t.Fatal("ALLOW_UNTRUSTED_SIGNERS must be refused in production")
 		}
 	})
 	t.Run("development tolerates absence", func(t *testing.T) {
 		set("CRABEDENCE_CONTROL_LEDGER", "")
 		set("CRABEDENCE_CONTROL_TRUST_ROOTS", "")
 		set("CRABEDENCE_DEPLOYMENT", "")
-		set("CRABEDENCE_CONTROL_ALLOW_UNSIGNED", "")
+		set("CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS", "")
 		cfg, err := controlLedgerConfigFromEnv(false)
 		if err != nil {
 			t.Fatal(err)
@@ -234,11 +276,25 @@ func TestControlLedgerConfigFromEnv(t *testing.T) {
 			t.Fatal("unconfigured dev must not enable the gate")
 		}
 	})
+	t.Run("development defaults checkpoint placement", func(t *testing.T) {
+		set("CRABEDENCE_CONTROL_LEDGER", "/x/ledger.jsonl")
+		set("CRABEDENCE_DEPLOYMENT", "d")
+		set("CRABEDENCE_CONTROL_TRUST_ROOTS", "")
+		set("CRABEDENCE_CONTROL_CHECKPOINT", "")
+		set("CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS", "")
+		cfg, err := controlLedgerConfigFromEnv(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.CheckpointPath != "/x/ledger.jsonl.checkpoint" {
+			t.Fatalf("dev default checkpoint = %q", cfg.CheckpointPath)
+		}
+	})
 	t.Run("development ledger requires deployment", func(t *testing.T) {
 		set("CRABEDENCE_CONTROL_LEDGER", "/x")
 		set("CRABEDENCE_DEPLOYMENT", "")
 		set("CRABEDENCE_CONTROL_TRUST_ROOTS", "")
-		set("CRABEDENCE_CONTROL_ALLOW_UNSIGNED", "")
+		set("CRABEDENCE_CONTROL_ALLOW_UNTRUSTED_SIGNERS", "")
 		if _, err := controlLedgerConfigFromEnv(false); err == nil {
 			t.Fatal("dev ledger without deployment must fail")
 		}

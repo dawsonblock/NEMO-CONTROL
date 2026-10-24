@@ -16,12 +16,13 @@ identity class has its own expectation and its own comparison target:
 Modes:
 
   --manifest M.json --artifact PATH --source-commit HEX40
-      [--source-tree HEX64] [--trust-store FILE --signer-id ID
+      [--source-tree HEX64] [--inventory I.json]
+      [--trust-store FILE --signer-id ID
         [--signature-file PATH]] [--require-signature]
 
   --evidence E.jsonl --inventory I.json --source-commit HEX40
       [--artifact-sha256 HEX64] [--require-lane L]
-      [--require-test T ...] [--require-signer]
+      [--require-test T ...] [--require-gate G ...] [--require-signer]
 
   --artifact PATH --artifact-sha256 HEX64
 
@@ -113,6 +114,14 @@ def load_json_strict(path):
         return None, str(e)
 
 
+def _type_ok(value, types):
+    # bool is a subclass of int — JSON true/false must not pass a
+    # numeric field's check.
+    if isinstance(value, bool):
+        return bool in (types if isinstance(types, tuple) else (types,))
+    return isinstance(value, types)
+
+
 def check_keys(obj, required, optional, label, failures, line=""):
     loc = f"line {line}: " if line else ""
     for k in obj:
@@ -121,11 +130,11 @@ def check_keys(obj, required, optional, label, failures, line=""):
     for k, t in required.items():
         if k not in obj:
             fail(f"{loc}{label}: missing required key {k!r}", failures)
-        elif not isinstance(obj[k], t):
+        elif not _type_ok(obj[k], t):
             fail(f"{loc}{label}: key {k!r} has wrong type "
                  f"{type(obj[k]).__name__}", failures)
     for k, t in optional.items():
-        if k in obj and not isinstance(obj[k], t):
+        if k in obj and not _type_ok(obj[k], t):
             fail(f"{loc}{label}: key {k!r} has wrong type "
                  f"{type(obj[k]).__name__}", failures)
 
@@ -195,7 +204,7 @@ def verify_manifest(args, failures):
             fail(f"artifact sha256 {actual} != manifest-declared {declared}",
                  failures)
         else:
-            ok(f"artifact sha256 == manifest claim ({actual[:12]}…)")
+            ok(f"artifact sha256 == manifest claim ({actual})")
 
     # External expectation for the artifact when supplied.
     if args.artifact_sha256 and os.path.isfile(artifact):
@@ -228,6 +237,18 @@ def verify_manifest(args, failures):
     inv = m.get("test_inventory_sha256", "").lower()
     if not RE_HEX64.match(inv):
         fail(f"manifest: test_inventory_sha256 malformed: {inv!r}", failures)
+    elif args.inventory:
+        # Bind the manifest to the actual inventory bytes — a declared
+        # digest is a claim, not evidence.
+        if not os.path.isfile(args.inventory):
+            fail(f"inventory: {args.inventory} not found", failures)
+        else:
+            actual_inv = sha256_file(args.inventory)
+            if actual_inv != inv:
+                fail(f"inventory sha256 {actual_inv} != manifest-declared "
+                     f"{inv}", failures)
+            else:
+                ok(f"test inventory sha256 == manifest claim ({actual_inv})")
     if m.get("qualification", "").upper().startswith("QUALIFIED"):
         if not args.trust_store:
             fail("manifest: QUALIFIED claim without signature verification",
@@ -270,6 +291,21 @@ def verify_evidence(args, failures):
     inventory_sha = sha256_file(args.inventory)
 
     required = set(args.require_test or [])
+    # --require-gate pulls the required case set from the inventory's
+    # own gate declaration — the tool binds evidence to the gate the
+    # inventory defines, not to a caller-picked subset.
+    for gate in args.require_gate or []:
+        entry = inv["gates"].get(gate)
+        if not isinstance(entry, dict):
+            fail(f"inventory: no such gate {gate!r}", failures)
+            continue
+        tests = entry.get("required_tests")
+        if not isinstance(tests, list) or not all(
+                isinstance(t, str) for t in tests):
+            fail(f"inventory: gate {gate!r} required_tests malformed",
+                 failures)
+            continue
+        required.update(tests)
     seen = {}
     bound = 0
     for n, raw in enumerate(open(args.evidence, encoding="utf-8"), 1):
@@ -337,7 +373,7 @@ def verify_evidence(args, failures):
         fail("evidence records deployments other than expected "
              f"{args.deployment!r} — replayed evidence", failures)
     ok(f"evidence: {bound} bound records, inventory sha256 "
-       f"{inventory_sha[:12]}…")
+       f"{inventory_sha}")
 
 
 def _deployments(path):
@@ -357,7 +393,7 @@ def verify_artifact(args, failures):
         return
     got = sha256_file(args.artifact)
     if got == args.artifact_sha256.lower():
-        ok(f"artifact-sha256 {got[:12]}…")
+        ok(f"artifact-sha256 {got}")
     else:
         fail(f"artifact sha256 {got} != expected {args.artifact_sha256}",
              failures)
@@ -378,6 +414,7 @@ def main():
     p.add_argument("--require-signature", action="store_true")
     p.add_argument("--require-lane")
     p.add_argument("--require-test", action="append")
+    p.add_argument("--require-gate", action="append")
     p.add_argument("--require-signer", action="store_true")
     p.add_argument("--deployment")
     args = p.parse_args()

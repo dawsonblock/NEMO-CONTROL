@@ -23,11 +23,11 @@ func testSigner(t *testing.T) *evidence.Signer {
 }
 
 func rootsOf(signers ...*evidence.Signer) TrustRoots {
-	r := TrustRoots{}
+	fps := make([]string, 0, len(signers))
 	for _, s := range signers {
-		r[s.Fingerprint()] = true
+		fps = append(fps, s.Fingerprint())
 	}
-	return r
+	return AnyRoots(fps...)
 }
 
 type fixture struct {
@@ -514,14 +514,91 @@ func TestKeyRotationEpochAdvance(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Retired key can no longer relax.
-	r2 := l2.NewEvent(KindRevoke, "dep", "old key tighten is fine unsigned anyway")
-	_ = r2
 	oldResume := l2.NewEvent(KindResume, "dep", "old key resume")
 	oldResume.Epoch = 1
 	if err := SignEvent(oldKey, &oldResume); err != nil {
 		t.Fatal(err)
 	}
 	mustDeny(t, l2.Append(oldResume))
+}
+
+// TestEpochScopedRootsSurviveRotation: a key scoped to epoch 0 keeps
+// its historical events verifiable after rotation to epoch-1 roots —
+// rotation adds a generation instead of freezing the ledger.
+func TestEpochScopedRootsSurviveRotation(t *testing.T) {
+	dir := t.TempDir()
+	path, ckpt := filepath.Join(dir, "c.jsonl"), filepath.Join(dir, "k.json")
+	oldKey, newKey := testSigner(t), testSigner(t)
+
+	l, err := Create(path, ckpt, NewVerifier(rootsOf(oldKey), false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := l.NewEvent(KindHalt, "dep", "halt")
+	if err := l.Append(e); err != nil {
+		t.Fatal(err)
+	}
+	r := l.NewEvent(KindResume, "dep", "signed resume under epoch 0")
+	if err := SignEvent(oldKey, &r); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Append(r); err != nil {
+		t.Fatal(err)
+	}
+
+	// Rotate: old key stays trusted ONLY at epoch 0, new key at epoch 1.
+	scoped := TrustRoots{
+		anyEpoch: map[string]bool{},
+		byEpoch: map[uint64]map[string]bool{
+			0: {oldKey.Fingerprint(): true},
+			1: {newKey.Fingerprint(): true},
+		},
+	}
+	l2, err := Open(path, ckpt, NewVerifier(scoped, false))
+	if err != nil {
+		t.Fatalf("epoch-scoped roots must preserve history: %v", err)
+	}
+	r3 := l2.NewEvent(KindUnrevoke, "dep", "unrevoke under new key")
+	r3.Epoch = 1
+	if err := SignEvent(newKey, &r3); err != nil {
+		t.Fatal(err)
+	}
+	if err := l2.Append(r3); err != nil {
+		t.Fatalf("new-epoch signer must relax: %v", err)
+	}
+
+	// The retired key may NOT sign epoch-1 relaxations even though its
+	// epoch-0 events still verify.
+	old := l2.NewEvent(KindResume, "dep", "retired key at wrong epoch")
+	old.Epoch = 1
+	if err := SignEvent(oldKey, &old); err != nil {
+		t.Fatal(err)
+	}
+	mustDeny(t, l2.Append(old))
+}
+
+// TestLoadTrustRootsEpochScoped: file format accepts bare fingerprints
+// (any epoch) and <epoch>:<fingerprint> scoped entries.
+func TestLoadTrustRootsEpochScoped(t *testing.T) {
+	dir := t.TempDir()
+	fp1, fp2 := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	p := filepath.Join(dir, "roots.txt")
+	os.WriteFile(p, []byte("# comment\n"+fp1+"\n3:"+fp2+"\n\n"), 0o600)
+	roots, err := LoadTrustRoots(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !roots.trusted(fp1, 9) || !roots.trusted(fp2, 3) {
+		t.Fatal("scoped roots not trusted where expected")
+	}
+	if roots.trusted(fp2, 0) || roots.count() != 2 {
+		t.Fatalf("scoped root leaked across epochs: %+v", roots)
+	}
+	// Malformed epoch prefix fails.
+	os.WriteFile(p, []byte("x:"+fp1+"\n"), 0o600)
+	if _, err := LoadTrustRoots(p); err == nil {
+		t.Fatal("malformed epoch-scoped entry must fail")
+	}
 }
 
 // TestUnsignedHaltAlwaysApplies: emergency tightening needs no key and
@@ -607,4 +684,112 @@ func TestStageTransitionSigned(t *testing.T) {
 	if st.StageLevel != 0 || st.StagedRelease != "" {
 		t.Fatalf("stage-clear failed: %+v", st)
 	}
+}
+
+// ─── Review-repair fixtures ─────────────────────────────────────────
+
+// TestPrevStateHashVerified: an event claiming a deployment state the
+// chain never produced is forged — denied at append and at open.
+func TestPrevStateHashVerified(t *testing.T) {
+	f := newFixture(t)
+	l := f.open(t)
+	f.unsigned(t, l, KindHalt, "dep")
+
+	e := l.NewEvent(KindHalt, "dep", "wrong state claim")
+	e.PrevStateHash = strings.Repeat("0", 64)
+	mustDeny(t, l.Append(e))
+
+	// A record whose prev_state_hash was tampered post-hoc fails open.
+	f.signed(t, l, KindResume, "dep")
+	data, _ := os.ReadFile(f.path)
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	var rec map[string]any
+	json.Unmarshal([]byte(lines[1]), &rec)
+	rec["prev_state_hash"] = strings.Repeat("1", 64)
+	forged, _ := json.Marshal(rec)
+	os.WriteFile(f.path, []byte(lines[0]+"\n"+string(forged)+"\n"), 0o600)
+	if _, err := Open(f.path, f.ckpt, NewVerifier(f.roots, false)); err == nil {
+		t.Fatal("tampered prev_state_hash must fail closed on open")
+	}
+}
+
+// TestOversizedAppendDenied: a record larger than the open-time limit
+// must be refused before it lands — otherwise it is durable but
+// unverifiable and freezes the ledger permanently.
+func TestOversizedAppendDenied(t *testing.T) {
+	f := newFixture(t)
+	l := f.open(t)
+	e := l.NewEvent(KindHalt, "dep", strings.Repeat("x", maxEventRecordSize))
+	if err := l.Append(e); err == nil {
+		t.Fatal("oversized record must be denied at append")
+	}
+	// The store remains openable — nothing unverifiable was written.
+	if _, err := Open(f.path, f.ckpt, NewVerifier(f.roots, false)); err != nil {
+		t.Fatalf("ledger must still open after denied append: %v", err)
+	}
+}
+
+// TestCheckpointEpochAheadRejected: a checkpoint claiming a trust
+// generation the chain never accepted is a conflict, not coverage.
+func TestCheckpointEpochAheadRejected(t *testing.T) {
+	f := newFixture(t)
+	l := f.open(t)
+	f.unsigned(t, l, KindHalt, "dep")
+	mustWriteCkpt(t, f.ckpt, Checkpoint{
+		Sequence: 1, HeadHash: EventHash(l.events[0]), Epoch: 99,
+	})
+	if _, err := Open(f.path, f.ckpt, NewVerifier(f.roots, false)); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("checkpoint epoch ahead of ledger must fail closed, got %v", err)
+	}
+}
+
+// TestCheckpointTrailingDataRejected: bytes after the checkpoint JSON
+// value corrupt the record.
+func TestCheckpointTrailingDataRejected(t *testing.T) {
+	f := newFixture(t)
+	l := f.open(t)
+	f.unsigned(t, l, KindHalt, "dep")
+	data, _ := os.ReadFile(f.ckpt)
+	os.WriteFile(f.ckpt, append(data, []byte(`{"extra":true}`)...), 0o600)
+	if _, err := Open(f.path, f.ckpt, NewVerifier(f.roots, false)); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("trailing checkpoint data must fail closed, got %v", err)
+	}
+}
+
+// TestConcurrentAppendSerialized: the lockfile refuses a second writer
+// while one holds it — racing appends would corrupt the chain.
+func TestConcurrentAppendSerialized(t *testing.T) {
+	f := newFixture(t)
+	l := f.open(t)
+	// Simulate a held lock.
+	lock := f.path + ".lock"
+	lf, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lf.Close()
+	defer os.Remove(lock)
+	e := l.NewEvent(KindHalt, "dep", "locked")
+	if err := l.Append(e); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("locked ledger must refuse append, got %v", err)
+	}
+	// After release the same event lands.
+	os.Remove(lock)
+	if err := l.Append(e); err != nil {
+		t.Fatalf("append after lock release must succeed: %v", err)
+	}
+}
+
+// TestEvidenceRefSeparatorRejected: a \x1f inside an evidence ref would
+// collide distinct ref lists under one signature preimage.
+func TestEvidenceRefSeparatorRejected(t *testing.T) {
+	f := newFixture(t)
+	l := f.open(t)
+	e := l.NewEvent(KindStage, "dep", "separator ref")
+	e.Stage = 1
+	e.EvidenceRefs = []string{"sha256:" + strings.Repeat("c", 60) + "\x1fevil"}
+	if err := SignEvent(f.op, &e); err != nil {
+		t.Fatal(err)
+	}
+	mustDeny(t, l.Append(e))
 }
