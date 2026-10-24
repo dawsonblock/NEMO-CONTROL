@@ -181,17 +181,72 @@ func (g *Graph) EvalRetrieval(cases []*RetrievalCase) (precision, recall float64
 	return precision, recall, violations
 }
 
-// Trusted filters the graph to nodes carrying no adverse verdict —
-// VERIFIED, or never assessed (""). Nodes the assessment layer
-// actively could not establish — REJECTED, CONFLICTED, STALE,
-// UNVERIFIED — are excluded: they are not deleted from the graph,
-// they are not offered to the learner.
+// IsTrustedObservation is the single trust predicate every learning
+// path must pass through: true only when the node carries an
+// affirmative VERIFIED verdict produced by a named verifier under the
+// trust policy this graph was reconstructed with. Every other value —
+// unassessed (""), UNVERIFIED, REJECTED, CONFLICTED, STALE, or any
+// unknown label — is untrusted. Blank and unknown values normalize to
+// UNVERIFIED, never to VERIFIED: a graph built with an empty trust
+// policy admits nothing, so a deployment that never pins a trust root
+// fails closed rather than trusting all memory by default.
+func IsTrustedObservation(n *Node) bool {
+	return n != nil && n.Trust == history.AssessmentVerified
+}
+
+// NormalizedTrust renders a node's trust as an assessment vocabulary
+// value: "" (never assessed) and every unrecognized label normalize
+// to UNVERIFIED. Use it at export/diagnostic boundaries; internally
+// "" stays the honest absence marker.
+func NormalizedTrust(n *Node) string {
+	if n == nil {
+		return history.AssessmentUnverified
+	}
+	switch n.Trust {
+	case history.AssessmentVerified, history.AssessmentRejected,
+		history.AssessmentUnverified, history.AssessmentConflicted,
+		history.AssessmentStale:
+		return n.Trust
+	default:
+		return history.AssessmentUnverified
+	}
+}
+
+// Trusted filters the graph to the nodes a learner may consume: only
+// nodes with an affirmative VERIFIED verdict under the reconstruct-time
+// policy, and never a node a later observation has superseded — stale
+// memory is quarantined even when its verdict once read clean.
+// Untrusted and superseded nodes are not deleted from the graph; they
+// are not offered to trusted retrieval, training, replay, or
+// promotion. Quarantined() exposes them for diagnosis.
 func (g *Graph) Trusted() *Graph {
 	out := &Graph{Nodes: map[string]*Node{}}
 	for id, n := range g.Nodes {
-		switch n.Trust {
-		case history.AssessmentRejected, history.AssessmentConflicted,
-			history.AssessmentStale, history.AssessmentUnverified:
+		if !IsTrustedObservation(n) || g.Superseded(id) {
+			continue
+		}
+		out.Nodes[id] = n
+	}
+	for _, e := range g.Edges {
+		if _, ok := out.Nodes[e.From]; !ok {
+			continue
+		}
+		if _, ok := out.Nodes[e.To]; !ok {
+			continue
+		}
+		out.Edges = append(out.Edges, e)
+	}
+	return out
+}
+
+// Quarantined is the diagnostic complement of Trusted(): every node
+// the learner may not consume — unassessed, adversely assessed, or
+// superseded — kept searchable so operators can explain what the
+// memory holds without granting it influence.
+func (g *Graph) Quarantined() *Graph {
+	out := &Graph{Nodes: map[string]*Node{}}
+	for id, n := range g.Nodes {
+		if IsTrustedObservation(n) && !g.Superseded(id) {
 			continue
 		}
 		out.Nodes[id] = n

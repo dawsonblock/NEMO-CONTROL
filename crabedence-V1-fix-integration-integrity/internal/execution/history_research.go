@@ -39,13 +39,23 @@ type HistoryAdapter struct {
 	store      *history.Store
 	witnessKey string
 	contentDir string
+	// trustSHA is the digest of the deployment's trusted-evidence-
+	// signer set — the trust policy every governed memory read
+	// evaluates nodes under. With no pinned signers the digest still
+	// exists but nothing verifies under it: unassessed and
+	// signer-dependent records stay untrusted, never trusted by
+	// default.
+	trustSHA string
 }
 
 // NewHistoryAdapter opens the configured store for the governed
 // surface. witnessKey, when set, enables history.checkpoint — the
 // witness is a key outside the store's administrative control.
 // contentDir defaults to the store's sibling object dir.
-func NewHistoryAdapter(dbPath, witnessKey, contentDir string) (*HistoryAdapter, error) {
+// trustedSigners is the deployment's pinned evidence-signer
+// fingerprint set (CRABBOX_EVIDENCE_TRUSTED_SIGNERS); the adaptive
+// reads diagnose/propose only over memory VERIFIED under it.
+func NewHistoryAdapter(dbPath, witnessKey, contentDir string, trustedSigners map[string]bool) (*HistoryAdapter, error) {
 	s, err := history.OpenStore(dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("history adapter open %s: %w", dbPath, err)
@@ -53,7 +63,12 @@ func NewHistoryAdapter(dbPath, witnessKey, contentDir string) (*HistoryAdapter, 
 	if contentDir == "" {
 		contentDir = dbPath + ".content"
 	}
-	return &HistoryAdapter{store: s, witnessKey: witnessKey, contentDir: contentDir}, nil
+	return &HistoryAdapter{
+		store:      s,
+		witnessKey: witnessKey,
+		contentDir: contentDir,
+		trustSHA:   history.TrustSetSHA256(trustedSigners),
+	}, nil
 }
 
 // Close releases the store handle.
@@ -157,7 +172,7 @@ func (a *HistoryAdapter) doExplain(args json.RawMessage) (json.RawMessage, error
 	if err := json.Unmarshal(args, &q); err != nil || q.Node == "" {
 		return nil, fmt.Errorf("history.explain requires node")
 	}
-	g, err := experience.Reconstruct(a.store, "")
+	g, err := experience.Reconstruct(a.store, a.trustSHA)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +186,7 @@ func (a *HistoryAdapter) doExplain(args json.RawMessage) (json.RawMessage, error
 // doDiagnose returns the failure signatures the experience holds —
 // the governed way an agent asks "what keeps breaking".
 func (a *HistoryAdapter) doDiagnose() (json.RawMessage, error) {
-	g, err := experience.Reconstruct(a.store, "")
+	g, err := experience.Reconstruct(a.store, a.trustSHA)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +213,7 @@ func (a *HistoryAdapter) doPropose(args json.RawMessage) (json.RawMessage, error
 	if err := q.Envelope.Validate(); err != nil {
 		return nil, fmt.Errorf("envelope invalid: %w", err)
 	}
-	g, err := experience.Reconstruct(a.store, "")
+	g, err := experience.Reconstruct(a.store, a.trustSHA)
 	if err != nil {
 		return nil, err
 	}

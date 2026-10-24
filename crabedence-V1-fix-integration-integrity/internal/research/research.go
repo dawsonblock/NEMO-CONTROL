@@ -29,9 +29,14 @@ type Signature struct {
 	FirstSeq   int64    `json:"first_seq"`
 	LastSeq    int64    `json:"last_seq"`
 	Resolved   bool     `json:"resolved"`   // a later pass/outcome resolves the latest failure
-	Trusted    bool     `json:"trusted"`    // the latest failure node carries no adverse verdict
+	Trusted    bool     `json:"trusted"`    // EVERY contributing problem node carries a VERIFIED verdict
 	Candidates []string `json:"candidates"` // candidate_cause intervention IDs
 	Problems   []string `json:"problems"`   // problem node IDs, chain order
+	// UntrustedProblems names the contributing nodes that are not
+	// VERIFIED — unassessed, UNVERIFIED, adverse, or superseded.
+	// Trust is all-evidence-verified, never latest-only: one clean
+	// node cannot launder a mixed-trust history.
+	UntrustedProblems []string `json:"untrusted_problems,omitempty"`
 }
 
 // Diagnose groups problem nodes into failure signatures: the same
@@ -43,13 +48,25 @@ func Diagnose(g *experience.Graph) []*Signature {
 	for _, n := range g.Problems() {
 		sig := bySubject[n.Subject]
 		if sig == nil {
-			sig = &Signature{Subject: n.Subject, FirstSeq: n.Seq}
+			sig = &Signature{Subject: n.Subject, FirstSeq: n.Seq, Trusted: true}
 			bySubject[n.Subject] = sig
 		}
 		sig.Count++
 		sig.LastSeq = n.Seq
 		sig.Problems = append(sig.Problems, n.ID)
-		sig.Trusted = n.Trust == "" || n.Trust == "VERIFIED"
+		// All-evidence-verified: a signature is trusted only when
+		// every contributing problem carries a VERIFIED verdict. An
+		// unassessed ("") node is untrusted — memory the store never
+		// vouched for cannot drive an experiment on authority it
+		// cannot prove. Supersession is not applied here: a signature
+		// inherently spans time, and each problem attests a timeless
+		// fact ("this subject failed at seq N") that a later failure
+		// does not falsify — supersession gates the retrieval and
+		// task-set views, where acting on stale state is the hazard.
+		if !experience.IsTrustedObservation(n) {
+			sig.Trusted = false
+			sig.UntrustedProblems = append(sig.UntrustedProblems, n.ID)
+		}
 	}
 	var out []*Signature
 	for _, sig := range bySubject {
@@ -118,9 +135,10 @@ const (
 // the declared envelope:
 //
 //   - resolved signature → resolved (record only).
-//   - untrusted latest failure → escalate? No — untrusted memory
-//     must not drive experiments on authority it can't prove:
-//     decide "untrusted", requiring new verification first.
+//   - not-fully-verified signature → escalate? No — memory that is
+//     not all-evidence-verified must not drive experiments on
+//     authority it can't prove: decide "untrusted", requiring new
+//     verification first.
 //   - an arm the model estimates positively that history has not
 //     already tried for this task family → experiment.
 //   - every arm tried or the fit is too thin → escalate: the
@@ -146,7 +164,7 @@ func Plan(g *experience.Graph, env *dream.Envelope, fit Estimator, task dream.Ta
 			p.Reason = "a later outcome resolves the latest failure"
 		case !sig.Trusted:
 			p.Decision = decideUntrusted
-			p.Reason = "the failure record carries an adverse verdict — verify the memory before intervening"
+			p.Reason = "the failure record is not fully verified — verify the memory before intervening"
 		default:
 			arm := chooseArm(env, fit, task, triedArms)
 			if arm < 0 {

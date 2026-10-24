@@ -170,6 +170,23 @@ So re-ingesting a receipt with a newly trusted signer mints a new
 previously rejected record can never become trusted without a new
 assessment explicitly saying so.
 
+**Trusted consumption.** The experience graph labels every node with
+its effective verdict; `experience.IsTrustedObservation` is the single
+predicate every learning path must pass through: only an affirmative
+`VERIFIED` verdict under the reconstruct-time policy qualifies.
+Unassessed (`""`), `UNVERIFIED`, `REJECTED`, `CONFLICTED`, `STALE`,
+superseded, and unrecognized values are all untrusted — the graph's
+`Trusted()` and `Quarantined()` views partition on exactly that, so
+excluded memory stays searchable for diagnosis without influencing
+the learner. Failure signatures are trusted only when **every**
+contributing problem node verifies (all-evidence-verified): one clean
+node can never launder a mixed-trust history, and the signature keeps
+the untrusted contributors' IDs as provenance. Because verdicts are
+bound to rules version and trust-set digest, re-deriving under a
+different policy cannot inherit another policy's `VERIFIED`, and
+records ingested before assessments existed stay untrusted until a
+verifier explicitly re-assesses them — there is no bulk promotion.
+
 ## The model
 
 `dream` learns which resource envelope a task family needs:
