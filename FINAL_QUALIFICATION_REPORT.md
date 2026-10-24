@@ -10,11 +10,11 @@ never PASS. Status vocabulary is defined in `PROVENANCE.md`.
   - `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957`
   - 1438 files, 10 symlinks (provenance format 2)
 - Canonical runtime: `runtimes/nemo-relay`
-  - `e1279ef20acc448ac52a6ac2332c81f71e278b2bf71579160ffc953d0f9567a0`
-  - 1466 files, 10 symlinks, version `0.9.1-rc.4`, format 2
+  - `905fb5476c556aaa1d2815929249d9c81ffb2c76de6bcf5bae9407ba7495756d`
+  - 1467 files, 10 symlinks, version `0.9.1-rc.4`, format 2
 - Provenance policy: `runtimes/nemo-provenance-policy.json`
   - `0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1`
-- Declared source→runtime delta: 78 modified, 29 added, 1 removed file
+- Declared source→runtime delta: 78 modified, 30 added, 1 removed file
   (10 declared added entries); 0 link/retype/mode changes — all declared
   in `runtimes/nemo-transfer-manifest.json`
 - Installed distribution (tested root):
@@ -47,10 +47,10 @@ not change this cycle; everything else is `NOT_RUN` and named.
 |---|---|---|
 | Frozen source identity | v2 digest of `NEMO-feat-native-plugin-isolation` | PASS (rerun) |
 | Runtime identity | `nemo-runtime-digest -manifest` (v2: files + symlinks + exec bits, generated paths excluded) | PASS (rerun) |
-| Source→runtime delta | every delta class declared; undeclared change fails | PASS (rerun: 78 modified, 29 added, 1 removed — all declared) |
+| Source→runtime delta | every delta class declared; undeclared change fails | PASS (rerun: 78 modified, 30 added, 1 removed — all declared) |
 | Require-source qualification | `--require-source` fails closed when frozen source absent | PASS (rerun, adversarial: absent declared source → hard failure, exit 1) |
 | Regeneration idempotency | `nemo-runtime-digest -manifest … -update` twice → zero diff | PASS (rerun) |
-| Cross-language parity | Go `nemo-runtime-digest` vs Python `verify-nemo-transfer.py`, identical digests + record stream | PASS (rerun: both print `e1279ef2…`, 1466 files, 10 symlinks) |
+| Cross-language parity | Go `nemo-runtime-digest` vs Python `verify-nemo-transfer.py`, identical digests + record stream | PASS (rerun: both print `905fb547…`, 1467 files, 10 symlinks) |
 | Generated-file exclusion | protobuf pb2 paths bound by policy `generated_paths`; tree identity stable with/without them | PASS (carried; policy hash unchanged, digest battery covers it) |
 | Golden fixture | fixed-tree v2 digest vector in `main_test.go`, agreed by both implementations | PASS (rerun: `go test ./cmd/nemo-runtime-digest`) |
 | Doc-drift gate | `scripts/check-provenance-docs.sh` — PROVENANCE.md / README / this report must match the manifest, declared **and** expanded delta counts | PASS (rerun — gate repaired this cycle: it previously computed added/removed counts but never checked them) |
@@ -153,8 +153,14 @@ not change this cycle; everything else is `NOT_RUN` and named.
 **Locally qualified for the executed gate set on `darwin_arm64`**: the
 provenance chain, source-packaging verification, installed-artifact
 qualification, and every rerun test lane pass on the exact artifact
-described by the evidence above — identity `e1279ef2…`, not the
-superseded `060719d7…`.
+described by the evidence above — identity `905fb547…`, not the
+superseded `060719d7…`. The executed lanes ran against the prior
+identity `e1279ef2…` (1466 files); the tree has since advanced by one
+declared addition (`bridges/nemo-crabedence/examples/abi_verdict.rs` —
+a differential-test binary, not on any runtime or dispatch path), and
+the identity-binding gates — manifest regeneration, delta declaration,
+and this docs gate — re-pass on `905fb547…`. Full-lane requalification
+on the new identity remains a clean-room run item below.
 
 **Not SIGNED, not PUBLISHED** — and the standalone-checkout-bound
 `internal/cli` subset plus a real clean-room run on the packaged
