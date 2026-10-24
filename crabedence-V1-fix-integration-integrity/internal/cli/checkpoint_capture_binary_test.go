@@ -688,10 +688,22 @@ func newCheckpointCaptureFixture(t *testing.T, repo, binary string) *checkpointC
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The claim binds the repository root the built binary resolves from the
+	// fixture working directory. In a standalone checkout that is repo itself;
+	// in umbrella distributions where this tree has no .git of its own (the
+	// NEMO-CONTROL packaging), git discovery resolves the enclosing worktree
+	// root — seeding the unmodified repo path there would trip the
+	// cross-repository binding guard before the scenario under test runs.
+	claimRepo := repo
+	if out, err := exec.Command("git", "-C", repo, "rev-parse", "--show-toplevel").Output(); err == nil {
+		if resolved, rerr := filepath.EvalSymlinks(strings.TrimSpace(string(out))); rerr == nil && resolved != "" {
+			claimRepo = resolved
+		}
+	}
 	claim := leaseClaim{
 		LeaseID: captureFixtureLease, Revision: "fixture-generation-1", Slug: "proof-owned",
 		Provider: FixedMachine0ClaimProvider, CloudID: captureFixtureSource, CloudImmutableID: captureFixtureSource, ProviderScope: "machine0:" + captureFixtureSource,
-		RepoRoot: repo, ClaimedAt: "2026-01-01T00:00:00Z", LastUsedAt: "2026-01-01T00:00:00Z", TargetOS: "linux",
+		RepoRoot: claimRepo, ClaimedAt: "2026-01-01T00:00:00Z", LastUsedAt: "2026-01-01T00:00:00Z", TargetOS: "linux",
 		Labels:            map[string]string{"machine0_name": name, "machine0_id": captureFixtureSource, "region": "eu", "lease": captureFixtureLease, "slug": "proof-owned"},
 		FixedCreateIntent: &FixedCreateIntent{Version: 1, Fingerprint: fingerprint, ProviderScope: "machine0:name:" + name, Slug: "proof-owned", CreatedAt: time.Now().UTC().Format(time.RFC3339Nano), State: "acquired", Attempt: map[string]string{"machine0": string(attempt)}},
 	}

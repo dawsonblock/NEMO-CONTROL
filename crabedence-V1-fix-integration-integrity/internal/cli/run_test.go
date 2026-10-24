@@ -812,15 +812,19 @@ func setupRunClaimSnapshotTest(t *testing.T) (LeaseTarget, leaseClaim) {
 	clearConfigEnv(t)
 	dir := t.TempDir()
 	isolateRunTestUserDirs(t, dir)
+	// Resolve the repository before installRecordingSSH narrows PATH to the
+	// fixture dir: with git unreachable, findRepo falls back to the process
+	// working directory — which differs from the git toplevel when this tree
+	// is checked out as a subdirectory of an umbrella repo (NEMO-CONTROL).
+	repo, err := findRepo()
+	if err != nil {
+		t.Fatal(err)
+	}
 	installRecordingSSH(t, dir)
 	t.Setenv("CRABBOX_CONFIG", filepath.Join(dir, "missing.yaml"))
 	t.Setenv("CRABBOX_FAKE_SSH_PORT", "22")
 	t.Setenv("CRABBOX_FAKE_SSH_PROXY", "1")
 
-	repo, err := findRepo()
-	if err != nil {
-		t.Fatal(err)
-	}
 	cfg := baseConfig()
 	cfg.Provider = runEnvProfileTestProvider{}.Name()
 	lease := LeaseTarget{
@@ -5222,6 +5226,47 @@ exit 0
 	t.Setenv("CRABBOX_FAKE_SSH_LOG", logPath)
 	t.Setenv("CRABBOX_FAKE_SSH_PORT", "22")
 	t.Setenv("CRABBOX_FAKE_SSH_PROXY", "1")
+
+	// Local Actions hydration resolves actions.workflow relative to the
+	// repository root. In the umbrella NEMO-CONTROL distribution this tree is
+	// a subdirectory without its own .github/workflows/hydrate.yml, so run
+	// from a dedicated fixture repo that owns the workflow file.
+	repoDir := filepath.Join(dir, "repo")
+	workflowPath := filepath.Join(repoDir, ".github", "workflows", "hydrate.yml")
+	if err := os.MkdirAll(filepath.Dir(workflowPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(workflowPath, []byte(`name: Hydrate
+on:
+  workflow_dispatch:
+    inputs:
+      crabbox_id:
+        required: true
+      crabbox_runner_label:
+        required: true
+      crabbox_keep_alive_minutes:
+        required: true
+jobs:
+  hydrate:
+    steps:
+      - run: echo prepared-snapshot
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"config", "user.email", "test@example.com"},
+		{"config", "user.name", "Crabbox Test"},
+		{"add", "."},
+		{"commit", "-qm", "fixture"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repoDir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	t.Chdir(repoDir)
 
 	var stdout, stderr bytes.Buffer
 	err := (App{Stdout: &stdout, Stderr: &stderr}).runCommand(context.Background(), []string{
