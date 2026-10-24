@@ -135,7 +135,7 @@ func newTestHistoryAdapter(t *testing.T) (*HistoryAdapter, *history.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := NewHistoryAdapter(db, "", "")
+	a, err := NewHistoryAdapter(db, "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func TestHistoryAdapterCheckpointRoundTrip(t *testing.T) {
 	if _, err := evidence.LoadOrCreateSigner(witnessPath); err != nil {
 		t.Fatal(err)
 	}
-	a, err := NewHistoryAdapter(db, witnessPath, "")
+	a, err := NewHistoryAdapter(db, witnessPath, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

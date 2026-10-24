@@ -299,7 +299,11 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	// deployment choice that fails CAPABILITY_UNAVAILABLE at dispatch.
 	var historyAdapter *HistoryAdapter
 	if cfg.HistoryDB != "" {
-		historyAdapter, err = NewHistoryAdapter(cfg.HistoryDB, cfg.HistoryWitnessKey, cfg.HistoryContentDir)
+		trustedSigners := map[string]bool{}
+		for _, fp := range cfg.EvidenceTrustedSigners {
+			trustedSigners[fp] = true
+		}
+		historyAdapter, err = NewHistoryAdapter(cfg.HistoryDB, cfg.HistoryWitnessKey, cfg.HistoryContentDir, trustedSigners)
 		if err != nil {
 			return fmt.Errorf("history adapter: %w", err)
 		}

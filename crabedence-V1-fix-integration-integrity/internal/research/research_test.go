@@ -74,19 +74,40 @@ func TestDiagnoseGroupsAndRanks(t *testing.T) {
 	}
 }
 
-// Plan: unresolved trusted signature + an untried arm → experiment;
-// all arms tried → escalate; adverse verdict → untrusted.
+// Plan: unresolved fully-verified signature + an untried arm →
+// experiment; all arms tried → escalate; unassessed or adverse
+// verdict → untrusted. Blank trust never drives an experiment.
 func TestPlanDecisions(t *testing.T) {
 	s := openStore(t)
 	appendEvent(t, s, "t:r1:F", "test_result", "pkg/F", 100, map[string]any{"status": "fail"})
+	env := testEnvelope(t)
+	task := dream.Task{ID: "fam-1", Features: map[string]string{"image": "img"}}
+
+	// Unassessed memory: the signature exists but cannot justify an
+	// experiment — verify first.
 	g, err := experience.Reconstruct(s, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := testEnvelope(t)
-	task := dream.Task{ID: "fam-1", Features: map[string]string{"image": "img"}}
+	ps := Plan(g, env, nil, task, map[int]bool{})
+	if len(ps) != 1 || ps[0].Decision != decideUntrusted {
+		t.Fatalf("unassessed memory should decide untrusted, got %+v", ps)
+	}
 
-	ps := Plan(g, env, nil, task, map[int]bool{0: true})
+	// Verify the record under a pinned trust set — now the untried
+	// arm is a legitimate proposal.
+	trustSHA := history.TrustSetSHA256(map[string]bool{"fp": true})
+	if err := s.RecordAssessment(&history.Assessment{
+		SubjectKey: "t:r1:F", Verifier: "v", RulesVersion: "observation-v1",
+		TrustSetSHA: trustSHA, InputSHA: "in", Result: history.AssessmentVerified,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	g, err = experience.Reconstruct(s, trustSHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps = Plan(g, env, nil, task, map[int]bool{0: true})
 	if len(ps) != 1 || ps[0].Decision != decideExperiment {
 		t.Fatalf("expected experiment proposal, got %+v", ps)
 	}

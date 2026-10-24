@@ -76,9 +76,16 @@ type Node struct {
 	At        int64  `json:"at"`
 	// Trust is the assessment the store currently reports for the
 	// observation: VERIFIED/REJECTED/UNVERIFIED/CONFLICTED/STALE.
+	// An empty value is honest absence — never assessed under the
+	// policy this graph was built with — and IsTrustedObservation
+	// treats it as untrusted, never as VERIFIED.
 	// Consumers that need provenance-verified memory filter on it;
 	// the graph does not silently hide untrusted nodes — it labels.
 	Trust string `json:"trust"`
+	// Verifier is the identity that produced the recorded verdict —
+	// the provenance a consumer needs to re-derive trust. Empty when
+	// the node was never assessed under this policy.
+	Verifier string `json:"verifier,omitempty"`
 	// Paths are the file references the event commits to — the
 	// structural link between reasoning (statements) and code
 	// (interventions).
@@ -135,6 +142,7 @@ func Reconstruct(s *history.Store, trustSetSHA string) (*Graph, error) {
 				// a real UNVERIFIED verdict a verifier produced.
 				if eff.Verifier != "" || eff.Result != history.AssessmentUnverified {
 					n.Trust = eff.Result
+					n.Verifier = eff.Verifier
 				}
 			}
 		}

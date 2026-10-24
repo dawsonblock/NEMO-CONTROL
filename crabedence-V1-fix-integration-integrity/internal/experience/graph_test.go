@@ -183,16 +183,24 @@ func TestEvalRetrieval(t *testing.T) {
 	}
 }
 
-// Trusted() excludes adversely-assessed nodes — the learner never
-// sees what the assessment layer could not establish.
+// Trusted() admits only VERIFIED nodes — adverse verdicts, unassessed
+// records, and superseded observations all stay quarantined. The
+// learner never sees what the assessment layer could not establish.
 func TestTrustedFiltersAdverseVerdicts(t *testing.T) {
 	s := openStore(t)
-	e := appendEvent(t, s, "r:bad", "receipt", "exec-1", "", 100, map[string]any{"outcome": "completed"})
+	bad := appendEvent(t, s, "r:bad", "receipt", "exec-1", "", 100, map[string]any{"outcome": "completed"})
+	good := appendEvent(t, s, "r:good", "receipt", "exec-2", "", 100, map[string]any{"outcome": "completed"})
 	appendEvent(t, s, "t:r:P", "test_result", "pkg/P", "r", 100, map[string]any{"status": "pass"})
 	trustSHA := history.TrustSetSHA256(map[string]bool{"fp": true})
 	if err := s.RecordAssessment(&history.Assessment{
-		SubjectKey: e.DedupeKey, Verifier: "v", RulesVersion: "receipt-v1",
+		SubjectKey: bad.DedupeKey, Verifier: "v", RulesVersion: "receipt-v1",
 		TrustSetSHA: trustSHA, InputSHA: "in", Result: history.AssessmentRejected,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RecordAssessment(&history.Assessment{
+		SubjectKey: good.DedupeKey, Verifier: "v", RulesVersion: "receipt-v1",
+		TrustSetSHA: trustSHA, InputSHA: "in", Result: history.AssessmentVerified,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -207,8 +215,22 @@ func TestTrustedFiltersAdverseVerdicts(t *testing.T) {
 	if _, ok := tg.Nodes["r:bad"]; ok {
 		t.Fatal("rejected node offered to the learner")
 	}
-	if _, ok := tg.Nodes["t:r:P"]; !ok {
-		t.Fatal("unassessed node dropped from the trusted graph")
+	if _, ok := tg.Nodes["r:good"]; !ok {
+		t.Fatal("verified node missing from the trusted graph")
+	}
+	if _, ok := tg.Nodes["t:r:P"]; ok {
+		t.Fatal("unassessed node offered to the learner — blank trust is not VERIFIED")
+	}
+	// The quarantined view keeps excluded nodes searchable.
+	q := g.Quarantined()
+	if _, ok := q.Nodes["r:bad"]; !ok {
+		t.Fatal("rejected node missing from quarantine")
+	}
+	if _, ok := q.Nodes["t:r:P"]; !ok {
+		t.Fatal("unassessed node missing from quarantine")
+	}
+	if _, ok := q.Nodes["r:good"]; ok {
+		t.Fatal("verified node quarantined")
 	}
 }
 

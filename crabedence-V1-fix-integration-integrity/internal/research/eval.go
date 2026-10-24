@@ -151,17 +151,18 @@ func trustedOnly(records []dream.Record, trusted map[string]bool) []dream.Record
 }
 
 // TrustedTaskSet maps experience nodes to the task identities the
-// learner may consume: job subjects on execution nodes carrying no
-// adverse verdict. Untrusted observations contribute nothing.
+// learner may consume: job subjects on execution nodes carrying an
+// affirmative VERIFIED verdict under the graph's reconstruct-time
+// policy. Unassessed (""), adversely assessed, and superseded
+// observations contribute nothing — the same single predicate as
+// every other trusted path, applied at task granularity.
 func TrustedTaskSet(g *experience.Graph) map[string]bool {
 	out := map[string]bool{}
 	for _, n := range g.Nodes {
 		if n.EventKind != history.KindExecution {
 			continue
 		}
-		switch n.Trust {
-		case history.AssessmentRejected, history.AssessmentConflicted,
-			history.AssessmentStale, history.AssessmentUnverified:
+		if !experience.IsTrustedObservation(n) || g.Superseded(n.ID) {
 			continue
 		}
 		out[n.Subject] = true
