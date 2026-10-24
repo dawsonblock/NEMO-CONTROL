@@ -111,7 +111,7 @@
    ]
   },
   "g5-sandbox-lifecycle": {
-   "status": "specified",
+   "status": "executed",
    "package": ["internal/sandboxexecutor", "internal/applevmhelper", "internal/reconcile"],
    "required_tests": [
     "TestCleanupReplacementSandboxSafe",

@@ -201,6 +201,14 @@ type MSBBackend struct {
 	// for a pinned digest, so it is resolved once.
 	envMu       sync.Mutex
 	envBaseline map[string]imageBaseline
+
+	// stepTimeoutOverride overrides the per-step external-call bound
+	// inside Cleanup (pre-removal inspect and the removal itself); zero
+	// uses the default. postVerifyOverride overrides
+	// postCleanupVerifyTimeout; zero uses the default. Both exist so
+	// tests can exercise wedged-runtime classification in bounded time.
+	stepTimeoutOverride time.Duration
+	postVerifyOverride  time.Duration
 }
 
 // imageBaseline is the pinned image's own execution defaults — the
@@ -1490,9 +1498,14 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 			"handle %q does not end with the claimed dispatch nonce — the deletion key and the asserted identity disagree", req.Handle)
 	}
 
-	// Step 1 — verify what the handle currently names.
+	// Step 1 — verify what the handle currently names. Bounded
+	// independently of the caller: a wedged inspect degrades to
+	// "cannot classify" and the conditioned removal still runs — the
+	// post-check, not the inspect, is the verdict.
 	var notes string
-	doc, ierr := b.inspectRaw(ctx, req.Handle)
+	ictx, icancel := context.WithTimeout(ctx, b.cleanupStepTimeout())
+	doc, ierr := b.inspectRaw(ictx, req.Handle)
+	icancel()
 	switch {
 	case ierr == nil:
 		cfg, _ := doc["config"].(map[string]any)
@@ -1535,9 +1548,11 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 	// cannot evaluate our leases, so the caller's commit-boundary
 	// validation is what makes the fence durable.
 	rmArgs := []string{"rm", "-f", req.Handle}
-	out, rerr := b.runOnce(ctx, rmArgs...)
+	rctx, rcancel := context.WithTimeout(ctx, b.cleanupStepTimeout())
+	defer rcancel()
+	out, rerr := b.runOnce(rctx, rmArgs...)
 	switch {
-	case rerr != nil && ctx.Err() == nil:
+	case rerr != nil && rctx.Err() == nil:
 		if msbNotFound(fmt.Errorf("%v: %s", rerr, strings.ToLower(string(out)))) {
 			// Nothing carried the authorized identity: either the
 			// instance was already gone, or step 1 could not classify
@@ -1545,36 +1560,53 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 			// ours. The post-check resolves which.
 		} else {
 			// A real removal failure — possibly after partial effect.
-			vctx, vcancel := postCleanupCtx(ctx)
+			vctx, vcancel := b.postCleanupCtx(ctx)
 			defer vcancel()
 			return b.postCleanupVerify(vctx, req, notes+"the identity-conditioned removal failed: "+errText(rerr, out))
 		}
-	case ctx.Err() != nil:
+	case rctx.Err() != nil:
 		// The deadline expired with the removal in flight — the
 		// command may or may not have taken effect.
-		vctx, vcancel := postCleanupCtx(ctx)
+		vctx, vcancel := b.postCleanupCtx(ctx)
 		defer vcancel()
 		return b.postCleanupVerify(vctx, req, notes+"the removal deadline expired after the command was issued — outcome uncertain")
 	}
 
 	// Step 3 — verify the resulting state independently.
-	vctx, vcancel := postCleanupCtx(ctx)
+	vctx, vcancel := b.postCleanupCtx(ctx)
 	defer vcancel()
 	return b.postCleanupVerify(vctx, req, notes)
+}
+
+// cleanupStepTimeout bounds each external call inside Cleanup — the
+// pre-removal inspect and the removal itself — so a wedged runtime
+// degrades to the unclassified/uncertain path instead of parking the
+// obligation on an unbounded syscall. Callers bound the whole
+// operation too; this bound applies per step even when they do not.
+func (b *MSBBackend) cleanupStepTimeout() time.Duration {
+	if b.stepTimeoutOverride > 0 {
+		return b.stepTimeoutOverride
+	}
+	return 15 * time.Second
 }
 
 // postCleanupVerifyTimeout bounds post-removal verification. The
 // check runs detached from the caller's deadline — which may already
 // be spent — but never unbounded: a hung inspect is REMOVAL_UNCERTAIN
 // after this window, not an indefinite block on the external CLI.
-const postCleanupVerifyTimeout = 15 * time.Second
+func (b *MSBBackend) postCleanupVerifyTimeout() time.Duration {
+	if b.postVerifyOverride > 0 {
+		return b.postVerifyOverride
+	}
+	return 15 * time.Second
+}
 
 // postCleanupCtx gives post-removal verification its own bounded
 // lifetime: detached from the caller's (possibly already-expired)
 // cancellation so the check can run to a conclusion, and re-deadlined
 // so a hung runtime cannot park cleanup accounting forever.
-func postCleanupCtx(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.WithoutCancel(ctx), postCleanupVerifyTimeout)
+func (b *MSBBackend) postCleanupCtx(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), b.postCleanupVerifyTimeout())
 }
 
 // postCleanupVerify independently confirms what the handle now names

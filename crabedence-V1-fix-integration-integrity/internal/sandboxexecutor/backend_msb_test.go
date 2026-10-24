@@ -274,6 +274,15 @@ func fakeMSBMain() int {
 		return 2
 	}
 	cmd, rest := os.Args[1], os.Args[2:]
+	if os.Getenv("MSB_FAKE_RECORD_ARGV") != "" {
+		// Record exactly what the adapter handed the runtime —
+		// argv is the boundary credential material must never cross.
+		f, err := os.OpenFile(filepath.Join(dir, "argv.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+		if err == nil {
+			fmt.Fprintln(f, strings.Join(os.Args[1:], "\x00"))
+			f.Close()
+		}
+	}
 	switch cmd {
 	case "--version":
 		version := os.Getenv("MSB_FAKE_VERSION")
@@ -311,6 +320,11 @@ func fakeMSBMain() int {
 				return 1
 			}
 			return fakeInspectJob(dir, rest, jobID)
+		}
+		if secs := fakeEnvInt("MSB_FAKE_INSPECT_SLEEP", 0); secs > 0 {
+			// A wedged runtime: the inspect syscall parks far beyond
+			// every cleanup bound the adapter is allowed to take.
+			time.Sleep(time.Duration(secs) * time.Second)
 		}
 		return fakeInspect(dir, rest)
 	case "image":

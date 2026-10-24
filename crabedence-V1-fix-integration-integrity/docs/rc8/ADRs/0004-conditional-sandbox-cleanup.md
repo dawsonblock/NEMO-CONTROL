@@ -1,6 +1,6 @@
 # ADR-0004: Conditional Sandbox Cleanup and Honest Atomicity Claims
 
-- Status: Proposed (PR-00 record; implementation PR-05)
+- Status: Implemented (PR-05)
 - Date: 2026-10-24
 - Related: INV-3, D-06, G5
 
@@ -47,3 +47,37 @@ namespace nor a "last writer wins" model makes this safe.
   (`internal/applevmhelper/cli_darwin_arm64.go` @
   `669f335d…`) is reviewed in PR-05 for alignment with this decision rather
   than cherry-picked blindly.
+
+## Implementation notes (PR-05)
+
+- **Runtime capability inventory:** the `msb` CLI exposes no atomic
+  identity-conditional delete — `rm` resolves a name and deletes whatever it
+  names. Decision branch (2) therefore applies: the adapter never claims
+  atomic destruction. The handle itself is the deletion condition
+  (`sx-<job>-<nonce>`), so name resolution can only name this dispatch's
+  instance; step-1 verification classifies the occupant and refuses foreign
+  or spoofed-identity sandboxes as `IDENTITY_MISMATCH`, and any step whose
+  outcome cannot be proven lands `REMOVAL_UNCERTAIN` with the obligation
+  retained. A native conditional-delete binding (msb's own catalog-locked
+  removal) remains the upgrade path, tracked with the defect register.
+- **Bounded steps:** the pre-removal inspect and the removal itself now each
+  carry an internal deadline (`cleanupStepTimeout`, 15s) independent of the
+  caller context, so a wedged runtime degrades to the
+  unclassified→conditioned-remove→post-check path instead of parking the
+  obligation on an unbounded syscall. Post-removal verification already ran
+  detached under `postCleanupVerifyTimeout` (15s).
+- **Crash recovery:** the terminal write sets `cleanup_pending` before any
+  destructive call; maintenance and startup recovery re-drive pending
+  obligations under recovery-claim fencing, so a kill between the commit and
+  the removal loses nothing.
+- **Apple helper review (plan action 6):** the delete path is aligned with
+  this decision — `runDelete` verifies process identity (PID + start-time)
+  before every SIGTERM/SIGKILL and re-verifies inside the grace window, and
+  its metadata-less-directory fix removes only the validated instance
+  directory under the state root, never an unverified path. No changes
+  needed; it is not a blind Main cherry-pick.
+- **Executed coverage:** all twelve normative G5 tests exist with the
+  inventory names and pass under `-race`
+  (`internal/sandboxexecutor/g5_lifecycle_test.go`). Gate credit still
+  requires signed receipts on the frozen RC8.1 candidate under pinned
+  toolchains and live KVM/Apple lanes (G8).
