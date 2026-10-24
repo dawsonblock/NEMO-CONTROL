@@ -50,6 +50,10 @@ type Worker struct {
 	// it, the worker cannot produce the signed evidence receipt the
 	// store requires for CRITICAL — such records stay UNKNOWN.
 	signer *evidence.Signer
+	// custodySink, when set, receives each resolved record's terminal
+	// receipt for durable enqueue toward the independent evidence
+	// witness — recovery resolutions are terminal commitments too.
+	custodySink func(executionID, receiptDigest string, payload []byte)
 	// maxAttempts bounds how many times an UNKNOWN record may be
 	// claimed for reconciliation. Past the ceiling the record is
 	// dead-lettered: it stays UNKNOWN and inspectable, but stops
@@ -91,6 +95,13 @@ func (w *Worker) SetClaimDuration(d time.Duration) { w.claimDuration = d }
 // trusted evidence signer on the store (SetTrustedEvidenceSigners) or
 // the store will reject the receipts it produces.
 func (w *Worker) SetEvidenceSigner(s *evidence.Signer) { w.signer = s }
+
+// SetCustodySink installs the custody enqueue hook fired after each
+// successful ResolveRecovery — a recovery resolution is a terminal
+// commitment and must reach the same custody boundary as dispatch.
+func (w *Worker) SetCustodySink(sink func(executionID, receiptDigest string, payload []byte)) {
+	w.custodySink = sink
+}
 
 // SetMaxAttempts overrides the reconcile-attempt ceiling (default 15).
 // Records that exhaust the ceiling are dead-lettered: they remain
@@ -458,6 +469,16 @@ func (w *Worker) reconcileOne(ctx context.Context, rec *idempotency.Record) erro
 	// reconcile claim fields automatically.
 	if err := w.store.ResolveRecovery(ctx, rec.ExecutionID, rec.Version, result); err != nil {
 		return w.releaseClaim(ctx, rec, fmt.Errorf("failed to resolve recovery: %w", err))
+	}
+
+	// Evidence custody: enqueue the resolved record's terminal receipt
+	// toward the independent witness. Enqueue failure never rewinds a
+	// committed terminal state — the backlog surfaces through custody
+	// health at the next mandated admission instead.
+	if w.custodySink != nil {
+		if resolved, err := w.store.Lookup(ctx, rec.ExecutionID); err == nil && resolved.TerminalReceiptDigest != "" {
+			w.custodySink(resolved.ExecutionID, resolved.TerminalReceiptDigest, resolved.EvidenceReceipt)
+		}
 	}
 
 	return nil

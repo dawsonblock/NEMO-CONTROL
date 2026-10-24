@@ -27,13 +27,20 @@ against these exact bytes; the machine-readable records live in
   - `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957`
   - 1438 files, 10 symlinks (provenance format 2)
 - Canonical runtime: `runtimes/nemo-relay`
-  - `f6229bb342d31fc1fa3224fd24b53490ceb507e4489f305605bb274947c16d0f`
-  - 1466 files, 10 symlinks, version `0.9.1-rc.4`, format 2
+  - `14fc142eda18ac4da65d498d4951f65914a175becf2bfff09ab2799043f530e1`
+  - 1467 files, 10 symlinks, version `0.9.1-rc.4`, format 2
 - Provenance policy: `runtimes/nemo-provenance-policy.json`
   - `0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1`
-- Declared source→runtime delta: 80 modified, 29 added, 1 removed file
+- Declared source→runtime delta: 80 modified, 30 added, 1 removed file
   (10 declared added entries); 0 link/retype/mode changes — all declared
   in `runtimes/nemo-transfer-manifest.json`
+- Identity note: the +1 file vs `f6229bb3…` is
+  `bridges/nemo-crabedence/examples/abi_verdict.rs` — the Go↔Rust
+  invocation-ABI differential example added under RC8 PR-02. It is a
+  test-side tool, not a runtime code change, but it is inside the shipped
+  tree, so the byte-exact identity moved. The `darwin_arm64` verdict
+  below was executed against `f6229bb3…` bytes and does **not** extend to
+  `14fc142e…`; re-qualification of the new identity is an open RC8 gate.
 - Qualification run: `RELEASE_VERSION=0.54.0-rc.3`, `GOTOOLCHAIN=local`
   `go1.26.5`, live gates against a local PostgreSQL 14.20 started by
   `initdb` (Docker daemon read-only in this environment; the CI image
@@ -199,7 +206,7 @@ noted otherwise:
 | Live-PostgreSQL matrix | `scripts/test-live-postgres.sh` — `TestLive` across idempotency / reconcile / execution / authority | PASS (`-race`, local `initdb` PostgreSQL 14.20 — the Docker `postgres:16` lane is NOT_RUN, daemon read-only in this environment) |
 | Stop/admission boundary | deterministic barrier test + 1000-schedule randomized campaign (`internal/execution/stop_accept_race_test.go`) | PASS — a handler can no longer register after the drain decision; refusals post-stop verified; campaign 1.15s |
 | Transport-refusal classification | `TestConcurrentIdenticalMutations` — 100-way burst against bounded admission | PASS — definitive FAILED frames and pre-frame closes both counted as fail-closed refusals; zero successes, zero mutations |
-| Provenance gates | `check-provenance-docs.sh`; `verify-nemo-transfer.py`; `cmd/nemo-runtime-digest` verify | PASS on `f6229bb3…` — manifest regenerated, delta 80 modified / 29 added / 1 removed all declared, policy and baseline-source digests unchanged |
+| Provenance gates | `check-provenance-docs.sh`; `verify-nemo-transfer.py`; `cmd/nemo-runtime-digest` verify | PASS on `14fc142e…` — manifest regenerated, delta 80 modified / 30 added / 1 removed all declared, policy and baseline-source digests unchanged |
 | Checkpoint custody | `go test ./internal/execution/ -run TestEmitCheckpoint` + `go test ./internal/evidence/` + `go test ./cmd/evidence-checkpoint/` | PASS — every emission retained in `<path>.jsonl`, sequence survives latest-file loss, corrupt retained tail refuses emission, custody path mirrors latest + log; **independent custody itself is NOT_QUALIFIED as a deployment property** — it requires the custody target to live outside the service host's failure domain, which this environment does not provide |
 | Source-packaging clean room | `package-source-archive.sh --format tar.gz\|zip` + extraction verification | PASS — both formats built and verified on extracted bytes (manifest 4115 entries, transfer provenance ok); tar.gz `ab1b6069…`, zip `7999cdcd…`; both BSD-tar and GNU-tar branches exercised in the packager suite |
 | Release-artifact binding | `artifact.json` schema v2 (the `release-rc` build-job object) | PASS — binds the qualified source `369d2860`/`3306903e`, manifest `ee07a945…`, both archive digests+sizes, the CycloneDX SBOM `3a5bf473…`, the registry, qualification `84910888…` and provenance digests, toolchain `go1.26.5`/`v24.16.0`/`11.13.0` |
@@ -360,7 +367,9 @@ to the bytes they qualified.
 
 **Locally qualified for the executed gate set on `darwin_arm64`** for source
 commit `369d2860`, source tree `3306903e`, runtime `f6229bb3…` (1466 files,
-80 modified / 29 added / 1 removed): the canonical pipeline passed 32/32
+80 modified / 29 added / 1 removed) — a historical verdict scoped to those
+exact bytes; it does not extend to the current `14fc142e…` identity:
+the canonical pipeline passed 32/32
 gates with RELEASE ADMISSION PASS and evidence root `177a3afb…`, the
 plugin-host crate suite passed on both this host and a Linux aarch64
 target (including the fd-70_000 lane the macOS kernel cannot run), the

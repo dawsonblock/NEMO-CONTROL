@@ -127,6 +127,15 @@ func (s *Signer) PublicKey() ed25519.PublicKey {
 	return s.key.Public().(ed25519.PublicKey)
 }
 
+// SignBytes signs an arbitrary payload under this signer's identity.
+// Custody services use it for acknowledgement signatures; receipts keep
+// the structured Sign path above. Callers must apply their own domain
+// separation in the payload — unlike SignRecord, this primitive does
+// not enforce it.
+func (s *Signer) SignBytes(payload []byte) []byte {
+	return ed25519.Sign(s.key, payload)
+}
+
 // Sign produces a signed ReceiptV3 attesting to the given binding.
 // The returned receipt is serialized to canonical JSON for storage.
 func (s *Signer) Sign(b Binding) (json.RawMessage, error) {
