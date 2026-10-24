@@ -1,6 +1,6 @@
 {
   "name": "@crabedence/nemo",
-  "version": "0.55.0-rc8-dev",
+  "version": "0.55.0-rc8.1-dev",
   "private": true,
   "type": "module",
   "exports": {
