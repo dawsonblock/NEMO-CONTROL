@@ -119,19 +119,20 @@ func LoadTrustRoots(path string) (TrustRoots, error) {
 
 // Verifier decides whether an event is authorized to be appended or to
 // contribute to folded state. roots comes from configuration only;
-// AllowUnverified is the explicit development escape hatch — never
+// allowUntrusted is the explicit development escape hatch — never
 // enabled silently, and refused in production callers.
 type Verifier struct {
-	roots           TrustRoots
-	allowUnverified bool
+	roots          TrustRoots
+	allowUntrusted bool
 }
 
-// NewVerifier builds a verifier. allowUnverified is an explicit
+// NewVerifier builds a verifier. allowUntrusted is an explicit
 // development flag: when false (the only production posture), every
 // relaxing event requires a signature from an allowlisted signer and
-// an empty root set fails closed.
-func NewVerifier(roots TrustRoots, allowUnverified bool) *Verifier {
-	return &Verifier{roots: roots, allowUnverified: allowUnverified}
+// an empty root set fails closed. When true, signatures must still
+// verify — only trust-root membership is waived.
+func NewVerifier(roots TrustRoots, allowUntrusted bool) *Verifier {
+	return &Verifier{roots: roots, allowUntrusted: allowUntrusted}
 }
 
 // Trusted reports whether a signer fingerprint is authorized at epoch.
@@ -169,10 +170,10 @@ func (v *Verifier) authorize(e Event) error {
 	if err := e.VerifySignature(); err != nil {
 		return fmt.Errorf("%w: %v", ErrDenied, err)
 	}
-	if v.roots.empty() && !v.allowUnverified {
+	if v.roots.empty() && !v.allowUntrusted {
 		return fmt.Errorf("%w: no operator trust roots configured", ErrDenied)
 	}
-	if !v.allowUnverified && !v.roots.trusted(e.SignerKeyID, e.Epoch) {
+	if !v.allowUntrusted && !v.roots.trusted(e.SignerKeyID, e.Epoch) {
 		return fmt.Errorf("%w: signer %s is not a trusted operator at epoch %d",
 			ErrDenied, e.SignerKeyID, e.Epoch)
 	}
