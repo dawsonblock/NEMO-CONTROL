@@ -32,12 +32,21 @@ Git history, not a ZIP extraction. Target development version
 | `runtimes/nemo-relay` shipped tree (format 2, 1467 files, 10 symlinks) | `14fc142eda18ac4da65d498d4951f65914a175becf2bfff09ab2799043f530e1` |
 | Frozen source `NEMO-feat-native-plugin-isolation` (1438 files) | `05d45ec86b1985b4aa4ba24f1315b96c858c56694c66116eae097cb68de06957` |
 | `qualification/rc8-required-tests.json` (current bytes) | `741048c9eb6e520a4580146a569d49f0e7d3d9e45e673bf9f50da7d319f5617e` |
+| `qualification/rc8.2-required-tests.json` (RC8.2 inventory, PR-12) | `b3cf71c5bc263c7aec43b8bd449cfc7487496e52e78863eca56a346fd0809881` |
 | Provenance policy | `0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1` |
 
 Note: the rc8.1 baseline recorded inventory digest `607b960d…`; the
 inventory then evolved through PR-03..PR-06. `741048c9…` is the digest
 of the exact bytes at the RC8.2 branch point and is the value RC8.2
 release records must carry (F-08).
+
+PR-12 note: `qualification/rc8.2-required-tests.json` is the RC8.2
+mandatory-test inventory — the rc8.1 file is retained unmodified for
+history; the RC8.2 document binds the PR-10/PR-11/PR-12 closure tests
+and flips `g7-packaging` to `executed` (the four normative cases are
+implemented in `scripts/rc8_evidence_verify_test.py::G7PackagingGate`,
+executed by `--emit-evidence`). Its digest `b3cf71c5…` is the value RC8.2
+release manifests and evidence verification must pin.
 
 ## 4. Artifact status
 

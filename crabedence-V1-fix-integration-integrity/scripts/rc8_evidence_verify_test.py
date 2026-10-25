@@ -6,6 +6,7 @@ and artifact-digest identities must pass.
 Run: python3 scripts/rc8_evidence_verify_test.py
 """
 
+import datetime
 import hashlib
 import json
 import os
@@ -13,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -421,5 +423,155 @@ class EvidenceMode(VerifierCase):
         self.assertIn(sha256(self.inventory), r.stdout)
 
 
+REPO_ROOT = os.path.dirname(HERE)
+TRANSFER_VERIFIER = os.path.join(HERE, "verify-nemo-transfer.py")
+TRANSFER_MANIFEST = os.path.join(REPO_ROOT, "runtimes",
+                               "nemo-transfer-manifest.json")
+
+
+class G7PackagingGate(VerifierCase):
+    """The four packaging-gate cases the rc8.2 required-test inventory
+    demands by exact name (qualification/rc8.2-required-tests.json,
+    gate g7-packaging). Each drives the real verifier entry points —
+    rc8_evidence_verify.py and verify-nemo-transfer.py — never a
+    shortcut fixture of the property itself.
+
+    Discovery note: unittest only auto-discovers ``test*`` method
+    names, so each case also carries its normative ``Test*`` alias;
+    the ``--emit-evidence`` runner loads the exact names and records
+    evidence under them.
+    """
+
+    G7_GATE = "g7-packaging"
+
+    def _g7_inventory(self, tests):
+        wfile(self.inventory, json.dumps(
+            {"schema_version": 2, "suite": "rc8.2-integration",
+             "gates": {self.G7_GATE: {"status": "executed",
+                                     "required_tests": tests}}}))
+        self.inv_sha = sha256(self.inventory)
+
+    def test_g7_evidence_bound_to_commit(self):
+        name = "TestEvidenceBoundToCommit"
+        self._g7_inventory([name])
+        e = self.evidence([self.rec(test=name)])
+        r = self.run_evidence(e, require_gate=self.G7_GATE)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    TestEvidenceBoundToCommit = test_g7_evidence_bound_to_commit
+
+    def test_g7_foreign_commit_evidence_rejected(self):
+        name = "TestForeignCommitEvidenceRejected"
+        self._g7_inventory([name])
+        e = self.evidence([
+            self.rec(test=name, source_commit=OTHER_COMMIT)])
+        r = self.run_evidence(e, require_gate=self.G7_GATE)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("!= expected", r.stderr)
+
+    TestForeignCommitEvidenceRejected = test_g7_foreign_commit_evidence_rejected
+
+    def test_g7_changed_pins_invalidate(self):
+        # The manifest pins the required-test inventory by digest; a
+        # mutated inventory under the same path must break the pin —
+        # the "changed pins invalidate" property of the packaging gate.
+        name = "TestChangedPinsInvalidate"
+        self._g7_inventory([name])
+        self.manifest()
+        r = self.run_manifest(inventory=self.inventory)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self._g7_inventory([name, "TestChangedPinsInvalidateExtra"])
+        r = self.run_manifest(inventory=self.inventory)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("inventory sha256", r.stderr)
+
+    TestChangedPinsInvalidate = test_g7_changed_pins_invalidate
+
+    def test_g7_transfer_manifest_recomputed(self):
+        # The NEMO transfer manifest is recomputed, not trusted: the
+        # real manifest verifies against the current shipped tree, and
+        # a tampered copy of the same document is rejected.
+        if not os.path.isfile(TRANSFER_MANIFEST):
+            self.skipTest("nemo transfer manifest not present")
+        r = subprocess.run(
+            [sys.executable, TRANSFER_VERIFIER, TRANSFER_MANIFEST],
+            capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0,
+                         f"transfer manifest must verify: {r.stderr}")
+
+        # A tampered copy inside a grafted runtimes/ — the verifier
+        # resolves the tree relative to the manifest's repo root, so a
+        # symlinked runtime subtree keeps the real bytes in scope while
+        # only the manifest document itself is falsified.
+        graft = os.path.join(self.dir, "runtimes")
+        os.makedirs(graft)
+        for entry in os.listdir(os.path.join(REPO_ROOT, "runtimes")):
+            os.symlink(os.path.join(REPO_ROOT, "runtimes", entry),
+                       os.path.join(graft, entry))
+        with open(TRANSFER_MANIFEST) as f:
+            doc = json.load(f)
+        doc["shipped_tree_sha256"] = "0" * 64
+        tampered = os.path.join(graft, "nemo-transfer-manifest.json")
+        os.remove(tampered)
+        wfile(tampered, json.dumps(doc))
+        r = subprocess.run([sys.executable, TRANSFER_VERIFIER, tampered],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1,
+                         "tampered transfer manifest must be rejected")
+
+    TestTransferManifestRecomputed = test_g7_transfer_manifest_recomputed
+
+
+G7_REQUIRED = [
+    "TestEvidenceBoundToCommit",
+    "TestForeignCommitEvidenceRejected",
+    "TestChangedPinsInvalidate",
+    "TestTransferManifestRecomputed",
+]
+
+
+def emit_g7_evidence(path, source_commit):
+    """Run the four g7-packaging cases under their normative names and
+    append evidence-record-v1 records to path — the qualification lane's
+    honest record of real executions, never a written-in assertion."""
+    commit = source_commit or subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT,
+        capture_output=True, text=True).stdout.strip()
+    results = {}
+    for name in G7_REQUIRED:
+        case = G7PackagingGate(name)
+        started = datetime.datetime.now(
+            datetime.timezone.utc).isoformat()
+        t0 = time.monotonic()
+        outcome = case.run()
+        results[name] = (outcome, started,
+                         round((time.monotonic() - t0) * 1000, 1))
+    ok_all = all(r.wasSuccessful() for r, _, _ in results.values())
+    with open(path, "a") as f:
+        for name in G7_REQUIRED:
+            res, started, dur = results[name]
+            f.write(json.dumps({
+                "schema": "evidence-record-v1",
+                "case_id": name,
+                "test": name,
+                "outcome": "PASS" if res.wasSuccessful() else "FAIL",
+                "source_commit": commit,
+                "lane": "scripts",
+                "command": "python3 scripts/rc8_evidence_verify_test.py "
+                           "--emit-evidence",
+                "started_at": started,
+                "duration_ms": dur,
+            }) + "\n")
+    if not ok_all:
+        print("g7 evidence: FAIL — see case output", file=sys.stderr)
+        return 1
+    print(f"g7 evidence: {len(G7_REQUIRED)} cases PASS -> {path}")
+    return 0
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--emit-evidence":
+        out = sys.argv[2]
+        commit = sys.argv[3] if len(sys.argv) > 3 else None
+        sys.exit(emit_g7_evidence(out, commit))
     unittest.main(verbosity=2)

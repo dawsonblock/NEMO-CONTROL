@@ -1,0 +1,368 @@
+{
+ "schema_version": 2,
+ "suite": "rc8.2-integration",
+ "description": "RC8.2 reviewer-maintained mandatory-test inventory. Carries the RC8.1 gate structure forward and adds the RC8.2 PR-10/PR-11/PR-12 security closure tests: control-gate broadcast (F-01), durable custody + verified readiness (F-02/F-03), signed release manifest + assurance profiles (F-04/F-05), exclusive sandbox namespace (F-06), and the g7 packaging cases implemented under their normative names. A gate qualifies only when every required test executed exactly once and passed for the candidate commit under the pinned toolchains; absent, skipped, duplicated, failed, NOT_RUN, or identity-mismatched evidence fails. Changes to this file require review and a signed note in the landing PR.",
+ "gates": {
+  "g1-trust-repair": {
+   "status": "executed",
+   "package": [
+    "internal/history",
+    "internal/experience",
+    "internal/research"
+   ],
+   "required_tests": [
+    "TestTrustBlankIsUnverified",
+    "TestTrustInvalidSignature",
+    "TestTrustStalePolicyInvalid",
+    "TestTrustContradictoryAssessment",
+    "TestTrustMixedSignatures",
+    "TestTrustSupersededEvidence",
+    "TestForgedAssessmentRejected",
+    "TestTrustReplayRejected",
+    "TestLegacyStoreMigrationKeepsUntrusted",
+    "TestTrustedTaskSetExcludesUnassessed",
+    "TestUnverifiedNotPromoted"
+   ],
+   "requirements": {
+    "blank-or-unknown-trust-untrusted": [
+     "TestTrustBlankIsUnverified"
+    ],
+    "forged-or-invalid-verdict-untrusted": [
+     "TestTrustInvalidSignature",
+     "TestForgedAssessmentRejected"
+    ],
+    "cross-policy-verdicts-do-not-inherit": [
+     "TestTrustStalePolicyInvalid",
+     "TestTrustContradictoryAssessment"
+    ],
+    "no-laundering-via-clean-later-node": [
+     "TestTrustMixedSignatures"
+    ],
+    "superseded-state-not-trusted": [
+     "TestTrustSupersededEvidence"
+    ],
+    "replayed-assessment-rejected": [
+     "TestTrustReplayRejected"
+    ],
+    "legacy-unassessed-store-stays-untrusted": [
+     "TestLegacyStoreMigrationKeepsUntrusted"
+    ],
+    "unassessed-excluded-from-task-set": [
+     "TestTrustedTaskSetExcludesUnassessed"
+    ],
+    "no-promotion-on-unverified-basis": [
+     "TestUnverifiedNotPromoted"
+    ]
+   }
+  },
+  "g2-authority-abi": {
+   "status": "executed",
+   "package": [
+    "internal/execution",
+    "internal/capability",
+    "internal/idempotency",
+    "internal/reconcile"
+   ],
+   "required_tests": [
+    "TestServiceBindsResolvedAuthorityIntoRequestDigest",
+    "TestCallerCannotForgeAuthorityBinding",
+    "TestBrokeredAuthorityBindsResolvedGrant",
+    "TestVerifyGrantDigest",
+    "TestComputeGrantDigestIsCanonicalOverConstraints",
+    "TestValidateIssuanceScopeConcreteAndAcknowledged",
+    "TestDescriptorDigestBindsPolicy",
+    "TestINV003UnknownCapabilityIsDeniedAtAdmission",
+    "TestINV001MutationCannotUseLocalRoute",
+    "TestINV006PostDispatchAmbiguityIsNeverFailed",
+    "TestClientUnknownWireStatusIsProtocol",
+    "TestNoopResolverReturnsUnknown",
+    "TestGitHubConnResetIsAmbiguous",
+    "TestReadCeilingCountsAsAmbiguousNotSuccess",
+    "TestSupervisorDegradedOnUnknownBacklogAge",
+    "TestProcessCrashMatrix",
+    "TestCrashPointMatrix",
+    "TestProcessCrashRecoveryCompletion",
+    "TestInvocationABIConformanceCorpus",
+    "FuzzParseInvocationRequest",
+    "TestControlGateProbeBroadcast32",
+    "TestControlGateProbeBroadcast128",
+    "TestControlGateProbeBroadcastFailure",
+    "TestControlGateProbeConcurrentDeadline",
+    "TestControlGateProbeStaleWorkerCompletion",
+    "TestControlGateProbeRecheckAfterCompletion",
+    "TestControlGateProbeCancelDuringSharedProbe",
+    "TestControlGateProbeStress",
+    "TestReleaseManifestRoundTrip",
+    "TestReleaseManifestTamperedRejected",
+    "TestReleaseManifestUnauthorizedSignerRejected",
+    "TestReleaseManifestShapeRejected",
+    "TestReleaseManifestTreeIdentity",
+    "TestReleaseSignersFileVerification",
+    "TestReleaseManifestDeploymentAttestation",
+    "TestReleaseManifestLoadsFromFile",
+    "TestAssuranceProfileResolution",
+    "TestAssuranceProfileInvalidValuesFail",
+    "TestAssuranceDevelopmentUnderProductionRefused",
+    "TestAssuranceHighAssuranceRequiresProduction",
+    "TestAssuranceHighAssurancePrerequisites",
+    "TestAssuranceHighAssuranceResolves",
+    "TestReleaseManifestEnvPairing"
+   ],
+   "requirements": {
+    "authority-kernel-assigned-fields": [
+     "TestServiceBindsResolvedAuthorityIntoRequestDigest",
+     "TestCallerCannotForgeAuthorityBinding"
+    ],
+    "grant-scope-enforced": [
+     "TestVerifyGrantDigest",
+     "TestComputeGrantDigestIsCanonicalOverConstraints",
+     "TestValidateIssuanceScopeConcreteAndAcknowledged",
+     "TestBrokeredAuthorityBindsResolvedGrant"
+    ],
+    "request-digest-binding": [
+     "TestServiceBindsResolvedAuthorityIntoRequestDigest",
+     "TestDescriptorDigestBindsPolicy"
+    ],
+    "nemo-cannot-mint-capability": [
+     "TestINV003UnknownCapabilityIsDeniedAtAdmission",
+     "TestINV001MutationCannotUseLocalRoute"
+    ],
+    "unknown-not-retried": [
+     "TestINV006PostDispatchAmbiguityIsNeverFailed",
+     "TestClientUnknownWireStatusIsProtocol",
+     "TestNoopResolverReturnsUnknown"
+    ],
+    "ambiguous-requires-absence-proof": [
+     "TestGitHubConnResetIsAmbiguous",
+     "TestReadCeilingCountsAsAmbiguousNotSuccess",
+     "TestSupervisorDegradedOnUnknownBacklogAge"
+    ],
+    "dispatch-crash-before-commit": [
+     "TestCrashPointMatrix"
+    ],
+    "dispatch-crash-after-commit": [
+     "TestProcessCrashMatrix",
+     "TestProcessCrashRecoveryCompletion"
+    ],
+    "abi-corpus-agreement": [
+     "TestInvocationABIConformanceCorpus"
+    ],
+    "abi-malformed-denied-consistently": [
+     "TestInvocationABIConformanceCorpus",
+     "FuzzParseInvocationRequest"
+    ],
+    "concurrent-control-gate-broadcast": [
+     "TestControlGateProbeBroadcast32",
+     "TestControlGateProbeBroadcast128",
+     "TestControlGateProbeBroadcastFailure",
+     "TestControlGateProbeConcurrentDeadline",
+     "TestControlGateProbeStaleWorkerCompletion",
+     "TestControlGateProbeRecheckAfterCompletion",
+     "TestControlGateProbeCancelDuringSharedProbe",
+     "TestControlGateProbeStress"
+    ],
+    "signed-release-manifest-verified": [
+     "TestReleaseManifestRoundTrip",
+     "TestReleaseManifestTamperedRejected",
+     "TestReleaseManifestUnauthorizedSignerRejected",
+     "TestReleaseManifestShapeRejected",
+     "TestReleaseManifestTreeIdentity",
+     "TestReleaseSignersFileVerification",
+     "TestReleaseManifestDeploymentAttestation",
+     "TestReleaseManifestLoadsFromFile"
+    ],
+    "assurance-profiles-fail-closed": [
+     "TestAssuranceProfileResolution",
+     "TestAssuranceProfileInvalidValuesFail",
+     "TestAssuranceDevelopmentUnderProductionRefused",
+     "TestAssuranceHighAssuranceRequiresProduction",
+     "TestAssuranceHighAssurancePrerequisites",
+     "TestAssuranceHighAssuranceResolves",
+     "TestReleaseManifestEnvPairing"
+    ]
+   },
+   "differential": {
+    "driver": "scripts/abi-differential.mjs",
+    "requirement": "Go and Rust implementations must agree on every normative corpus case under the pinned toolchains; Node-wrapper mocks do not satisfy this gate. Executed 2026-10-24 under Go 1.26.5 + Rust 1.96.1: 68/68 corpus + 2000 seeded cases, verdicts identical."
+   }
+  },
+  "g3-release-controls": {
+   "status": "executed",
+   "package": [
+    "internal/releasectl",
+    "internal/cli"
+   ],
+   "required_tests": [
+    "TestVerifyEmptyAllowlistFailsClosed",
+    "TestVerifySelfSignedRejected",
+    "TestResumeUnsignedRejected",
+    "TestHaltSurvivesFileDeletion",
+    "TestControlLedgerRollbackFailsClosed",
+    "TestStaleEpochRejected",
+    "TestRogueDaemonCannotClear",
+    "TestCorruptRecordFailsClosed",
+    "TestReplicaMismatchFailsClosed",
+    "TestRestartPreservesState",
+    "TestOutageFailsClosed",
+    "TestTwoStepRecovery"
+   ],
+   "requirements": {}
+  },
+  "g4-custody": {
+   "status": "executed",
+   "package": [
+    "internal/custody",
+    "internal/witness",
+    "internal/sandboxcustody",
+    "internal/evidence",
+    "internal/execution"
+   ],
+   "required_tests": [
+    "TestWitnessForgedAckRejected",
+    "TestWitnessWrongKeyRejected",
+    "TestWitnessReplayRejected",
+    "TestWitnessDuplicateIdempotent",
+    "TestWitnessSequenceGapDetected",
+    "TestWitnessForeignDeploymentRejected",
+    "TestContradictoryCheckpointRejected",
+    "TestSameHashDifferentPayloadRejected",
+    "TestCustodyOutageNoTerminalSuccess",
+    "TestCustodyReconnectReconciles",
+    "TestColdRestoreReconciles",
+    "TestWitnessKeyRotation",
+    "TestWitnessCrossFamilyConfusion",
+    "TestCustodyStartupUnverifiedNeverHealthy",
+    "TestCustodyWitnessOfflineStartupNeverHealthy",
+    "TestCustodyInvalidCheckpointRejected",
+    "TestCustodyStaleReadinessExpires",
+    "TestCustodyDegradedMarkerSurvivesRestart",
+    "TestCustodyDegradedClearsOnlyOnVerifiedRepair",
+    "TestCustodyRepairRequiredStickyUntilOperatorRepair",
+    "TestCustodyConflictingAckEscalates",
+    "TestCustodyContradictoryHeadEscalates",
+    "TestCustodyEmptyPayloadRefused",
+    "TestCustodyObligationIdempotentEnqueue",
+    "TestCustodyObligationHighWaterMonotonic",
+    "TestCustodyColdRestartUnackedReceipts",
+    "TestObligationReplayRestoresCrashLostEnqueue",
+    "TestObligationReplayIdempotent",
+    "TestObligationReplayContradictionEscalates",
+    "TestObligationReplayBoundedByHighWater",
+    "TestObligationSinkFailureMarksDegraded",
+    "TestObligationEmptyPayloadNeverCustodied",
+    "TestCustodyGateRefusesCriticalWhenDegraded",
+    "TestCustodySinkReceivesTerminalReceipts",
+    "TestCustodyEndToEndProviderTerminalVsVerified",
+    "TestWitnessConfigFromEnv"
+   ],
+   "requirements": {
+    "verified-startup-readiness": [
+     "TestCustodyStartupUnverifiedNeverHealthy",
+     "TestCustodyWitnessOfflineStartupNeverHealthy",
+     "TestCustodyInvalidCheckpointRejected",
+     "TestCustodyStaleReadinessExpires"
+    ],
+    "durable-custody-obligation-replay": [
+     "TestCustodyDegradedMarkerSurvivesRestart",
+     "TestCustodyDegradedClearsOnlyOnVerifiedRepair",
+     "TestCustodyRepairRequiredStickyUntilOperatorRepair",
+     "TestCustodyConflictingAckEscalates",
+     "TestCustodyContradictoryHeadEscalates",
+     "TestCustodyEmptyPayloadRefused",
+     "TestCustodyObligationIdempotentEnqueue",
+     "TestCustodyObligationHighWaterMonotonic",
+     "TestCustodyColdRestartUnackedReceipts",
+     "TestObligationReplayRestoresCrashLostEnqueue",
+     "TestObligationReplayIdempotent",
+     "TestObligationReplayContradictionEscalates",
+     "TestObligationReplayBoundedByHighWater",
+     "TestObligationSinkFailureMarksDegraded",
+     "TestObligationEmptyPayloadNeverCustodied"
+    ],
+    "critical-admission-gated-on-custody": [
+     "TestCustodyGateRefusesCriticalWhenDegraded",
+     "TestCustodySinkReceivesTerminalReceipts",
+     "TestCustodyEndToEndProviderTerminalVsVerified",
+     "TestWitnessConfigFromEnv"
+    ]
+   }
+  },
+  "g5-sandbox-lifecycle": {
+   "status": "executed",
+   "package": [
+    "internal/sandboxexecutor",
+    "internal/applevmhelper",
+    "internal/reconcile"
+   ],
+   "required_tests": [
+    "TestCleanupReplacementSandboxSafe",
+    "TestCleanupLabelCollisionRejected",
+    "TestVerifiedAbsentNeverFalse",
+    "TestKillAtEveryCommitBoundary",
+    "TestIncompleteCreateRecovered",
+    "TestOrphanedVMInventoried",
+    "TestStaleOwnershipRejected",
+    "TestConcurrentRetargetedDeletion",
+    "TestSlowInspectBounded",
+    "TestRetainedResourcesAccounted",
+    "TestCredentialIsolationPreserved",
+    "TestSandboxRecreationSafe",
+    "TestValidateNamespace",
+    "TestNamespaceMintsPrefixedLabeledSandbox",
+    "TestNamespaceCleanupHappyPath",
+    "TestNamespaceForeignOccupantRefused",
+    "TestNamespaceLabelAbsentRefused",
+    "TestNamespaceRejectsHandlesOutsidePrefix",
+    "TestNamespaceCrossDeploymentSymmetric"
+   ],
+   "requirements": {
+    "exclusive-namespace-enforcement": [
+     "TestValidateNamespace",
+     "TestNamespaceMintsPrefixedLabeledSandbox",
+     "TestNamespaceCleanupHappyPath",
+     "TestNamespaceForeignOccupantRefused",
+     "TestNamespaceLabelAbsentRefused",
+     "TestNamespaceRejectsHandlesOutsidePrefix",
+     "TestNamespaceCrossDeploymentSymmetric"
+    ]
+   }
+  },
+  "g6-research-boundary": {
+   "status": "executed",
+   "package": [
+    "internal/history",
+    "internal/experience",
+    "internal/research",
+    "internal/dream"
+   ],
+   "required_tests": [
+    "TestProposalImmutable",
+    "TestPromotionRequiresOperatorSignature",
+    "TestSelfReportedDeltaInsufficient",
+    "TestBoundedExperimentBudget",
+    "TestEvalLeakageDetected",
+    "TestForgedOutcomeRejected",
+    "TestReceiptReplayRejected",
+    "TestUnverifiedEvidenceExcluded",
+    "TestFalseImprovementDetected",
+    "TestBudgetExhaustionBounded",
+    "TestNonAuthorizedPromotionRejected"
+   ],
+   "requirements": {}
+  },
+  "g7-packaging": {
+   "status": "executed",
+   "package": [
+    "scripts"
+   ],
+   "required_tests": [
+    "TestEvidenceBoundToCommit",
+    "TestForeignCommitEvidenceRejected",
+    "TestChangedPinsInvalidate",
+    "TestTransferManifestRecomputed"
+   ],
+   "note": "Implemented in PR-12: scripts/rc8_evidence_verify_test.py G7PackagingGate executes the four normative names against the real verifiers (rc8_evidence_verify.py, verify-nemo-transfer.py); --emit-evidence emits evidence-record-v1 records for the lane.",
+   "requirements": {}
+  }
+ }
+}
