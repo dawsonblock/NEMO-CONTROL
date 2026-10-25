@@ -11,9 +11,9 @@ was packaged or signed — no artifact-bound claim is made.
 | G1 | Go build, all packages + custodyctl | PASS | `go build ./...` clean |
 | G2 | Go unit/race — sandbox cleanup lanes (PR-01) | PASS | `go test -race -run 'TestCleanup\|TestHighAssurance' ./internal/sandboxexecutor/` — 32.9s; full cleanup suite 170.7s |
 | G3 | Go unit/race — custody/witness/idempotency lanes (PR-02..05) | PASS | `go test -race ./internal/witness/ ./internal/custody/` 2.7s; `-run 'Custody\|Obligation\|Manifest' ./internal/execution/` 3.8s; `-run 'TerminalEvidence' ./internal/idempotency/` 2.7s |
-| G4 | Full `go test -race -timeout=20m ./...` | NOT_RUN | Time budget; targeted suites above ran instead |
+| G4 | Full `go test -race -timeout=20m ./...` | FAIL (environmental) | Every package green except: `internal/cli` 20m timeout panic on `TestRunGitOverlaySuccessFallbackAndLateLocalEdit` (git-overlay path, RC8.3-untouched); `internal/providers/{aws,blacksmith,machine0}` provider-double timeouts (no provider code touched); `internal/sandboxexecutor` `TestSlowInspectBounded` asserted the pre-RC8.3 unsafe fall-through — updated to the new contract, now green (16.9s). `internal/execution` re-run separately: PASS 53.3s |
 | G5 | Worker TypeScript / npm suites | NOT_RUN | No worker changes in RC8.3 scope |
-| G6 | Live PostgreSQL parity | NOT_RUN | `scripts/test-live-postgres.sh` not executed (no live DB provisioned) |
+| G6 | Live PostgreSQL parity | PASS | `scripts/test-live-postgres.sh` on postgres:16 docker: idempotency 13.3s, reconcile 6.2s, execution 40.7s, authority 2.4s |
 | G7 | Release packaging / attestation | NOT_RUN | No frozen candidate built; PR-06 contract landed (`docs/rc8.3/PROVENANCE_CONTRACT.md`, legacy verifier fail-fast) |
 | G8 | Independent witness, Apple HVF, Linux KVM real-hypervisor lanes | **BLOCKED** | No separately administered witness, no independent trust root, and no executed real-hypervisor fault-injection lanes in this environment. msb 0.7.8 verified present; fake-runtime lanes qualified only |
 
