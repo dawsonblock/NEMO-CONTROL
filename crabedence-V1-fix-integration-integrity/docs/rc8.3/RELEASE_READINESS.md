@@ -1,5 +1,19 @@
 # RC8.3 Release Readiness
 
+> **Integrity-closure requalification supersedes the G4 claim below.** On
+> branch `codex/rc8.3-integrity-closure`, the exact
+> `go test -race -timeout=20m ./...` invocation was rerun and recorded
+> **FAIL**: `internal/cli` hit the 20m package timeout (1203.2s) and
+> `providers/{aws,blacksmith,localcontainer,machine0,tart}` failed on
+> deadline/signal-killed paths under full-tree parallelism. A timed-out
+> suite is not PASS and isolated reruns are not substituted. The security
+> corrections pass their targeted and live lanes (including live
+> PostgreSQL and Apple Silicon/HVF), but the release decision is **NO-GO**
+> until the remaining independent-witness, Linux-KVM, external-signing,
+> and full-suite gates close. See
+> `qualification/rc8.3-integrity/FINAL-REPORT.md` and
+> `qualification/rc8.3-integrity/qualification-matrix.json`.
+
 Gate statuses are only PASS / FAIL / NOT_RUN / BLOCKED. Results bind to
 the frozen signed candidate `NEMO-CONTROL-v0.55.0-rc8.3-development.zip`
 (sha256 `1611b161…`, source commit `0db72fd2`), built twice
