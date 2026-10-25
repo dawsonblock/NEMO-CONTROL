@@ -9,6 +9,6 @@
 | PR-10 | F-04 | `internal/execution/release_manifest.go` (new), `config.go`, `serve.go`, `internal/custody/envelope.go` | manifest verify suite: tamper/wrong-signer/wrong-artifact/policy/registry/commit | DONE |
 | PR-10 | F-05 | `internal/execution/config.go`, `serve.go`, `config_test.go` | every invalid profile/config → fail closed | DONE |
 | PR-11 | F-06 | `internal/sandboxexecutor/backend_msb.go`, `namespace_test.go`, `cmd/sandbox-executord`, `docs/rc8.2/SANDBOX_CLEANUP.md` | G5 adversarial suite + namespace tests under `-race`; `msb` v0.7.8 inventory — no atomic delete, exclusive-namespace fallback | DONE |
-| PR-12 | F-07/F-08 | `RELEASE_MANIFEST.json`, `qualification/rc8-required-tests.json` binding, packaging scripts, `docs/rc8.2/RELEASE_PROVENANCE.md` | version consistency, inventory digest, clean-room extract, deterministic pack | PENDING |
-| PR-13 | G8 | qualification runs | gate-by-gate statuses in `docs/rc8.2/G8_REPORT.md` | PENDING |
-| PR-14 | F-09 | `worker/src/fleet.ts` (assessment only) | scoping note in `docs/rc8.2/F09_ASSESSMENT.md` | PENDING |
+| PR-12 | F-07/F-08 | `RELEASE_MANIFEST.json`, `qualification/rc8.2-required-tests.json` (digest `b3cf71c5…`), `rc8_evidence_verify_test.py` G7PackagingGate, signed artifact + sidecars | deterministic double-build byte-identical; clean-room extract verify; g7 4/4 evidence records | DONE |
+| PR-13 | G8 | all runnable lanes | `docs/rc8.2/RELEASE_READINESS.md` gate table — Go race sweep, Rust workspace, Node, Python, ABI differential, live Postgres, post-dispatch | DONE (BLOCKED on external-witness + live-hypervisor lanes; NO-GO for shared-ns) |
+| PR-14 | F-09 | `worker/src/fleet.ts` (assessment only) | `docs/rc8.2/FLEET_SCOPING.md` — ranked boundaries, characterization requirements | SCOPED (no refactor in candidate) |

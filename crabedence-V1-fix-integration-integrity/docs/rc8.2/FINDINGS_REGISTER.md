@@ -147,9 +147,14 @@ Statuses: OPEN / IN_PROGRESS / CLOSED / NOT_RUN / BLOCKED.
   attestation via the existing SSH `allowed-signers` mechanism;
   clean-room extraction verification; implement or rescope the four
   specified G7 tests.
-- **Status:** OPEN — PR-12 not yet executed (the signed-manifest
-  *runtime* half landed in PR-10: `release-manifest-v1` verify/load +
-  custody-envelope release binding).
+- **Status:** CLOSED (PR-12) — `RELEASE_MANIFEST.json` now binds the
+  RC8.2 candidate (commit `32654ced`, artifact `57f4f6a6…`,
+  deterministic double-build, extraction-verified, SSH-signed
+  attestation `rc8-release`); `rc8.2-required-tests.json` digest
+  `b3cf71c5…` is the authoritative inventory; the stale transfer-
+  manifest digest was corrected to `d094c949…`; g7-packaging's four
+  normative cases are implemented and executed (`--emit-evidence`,
+  4/4 verified records).
 
 ## F-09 — Maintainability: `worker/src/fleet.ts` ~24.3k lines
 
@@ -159,4 +164,7 @@ Statuses: OPEN / IN_PROGRESS / CLOSED / NOT_RUN / BLOCKED.
 - **Correction:** deferred to post-stabilization (PR-14); safe
   extraction boundaries identified; characterization tests required
   before any move. Not bundled into the qualification candidate.
-- **Status:** OPEN — scoped, not started (by design).
+- **Status:** SCOPED (PR-14) — `docs/rc8.2/FLEET_SCOPING.md` records
+  the measured module shape and ranked extraction boundaries with
+  characterization-test requirements; no refactor in the candidate,
+  by design.
