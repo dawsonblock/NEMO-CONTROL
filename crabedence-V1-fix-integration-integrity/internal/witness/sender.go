@@ -2,6 +2,9 @@ package witness
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -43,6 +46,10 @@ type Sender struct {
 	stopped    chan struct{}
 	once       sync.Once
 	wake       chan struct{} // enqueue notification — prompt drain
+	// repairHook is a test-only fault-injection seam between the
+	// verified scan and the transactional marker clear. Nil in
+	// production.
+	repairHook func(stage string) error
 }
 
 // DefaultReadinessTTL bounds how old verified-custody evidence may be
@@ -371,22 +378,104 @@ func (s *Sender) readinessFresh(ctx context.Context) (bool, string) {
 	return true, ""
 }
 
-// OperatorRepair is the explicit repair path for a REPAIR_REQUIRED
-// custody state. It requires an authenticated actor and a non-empty
-// reason — the audit record binds both — then runs an independent
-// full-history obligation rescan (sequence 0, not the incremental
-// mark), a verified drain pass (signed checkpoint, outbox contents,
-// acks, backlog), and a final readiness check. Only when every stage
-// verifies is the contradiction marker cleared; a failure at any
-// stage leaves REPAIR_REQUIRED open. Repair never clears a forensic
-// contradiction merely because connectivity recovered — the full
-// rescan must prove the stream itself is consistent.
-func (s *Sender) OperatorRepair(ctx context.Context, actor, reason string) error {
-	if actor == "" {
-		return fmt.Errorf("custody repair requires an authenticated actor identity")
+// OperatorAuthorization is the privileged authority a repair carries.
+// It is the same signed-grant shape migration uses, verified against a
+// repair-authority trust set pinned separately from the evidence keys.
+type OperatorAuthorization = MigrationAuthorization
+
+// RepairEvidence is the verified full-history receipt a repair binds
+// into its audit record: structural chain state plus obligation
+// coverage, with a digest over the canonical document.
+type RepairEvidence struct {
+	Schema        string `json:"schema"`
+	DeploymentID  string `json:"deployment_id"`
+	GrantDigest   string `json:"grant_digest"`
+	Subject       string `json:"subject"`
+	Nonce         string `json:"nonce"`
+	ChainRows     int64  `json:"chain_rows"`
+	HeadSeq       int64  `json:"head_seq"`
+	HeadHash      string `json:"head_hash"`
+	ChainDigest   string `json:"chain_digest"`
+	ObligationHWM int64  `json:"obligation_hwm"`
+	Undelivered   int64  `json:"undelivered"`
+	ScannedAt     string `json:"scanned_at"`
+	Digest        string `json:"digest"`
+}
+
+// RepairEvidence independently re-reads the durable outbox and proves
+// the chain is structurally intact. It never trusts the scanner's own
+// report: the scanner restores obligations, this recomputes the state
+// those obligations live in.
+func (o *Outbox) RepairEvidence(ctx context.Context, deploymentID string, grant *OperatorGrant) (RepairEvidence, error) {
+	chain, err := o.VerifyChain(ctx)
+	if err != nil {
+		return RepairEvidence{}, err
 	}
+	st, err := o.CustodyStatus(ctx)
+	if err != nil {
+		return RepairEvidence{}, err
+	}
+	undelivered, err := o.Undelivered(ctx)
+	if err != nil {
+		return RepairEvidence{}, err
+	}
+	grantDigest, err := GrantDigest(grant)
+	if err != nil {
+		return RepairEvidence{}, err
+	}
+	ev := RepairEvidence{
+		Schema:        "custody-repair-evidence-v1",
+		DeploymentID:  deploymentID,
+		GrantDigest:   grantDigest,
+		Subject:       grant.Subject,
+		Nonce:         grant.Nonce,
+		ChainRows:     chain.Rows,
+		HeadSeq:       chain.HeadSeq,
+		HeadHash:      chain.HeadHash,
+		ChainDigest:   chain.Digest,
+		ObligationHWM: st.ObligationHWM,
+		Undelivered:   undelivered,
+		ScannedAt:     time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	raw, err := json.Marshal(ev)
+	if err != nil {
+		return RepairEvidence{}, err
+	}
+	sum := sha256.Sum256(raw)
+	ev.Digest = hex.EncodeToString(sum[:])
+	return ev, nil
+}
+
+// OperatorRepair is the explicit repair path for a REPAIR_REQUIRED
+// custody state. It refuses outright when no independent full-history
+// scanner is installed: an incremental scan since the high-water mark
+// could inherit exactly the corruption the repair must disprove.
+//
+// Authority is a signed grant, never a caller-supplied name: the actor
+// is the grant's subject, covered by a repair-authority signature, and
+// its nonce is consumed durably before any scan runs. The repair then
+// requires a verified full-history obligation rescan, a verified drain
+// (signed checkpoint, outbox contents, acks, backlog), a recomputed
+// chain/coverage receipt, and a final readiness check. Only when every
+// stage verifies is the marker cleared — transactionally, and only if
+// the marker is still the exact contradiction the scan observed, so a
+// concurrent new contradiction can never be cleared by stale work.
+func (s *Sender) OperatorRepair(ctx context.Context, auth OperatorAuthorization, reason string) error {
 	if reason == "" {
 		return fmt.Errorf("custody repair requires a non-empty operator reason")
+	}
+	if auth.Grant == nil {
+		return fmt.Errorf("%w: repair requires a signed operator grant — a self-supplied actor name never establishes identity", ErrOperatorAuthorization)
+	}
+	if auth.DeploymentID == "" || auth.DeploymentID != s.deploymentID {
+		return fmt.Errorf("%w: repair grant is scoped to %q, this sender serves %q", ErrOperatorAuthorization, auth.DeploymentID, s.deploymentID)
+	}
+	if err := VerifyOperatorGrant(auth.Grant, auth.Trust, s.deploymentID, OperationRepair, time.Now()); err != nil {
+		return err
+	}
+	fn, ok := s.fullScan.Load().(func(context.Context) error)
+	if !ok || fn == nil {
+		return fmt.Errorf("%w: refusing repair — no independent full-history scanner is installed, so the stream cannot be re-proven", ErrRepairScannerUnavailable)
 	}
 	st, err := s.outbox.CustodyStatus(ctx)
 	if err != nil {
@@ -395,9 +484,32 @@ func (s *Sender) OperatorRepair(ctx context.Context, actor, reason string) error
 	if st.RepairReason == "" {
 		return fmt.Errorf("custody repair refused: no REPAIR_REQUIRED marker is open (state %s)", s.CustodyState(ctx))
 	}
-	if fn, ok := s.fullScan.Load().(func(context.Context) error); ok && fn != nil {
-		if err := fn(ctx); err != nil {
-			return fmt.Errorf("custody repair: full-history obligation rescan failed: %w", err)
+	expectedReason := st.RepairReason
+	// The operator surface consumes the grant nonce exactly once before
+	// calling in; an unconsumed grant is not live authority. This is the
+	// durable replay fence — a captured grant presented to a later
+	// invocation finds its nonce already spent at the entry point.
+	grantDigest, err := GrantDigest(auth.Grant)
+	if err != nil {
+		return err
+	}
+	used, err := s.outbox.OperatorNonceUsed(ctx, auth.Grant.Nonce, grantDigest)
+	if err != nil {
+		return err
+	}
+	if !used {
+		return fmt.Errorf("%w: repair grant nonce was never consumed — authorization is not live", ErrOperatorAuthorization)
+	}
+	if err := fn(ctx); err != nil {
+		return fmt.Errorf("custody repair: full-history obligation rescan failed: %w", err)
+	}
+	preEvidence, err := s.outbox.RepairEvidence(ctx, s.deploymentID, auth.Grant)
+	if err != nil {
+		return fmt.Errorf("custody repair: pre-drain evidence verification failed: %w", err)
+	}
+	if s.repairHook != nil {
+		if err := s.repairHook("after_scan"); err != nil {
+			return err
 		}
 	}
 	if !s.drain(ctx) {
@@ -421,8 +533,17 @@ func (s *Sender) OperatorRepair(ctx context.Context, actor, reason string) error
 	if n, err := s.outbox.Undelivered(ctx); err != nil || n > 0 {
 		return fmt.Errorf("custody repair: %d obligations undelivered — marker stays open", n)
 	}
-	note := fmt.Sprintf("operator repair actor=%q reason=%q full-rescan=verified", actor, reason)
-	if err := s.outbox.ClearRepairRequired(ctx, note); err != nil {
+	postEvidence, err := s.outbox.RepairEvidence(ctx, s.deploymentID, auth.Grant)
+	if err != nil {
+		return fmt.Errorf("custody repair: post-drain evidence verification failed: %w", err)
+	}
+	if postEvidence.HeadSeq != preEvidence.HeadSeq || postEvidence.ChainDigest != preEvidence.ChainDigest {
+		return fmt.Errorf("custody repair: chain changed during repair (%d/%s → %d/%s) — a concurrent writer landed; marker stays open",
+			preEvidence.HeadSeq, preEvidence.ChainDigest, postEvidence.HeadSeq, postEvidence.ChainDigest)
+	}
+	note := fmt.Sprintf("operator repair subject=%q reason=%q grant=%s pre=%s post=%s full-rescan=verified",
+		auth.Grant.Subject, reason, postEvidence.GrantDigest, preEvidence.Digest, postEvidence.Digest)
+	if err := s.outbox.ClearRepairRequiredIfUnchanged(ctx, expectedReason, note); err != nil {
 		return fmt.Errorf("custody repair marker: %w", err)
 	}
 	return nil
