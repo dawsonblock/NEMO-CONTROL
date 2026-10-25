@@ -72,6 +72,18 @@ func newControlGate(cfg ControlLedgerConfig, production bool) (func() error, err
 	}, nil
 }
 
+// controlGateFlight is one shared in-flight ledger probe. Completion
+// is broadcast — done is closed, never sent on — so every waiter
+// parked on this generation observes the same stored result. gen is
+// the flight's generation identifier: the worker retires the shared
+// slot only while its own generation is still current, so a stale
+// worker can never clear a newer probe's slot.
+type controlGateFlight struct {
+	done chan struct{} // closed exactly once, when err is readable
+	err  error         // valid only after done is closed
+	gen  uint64
+}
+
 // controlGateProbe wraps the admission check with a soft timeout so a
 // wedged filesystem read degrades to denial rather than hanging the
 // dispatch path forever.
@@ -80,33 +92,49 @@ func newControlGate(cfg ControlLedgerConfig, production bool) (func() error, err
 // running until the filesystem answers. Spawning one probe per
 // admission would leak a goroutine for every dispatch while the store
 // is wedged; instead concurrent admissions share a single in-flight
-// probe — they would observe the same on-disk state anyway — each
-// waiter enforces its own timeout, and the next admission after the
-// probe completes gets a fresh read.
+// probe — they would observe the same on-disk state anyway.
+//
+// Result delivery is broadcast, not consumable: every waiter attached
+// when the probe completes receives the identical stored result.
+// Each waiter enforces its own timeout — a waiter that times out
+// simply stops waiting and never touches shared state. The completed
+// state is valid only for waiters already attached at completion: the
+// worker publishes the result and retires the generation in the same
+// atomic step, so a caller arriving after completion always starts a
+// fresh probe. A hung probe can therefore delay admissions (each
+// denies at its own budget) but can never deliver an unauthorized
+// admission or a lost broadcast.
 func controlGateProbe(check func() error, budget time.Duration) func() error {
 	var mu sync.Mutex
-	var done chan error
+	var current *controlGateFlight
+	var nextGen uint64
 	return func() error {
 		mu.Lock()
-		if done == nil {
-			done = make(chan error, 1)
-			d := done
+		if current == nil {
+			f := &controlGateFlight{done: make(chan struct{}), gen: nextGen}
+			nextGen++
+			current = f
 			go func() {
 				err := check()
-				// Release the slot before delivering the result: a
-				// caller arriving in between must start a fresh probe,
-				// never attach to a channel that receives nothing more.
+				// Publish, broadcast, and retire under one lock: a
+				// caller arriving after this step starts a fresh
+				// probe rather than attaching to a completed
+				// generation, and the generation guard keeps a stale
+				// worker from clearing a newer flight's slot.
 				mu.Lock()
-				done = nil
+				f.err = err
+				close(f.done)
+				if current == f {
+					current = nil
+				}
 				mu.Unlock()
-				d <- err
 			}()
 		}
-		d := done
+		f := current
 		mu.Unlock()
 		select {
-		case err := <-d:
-			return err
+		case <-f.done:
+			return f.err
 		case <-time.After(budget):
 			return fmt.Errorf("control ledger check exceeded %s — denied", budget)
 		}
