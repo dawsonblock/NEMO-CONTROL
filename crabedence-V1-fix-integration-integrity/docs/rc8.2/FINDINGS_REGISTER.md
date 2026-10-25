@@ -113,15 +113,25 @@ Statuses: OPEN / IN_PROGRESS / CLOSED / NOT_RUN / BLOCKED.
   `docs/rc8/ADRs/0004-conditional-sandbox-cleanup.md` — `msb` exposes
   no remove-if-identity primitive; RC8.1 PR-05 bounded the steps and
   lands REMOVAL_UNCERTAIN on any unproven step (implemented).
-- **Correction (this cycle):** re-inventory runtime primitives; if
-  none is atomic, ship the documented exclusive-namespace deployment
-  mode (`CRABEDENCE_SANDBOX_NAMESPACE=exclusive`) that makes the
-  residual trust assumption explicit and enforceable, and retain
-  NO-GO for shared-namespace high-assurance claims.
+- **Correction (this cycle):** re-inventoried `msb` v0.7.8 — `rm`
+  resolves name/label then deletes; **no conditional/atomic delete
+  exists**, so the native branch is unavailable and the fallback
+  stands. Implemented `MSBBackend.Namespace` +
+  `-msb-namespace`/`SANDBOX_EXECUTOR_MSB_NAMESPACE`: handles mint under
+  `sx-<ns>-`, `crabedence.namespace` is stamped at create and verified
+  on cleanup, foreign/absent-namespace occupants classify
+  `IDENTITY_MISMATCH` and survive, out-of-namespace handles classify
+  `IDENTITY_UNVERIFIABLE`. Documented in
+  `docs/rc8.2/SANDBOX_CLEANUP.md`; NO-GO retained for shared-namespace
+  high-assurance deployments.
 - **Tests:** the RC8.1 G5 adversarial suite already covers replacement,
   nonce mismatch, concurrent cleanup, disappearance, timeouts, crash,
-  name reuse, collision — re-run under `-race`.
-- **Status:** OPEN — PR-11 not yet executed.
+  name reuse, collision — re-run under `-race`; new
+  `namespace_test.go` adds namespace validation, prefixed/labeled
+  minting, foreign- and absent-namespace refusal, out-of-prefix handle
+  refusal, and symmetric cross-deployment isolation.
+- **Status:** CLOSED (PR-11) — exclusive-namespace fallback enforced;
+  production claim restricted to namespaced deployments only.
 
 ## F-07 / F-08 — Release identity and reproducibility
 

@@ -8,7 +8,7 @@
 | PR-10 | F-03 | `internal/witness/sender.go`, `config.go`, `serve.go`, `witness_test.go`, `custody_gate_test.go` | offline/slow/bad-sig/stale/wrong-id witness, cold restart w/ backlog, outage pre-admission | DONE |
 | PR-10 | F-04 | `internal/execution/release_manifest.go` (new), `config.go`, `serve.go`, `internal/custody/envelope.go` | manifest verify suite: tamper/wrong-signer/wrong-artifact/policy/registry/commit | DONE |
 | PR-10 | F-05 | `internal/execution/config.go`, `serve.go`, `config_test.go` | every invalid profile/config → fail closed | DONE |
-| PR-11 | F-06 | `internal/sandboxexecutor` (inspect), `docs/rc8.2/SANDBOX_CLEANUP.md`, config | G5 adversarial suite re-run; exclusive-namespace enforcement | PENDING |
+| PR-11 | F-06 | `internal/sandboxexecutor/backend_msb.go`, `namespace_test.go`, `cmd/sandbox-executord`, `docs/rc8.2/SANDBOX_CLEANUP.md` | G5 adversarial suite + namespace tests under `-race`; `msb` v0.7.8 inventory — no atomic delete, exclusive-namespace fallback | DONE |
 | PR-12 | F-07/F-08 | `RELEASE_MANIFEST.json`, `qualification/rc8-required-tests.json` binding, packaging scripts, `docs/rc8.2/RELEASE_PROVENANCE.md` | version consistency, inventory digest, clean-room extract, deterministic pack | PENDING |
 | PR-13 | G8 | qualification runs | gate-by-gate statuses in `docs/rc8.2/G8_REPORT.md` | PENDING |
 | PR-14 | F-09 | `worker/src/fleet.ts` (assessment only) | scoping note in `docs/rc8.2/F09_ASSESSMENT.md` | PENDING |

@@ -133,6 +133,7 @@ func main() {
 	msbVersion := flag.String("msb-version", sandboxexecutor.PinnedMSBVersion, "pinned Microsandbox runtime version the adapter is qualified against")
 	runtimeManifest := flag.String("runtime-manifest", os.Getenv("SANDBOX_EXECUTOR_RUNTIME_MANIFEST"), "qualified runtime manifest (JSON) pinning the msb executable and libkrunfw firmware SHA-256 (or SANDBOX_EXECUTOR_RUNTIME_MANIFEST); required for the microsandbox backend")
 	msbProfile := flag.String("msb-deployment-profile", sandboxexecutor.DeploymentSingleTenant, "host-runtime isolation profile every sandbox boots under (single-tenant or multi-tenant)")
+	msbNamespace := flag.String("msb-namespace", os.Getenv("SANDBOX_EXECUTOR_MSB_NAMESPACE"), "deployment-exclusive sandbox namespace (or SANDBOX_EXECUTOR_MSB_NAMESPACE): handles mint under sx-<ns>- and a crabedence.namespace label is verified on cleanup; empty shares the sx- namespace — the shared posture cannot carry high-assurance cleanup claims")
 	msbPull := flag.String("msb-pull", "never", "image fetch policy for the microsandbox backend: never (require the pinned image locally) or if-missing")
 	stateDir := flag.String("state-dir", os.Getenv("SANDBOX_EXECUTOR_STATE_DIR"), "artifact directory for captured output (or SANDBOX_EXECUTOR_STATE_DIR)")
 	ledgerPath := flag.String("ledger", os.Getenv("SANDBOX_EXECUTOR_LEDGER"), "durable job ledger path (or SANDBOX_EXECUTOR_LEDGER)")
@@ -211,9 +212,15 @@ func main() {
 		if artifacts == "" {
 			artifacts = filepath.Join(*socketDir, "artifacts")
 		}
+		if *msbNamespace != "" {
+			if err := sandboxexecutor.ValidateNamespace(*msbNamespace); err != nil {
+				log.Fatalf("sandbox-executord: %v", err)
+			}
+		}
 		mb := &sandboxexecutor.MSBBackend{
 			Bin: bin, StateDir: artifacts, PullPolicy: *msbPull,
 			RequiredVersion: *msbVersion, DeploymentProfile: *msbProfile,
+			Namespace: *msbNamespace,
 		}
 		// The qualified runtime manifest is mandatory: the version
 		// string is a claim, the digests are the identity. A runtime

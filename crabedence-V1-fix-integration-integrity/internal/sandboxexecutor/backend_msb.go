@@ -162,6 +162,17 @@ type MSBBackend struct {
 	// Inspect refuses handles that lack it, so the backend can never
 	// be pointed at sandboxes it did not launch.
 	NamePrefix string
+	// Namespace, when set, is the deployment-exclusive sandbox
+	// namespace (RC8.2 F-06): every sandbox boots with a
+	// crabedence.namespace=<ns> label, every handle mints under the
+	// sx-<ns>- prefix, and cleanup classifies a foreign-namespace
+	// occupant as IDENTITY_MISMATCH rather than destroying it. Empty
+	// is the shared sx- posture — adequate while the per-dispatch
+	// nonce is the deletion key, but it cannot bound which other
+	// tenants write into the same catalog namespace, so
+	// shared-namespace deployments do not qualify for high-assurance
+	// cleanup claims.
+	Namespace string
 	// PullPolicy pins the image-fetch policy on every create: "never"
 	// (default) requires the authorized image to be present locally
 	// and refuses fast otherwise; "if-missing" lets the CLI fetch the
@@ -464,14 +475,43 @@ func (f *msbJobFailure) text() string {
 // ledger before any VM exists, so a later lifetime reconciles the
 // recorded handle and never needs to guess it.
 //
+// ValidateNamespace checks a deployment namespace declaration: a
+// short DNS-label-style segment. Anything else is refused — the
+// namespace is a label value and a name-prefix component, so
+// punctuation or length that msb cannot carry would silently weaken
+// the isolation it claims.
+func ValidateNamespace(ns string) error {
+	if len(ns) == 0 || len(ns) > 32 {
+		return fmt.Errorf("sandbox namespace %q: must be 1-32 chars", ns)
+	}
+	for i, c := range ns {
+		ok := (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '-' && i > 0)
+		if !ok {
+			return fmt.Errorf("sandbox namespace %q: lowercase alnum and interior '-' only", ns)
+		}
+	}
+	return nil
+}
+
+// handlePrefix is the backend's effective sandbox name prefix —
+// the exclusive namespace when declared, the shared default
+// otherwise. Every handle/inspect/cleanup namespace check resolves
+// through here.
+func (b *MSBBackend) handlePrefix() string {
+	if b.Namespace != "" {
+		return "sx-" + b.Namespace + "-"
+	}
+	if b.NamePrefix != "" {
+		return b.NamePrefix
+	}
+	return "sx-"
+}
+
 // msb bounds names at 128 UTF-8 bytes; the nonce tail is the part
 // that must never be truncated away, so a long job id is hashed out
 // of the middle and the nonce is always preserved intact.
 func (b *MSBBackend) msbJobName(jobID, nonce string) string {
-	prefix := b.NamePrefix
-	if prefix == "" {
-		prefix = "sx-"
-	}
+	prefix := b.handlePrefix()
 	suffix := "-" + nonce
 	name := prefix + jobID + suffix
 	if len(name) > 120 {
@@ -579,6 +619,9 @@ func (b *MSBBackend) createArgs(job *JobContractV2, name, nonce string) ([]strin
 		"--label", "crabedence.job="+job.JobID,
 		"--label", "crabedence.dispatch="+nonce,
 	)
+	if b.Namespace != "" {
+		args = append(args, "--label", "crabedence.namespace="+b.Namespace)
+	}
 	policy := b.PullPolicy
 	if policy == "" {
 		policy = PullNever
@@ -1023,10 +1066,7 @@ func (b *MSBBackend) inspectJob(ctx context.Context, name, runID string) (*msbJo
 // It refuses handles outside this backend's namespace: the executor
 // must never query a sandbox it did not create.
 func (b *MSBBackend) Inspect(ctx context.Context, handle string) (bool, error) {
-	prefix := b.NamePrefix
-	if prefix == "" {
-		prefix = "sx-"
-	}
+	prefix := b.handlePrefix()
 	if !strings.HasPrefix(handle, prefix) {
 		return false, fmt.Errorf("handle %q is outside this backend's namespace %q", handle, prefix)
 	}
@@ -1481,10 +1521,7 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 	if err := req.Validate(); err != nil {
 		return refuse(CleanupIdentityUnverifiable, "%v", err)
 	}
-	prefix := b.NamePrefix
-	if prefix == "" {
-		prefix = "sx-"
-	}
+	prefix := b.handlePrefix()
 	if !strings.HasPrefix(req.Handle, prefix) {
 		return refuse(CleanupIdentityUnverifiable,
 			"handle %q is outside this backend's namespace %q — refusing to destroy outside the jobs this backend launched", req.Handle, prefix)
@@ -1516,6 +1553,14 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 			return refuse(CleanupIdentityMismatch,
 				"sandbox %s carries dispatch %q job %q, not the authorized %q/%q — a substituted or foreign instance is never destroyed; it belongs to an operator",
 				req.Handle, dispatch, jobLabel, req.DispatchNonce, req.JobID)
+		}
+		if b.Namespace != "" && jsonString(labels, "crabedence.namespace") != b.Namespace {
+			// The occupant presents our per-dispatch labels but a
+			// different namespace — a foreign deployment's sandbox
+			// inside our naming space is never destroyed.
+			return refuse(CleanupIdentityMismatch,
+				"sandbox %s carries namespace %q, not the declared %q — a cross-deployment occupant is never destroyed",
+				req.Handle, jsonString(labels, "crabedence.namespace"), b.Namespace)
 		}
 		if req.BootID != "" {
 			if boot, berr := b.sandboxBootID(doc); berr == nil && boot != req.BootID {
