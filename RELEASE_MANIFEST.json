@@ -1,47 +1,51 @@
 {
-  "schema_version": 1,
-  "release": "0.54.0-rc.7.6-dev",
-  "designation": "development-candidate",
-  "artifact": {
-    "filename": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip",
-    "sha256": "41d4f572e89087447bec3651502a98c5ce3c68a7d05ce30a07b9816c8eb54f68",
-    "size_bytes": 19044531,
-    "format": "zip",
-    "prefix": "nemo-control-0.54.0-rc.7.6-dev"
-  },
-  "source": {
-    "commit": "50343e5e0721ad163e4c9754eaa334368f5c57dc",
-    "branch": "fix/rc7.6-defect-repair",
-    "packaged_from": "git ls-files membership under crabedence-V1-fix-integration-integrity/ via scripts/package-source-archive.sh --format zip",
-    "extraction_verified": true,
-    "manifest_entries": 4265
-  },
-  "provenance": {
-    "attestation": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip.attestation.json",
-    "attestation_signature": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip.attestation.json.sig",
-    "attestation_schema": "rc75-release-attestation-v1",
-    "signature_namespace": "rc75-release",
-    "signature_identity": "dawsonblock@users.noreply.github.com (trusted release key — principal in .github/release-allowed-signers, registered on the GitHub account as an SSH signing key)",
-    "source_manifest_sha256": "3f32f9a9d010d4378d1704d20d1f1657c536a8c9f20578c64f31c6914ebd3a0d",
-    "source_manifest_root_hash": "e3a425497361ccc4f7be11129ea9e77f943289a12cad97f81698d13fe7d01da0",
-    "source_entry_count": 4265,
-    "source_symlink_count": 12,
-    "note": "the attestation is SSH-signed over the archive digest and verifies by default (signature material required; --allow-unsigned is dev-only). Signed by the trusted release key at ~/.ssh/id_ed25519 whose public half is in .github/release-allowed-signers and registered on the GitHub account — the binding is now release-key authenticated, not a development stand-in. The source manifest also covers the embedded release-evidence/source-tree-sha256.txt (4264 entries vs the prior 4263-entry binding, which predates its auto-embedding)."
-  },
-  "identities": {
-    "msb_runtime_pin_manifest": "qualification/msb-runtime-pins.json",
-    "msb_runtime_pin_manifest_sha256": "e6bde12f337538481bf3af680a6bc727231b142be950b67e1750ebf80b7e6894",
-    "lane_image_pins": "qualification/msb-lane-image-pins.json",
-    "lane_image_pins_sha256": "f86821a73fba103d2bb70a00bba3ca71dc8e404cc75ddcae3c3a227b65a32b27",
-    "nemo_transfer_manifest_sha256": "43d8f6e69be3ad504359815bbd1ee7b44e405132c086cf8b608f850da7d57519"
-  },
-  "supersedes": "prior RC7.6 manifest records (commits 1f0625f9, d870703e, d46d0006; archive sha256s 71346719…, 3d224f41…, aa7ae922…) — this record binds the RC7.6 development candidate at 50343e5e including the RC7.7 round-2 hardening, the witness_checkpoint fix + drill tool, and the custody cleanup (op regression tests, current docs); the attestation is signed by the trusted release key (dawsonblock@users.noreply.github.com), no longer the dev binding key; the RC7.5 artifact remains NO-GO",
-  "qualification": "NOT QUALIFIED — development candidate containing the RC7.5-audit repairs and RC7.7 hardening rounds 1-2; the mandatory qualification campaign (pinned toolchain, both lanes, live crash/fault injection, independent custody) has not completed for this identity; see DEFECT_REGISTER.md",
-  "blockers": [
-    "exclusive sandbox-namespace ownership is a stated deployment assumption (T1 residual) — native catalog-locked conditional delete remains the upgrade path",
-    "external custody on a separately administered host NOT_RUN — local live drills passed (cmd/sandbox-custody-drill: baseline, outage hold/recover, replay refusal, forgery refusal, foreign-deployment refusal, clean audit) but a custodian under different administrative control remains",
-    "apple-hypervisor-framework lane: runner dawson-macbook-apple-silicon is registered on dawsonblock/crabedence-V1 (self-hosted, macOS, ARM64) and online — a dispatched qualification job has not yet passed on it",
-    "real crash/fault-injection requalification pending — epoch takeover, ambiguous-create cleanup, and bounded verify are implemented and unit-tested but not live-qualified",
-    "toolchain: local verification ran under go1.27.2; the pinned go1.26.5 lane has not re-run in this workspace"
-  ]
+ "schema_version": 1,
+ "release": "0.55.0-rc8.2-dev",
+ "designation": "development-candidate",
+ "artifact": {
+  "filename": "NEMO-CONTROL-v0.55.0-rc8.2-development.zip",
+  "sha256": "57f4f6a6555edbc89a0c32a89240b1d6ed3fb25a1af6340e349413b2ef543fcc",
+  "size_bytes": 19050326,
+  "format": "zip",
+  "prefix": "nemo-control-0.55.0-rc8.2-dev"
+ },
+ "source": {
+  "commit": "32654cedd2699d27e23314ec3a91309ff71229ad",
+  "branch": "codex/rc8.2-security-qualification",
+  "packaged_from": "git ls-files membership under crabedence-V1-fix-integration-integrity/ via scripts/package-source-archive.sh --format zip",
+  "extraction_verified": true,
+  "manifest_entries": 4329,
+  "reproducibility": "two independent package-source-archive.sh runs at commit 32654ced produced byte-identical archives (sha256 57f4f6a6… verified twice)"
+ },
+ "provenance": {
+  "attestation": "NEMO-CONTROL-v0.55.0-rc8.2-development.zip.attestation.json",
+  "attestation_signature": "NEMO-CONTROL-v0.55.0-rc8.2-development.zip.attestation.json.sig",
+  "attestation_schema": "rc75-release-attestation-v1",
+  "signature_namespace": "rc8-release",
+  "signature_identity": "dawsonblock@users.noreply.github.com (trusted release key — principal in .github/release-allowed-signers, registered on the GitHub account as an SSH signing key)",
+  "source_manifest": "NEMO-CONTROL-v0.55.0-rc8.2-development.zip.source-manifest.json",
+  "source_manifest_sha256": "c3f8589cedd25d53517965eb795e28a5d666a4270e753dbfa77945c0db4b73a1",
+  "source_manifest_root_hash": "fe654970404897ad0dc9ee68ec231a6a820feb392ffe908c71b52475bd6ffdca",
+  "source_entry_count": 4329,
+  "note": "the attestation is SSH-signed over the archive identity under namespace rc8-release and verifies against the allowed-signers sidecar (signature material required; --allow-unsigned is dev-only). Signed by the trusted release key at ~/.ssh/id_ed25519."
+ },
+ "identities": {
+  "msb_runtime_pin_manifest": "qualification/msb-runtime-pins.json",
+  "msb_runtime_pin_manifest_sha256": "e6bde12f337538481bf3af680a6bc727231b142be950b67e1750ebf80b7e6894",
+  "lane_image_pins": "qualification/msb-lane-image-pins.json",
+  "lane_image_pins_sha256": "f86821a73fba103d2bb70a00bba3ca71dc8e404cc75ddcae3c3a227b65a32b27",
+  "nemo_transfer_manifest_sha256": "d094c9498fac1ec477319fb47bd7cbf6ad2dabb90a1cfcdf37d66eb4a8c0c29c",
+  "required_test_inventory": "qualification/rc8.2-required-tests.json",
+  "required_test_inventory_sha256": "b3cf71c5bc263c7aec43b8bd449cfc7487496e52e78863eca56a346fd0809881",
+  "provenance_policy_sha256": "0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1"
+ },
+ "supersedes": "RELEASE_MANIFEST.json record for 0.54.0-rc.7.6-dev (archive sha256 41d4f572…) — retained in git history as the prior development-candidate record; RC7.x artifacts remain historical sidecars, never inputs to RC8.2 qualification",
+ "qualification": "NOT QUALIFIED — development candidate carrying the RC8.2 security closure (F-01..F-06 implemented and race-verified; g1..g7 inventories executed-status). The mandatory qualification campaign — pinned-toolchain full suite, live lanes, external witness custody, crash/fault injection — has not completed for this identity; see docs/rc8.2/FINDINGS_REGISTER.md and the RC8.2 residual-risk register",
+ "blockers": [
+  "sandbox conditional deletion: msb v0.7.8 has no atomic identity-conditional delete — cleanup qualifies only under a deployment-exclusive namespace (-msb-namespace); shared-namespace deployments remain NO-GO for high-assurance cleanup (docs/rc8.2/SANDBOX_CLEANUP.md)",
+  "external witness custody on a separately administered host NOT_RUN — durable obligations, verified readiness, and replay are implemented and tested, but a custodian under different administrative control remains unqualified",
+  "apple-hypervisor-framework and Linux/KVM live lanes not yet executed for this commit — unavailable hardware lanes remain NOT_RUN, not passes",
+  "full pinned-toolchain qualification sweep (Go 1.26.5 race suite, Rust workspace, Node worker, ABI differential corpus, PostgreSQL parity) not yet run end-to-end for commit 32654ced",
+  "g8 security qualification evidence bundle not yet produced — gate-by-gate statuses are recorded honestly in the RC8.2 release-readiness report"
+ ]
 }
