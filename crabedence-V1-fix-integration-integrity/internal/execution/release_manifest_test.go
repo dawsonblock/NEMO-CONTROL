@@ -70,7 +70,7 @@ func TestReleaseManifestRoundTrip(t *testing.T) {
 // invalidates the signature — no field of the identity is malleable.
 func TestReleaseManifestTamperedRejected(t *testing.T) {
 	mutations := map[string]func(*ReleaseManifest){
-		"version":       func(m *ReleaseManifest) { m.Version = "0.55.0-rc8.3-dev" },
+		"version":       func(m *ReleaseManifest) { m.Version = "0.55.0-rc8.2-dev" },
 		"source commit": func(m *ReleaseManifest) { m.SourceCommit = strings.Repeat("f", 40) },
 		"artifact":      func(m *ReleaseManifest) { m.ArtifactSHA256 = strings.Repeat("e", 64) },
 		"policy":        func(m *ReleaseManifest) { m.PolicyDigest = strings.Repeat("9", 64) },

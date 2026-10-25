@@ -255,11 +255,52 @@ func TestCustodyRepairRequiredStickyUntilOperatorRepair(t *testing.T) {
 			t.Fatalf("successful drain cleared REPAIR_REQUIRED — got %s", got)
 		}
 	}
-	if err := h.sender.OperatorRepair(context.Background(), "operator confirmed fork resolved: witness restored"); err != nil {
+	// Unauthorized repairs are refused before any pass runs.
+	if err := h.sender.OperatorRepair(context.Background(), "", "no actor"); err == nil {
+		t.Fatal("repair without an actor was admitted")
+	}
+	if err := h.sender.OperatorRepair(context.Background(), "alice", ""); err == nil {
+		t.Fatal("repair without a reason was admitted")
+	}
+	if got := h.sender.CustodyState(context.Background()); got != "REPAIR_REQUIRED" {
+		t.Fatalf("unauthorized repair cleared the marker — got %s", got)
+	}
+	if err := h.sender.OperatorRepair(context.Background(), "alice", "operator confirmed fork resolved: witness restored"); err != nil {
 		t.Fatalf("operator repair: %v", err)
 	}
 	if got := h.sender.CustodyState(context.Background()); got != "HEALTHY" {
 		t.Fatalf("post-repair state = %s, want HEALTHY", got)
+	}
+}
+
+// TestCustodyFailedProbeImmediatelyDegrades: a failed drain after a
+// fresh success invalidates readiness at once — a millisecond-old
+// verified pass can never mask the current failure, and only a new
+// complete verified pass restores HEALTHY.
+func TestCustodyFailedProbeImmediatelyDegrades(t *testing.T) {
+	h := newHarness(t, true)
+	defer h.cancel()
+	if !h.drain() {
+		t.Fatalf("drain failed: %s", h.sender.LastError())
+	}
+	if got := h.sender.CustodyState(context.Background()); got != "HEALTHY" {
+		t.Fatalf("state after verified drain = %s, want HEALTHY", got)
+	}
+	h.cancel() // witness down — the next pass cannot reach it
+	if h.drain() {
+		t.Fatal("drain succeeded against a dead witness")
+	}
+	if got := h.sender.CustodyState(context.Background()); got != "DEGRADED" {
+		t.Fatalf("a fresh failure was masked by a prior success: state = %s, want DEGRADED", got)
+	}
+	// Recovery is only a new complete verified pass.
+	h.serve()
+	defer h.cancel()
+	if !h.drain() {
+		t.Fatalf("recovery drain failed: %s", h.sender.LastError())
+	}
+	if got := h.sender.CustodyState(context.Background()); got != "HEALTHY" {
+		t.Fatalf("post-recovery state = %s, want HEALTHY", got)
 	}
 }
 

@@ -86,6 +86,7 @@ func OpenOutbox(path string) (*Outbox, error) {
 			detail TEXT NOT NULL,
 			created_at TEXT NOT NULL
 		)`,
+		legacyJournalDDL,
 	} {
 		if _, err := db.Exec(stmt); err != nil {
 			db.Close()

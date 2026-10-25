@@ -32,10 +32,14 @@ type Sender struct {
 	custodianTrust *custody.TrustSet
 	log            *slog.Logger
 
-	lastErr    atomic.Value // string — most recent transport/refusal error
-	verifiedAt atomic.Value // time.Time — last fully verified drain
-	freshness  atomic.Int64 // readiness freshness bound, ns (0 = default)
-	scanner    atomic.Value // func(ctx) error — obligation replay scanner
+	lastErr    atomic.Value  // string — most recent transport/refusal error
+	verifiedAt atomic.Value  // time.Time — last fully verified drain
+	freshness  atomic.Int64  // readiness freshness bound, ns (0 = default)
+	scanner    atomic.Value  // func(ctx) error — obligation replay scanner
+	fullScan   atomic.Value  // func(ctx) error — seq-0 full-history rescan (operator repair)
+	drainMu    sync.Mutex    // serializes drain attempts — linearizes pass ordering
+	passGen    atomic.Uint64 // completed drain attempts, 1-based
+	verifyGen  atomic.Uint64 // generation of the last verified pass (0 = never)
 	stopped    chan struct{}
 	once       sync.Once
 	wake       chan struct{} // enqueue notification — prompt drain
@@ -90,6 +94,16 @@ func (s *Sender) SetObligationScanner(fn func(ctx context.Context) error) {
 	s.scanner.Store(fn)
 }
 
+// SetFullRescanScanner installs the independent full-history custody
+// obligation verification (sequence 0 forward, bounded pages) used by
+// the explicit operator repair path. It is deliberately distinct from
+// the incremental HWM scanner: an operator repair that re-scanned only
+// since the mark could inherit the same corruption it is meant to
+// disprove.
+func (s *Sender) SetFullRescanScanner(fn func(ctx context.Context) error) {
+	s.fullScan.Store(fn)
+}
+
 // CustodyState reports the effective custody posture — the
 // machine-readable state the authenticated operational status
 // surfaces. States:
@@ -117,6 +131,12 @@ func (s *Sender) CustodyState(ctx context.Context) string {
 	verified, ok := s.verifiedAt.Load().(time.Time)
 	if !ok {
 		return "UNVERIFIED_STARTUP"
+	}
+	if s.verifyGen.Load() != s.passGen.Load() {
+		// The newest completed drain failed — a prior success inside
+		// the freshness bound can never mask a current failure. Only
+		// another complete verified pass restores readiness.
+		return "DEGRADED"
 	}
 	if time.Since(verified) > s.freshnessBound() {
 		return "DEGRADED"
@@ -212,7 +232,24 @@ func (s *Sender) Run(ctx context.Context, interval time.Duration) {
 // the kernel committed but never queued is restored before the
 // custody-head exchange. A scanner failure fails the pass — custody
 // cannot prove completeness it never verified.
+// drain serializes a pass and assigns its generation. The mutex makes
+// attempt ordering linearizable — a stale in-flight pass cannot
+// complete after a newer failure and overwrite the generation — and
+// every completed attempt advances passGen, so a failed pass renders a
+// previous success stale the moment it returns, not when the TTL
+// expires.
 func (s *Sender) drain(ctx context.Context) bool {
+	s.drainMu.Lock()
+	ok := s.drainPass(ctx)
+	gen := s.passGen.Add(1)
+	s.drainMu.Unlock()
+	if ok {
+		s.verifyGen.Store(gen)
+	}
+	return ok
+}
+
+func (s *Sender) drainPass(ctx context.Context) bool {
 	if fn, ok := s.scanner.Load().(func(context.Context) error); ok && fn != nil {
 		if err := fn(ctx); err != nil {
 			s.lastErr.Store(fmt.Sprintf("custody obligation rescan: %v", err))
@@ -311,15 +348,75 @@ func (s *Sender) drain(ctx context.Context) bool {
 	return true
 }
 
-// OperatorRepair is the explicit repair path for a REPAIR_REQUIRED
-// custody state: it runs a full verified pass — obligation rescan,
-// signed-checkpoint verification, backlog delivery — and only then
-// clears the contradiction marker with the operator's evidence note
-// in the audit log. A failed pass clears nothing.
-func (s *Sender) OperatorRepair(ctx context.Context, note string) error {
-	if !s.drain(ctx) {
-		return fmt.Errorf("custody repair failed: %s", s.LastError())
+// readinessFresh reports whether the generation-scoped readiness
+// claim holds right now: a verified pass is the newest completed
+// attempt and sits inside the freshness bound. The repair/degraded
+// markers and backlog are checked separately by the caller.
+func (s *Sender) readinessFresh(ctx context.Context) (bool, string) {
+	verified, ok := s.verifiedAt.Load().(time.Time)
+	if !ok {
+		return false, "no verified drain this boot"
 	}
+	if s.verifyGen.Load() != s.passGen.Load() {
+		return false, "the newest completed drain failed — a newer verified pass is required"
+	}
+	if time.Since(verified) > s.freshnessBound() {
+		return false, "verified readiness is stale"
+	}
+	return true, ""
+}
+
+// OperatorRepair is the explicit repair path for a REPAIR_REQUIRED
+// custody state. It requires an authenticated actor and a non-empty
+// reason — the audit record binds both — then runs an independent
+// full-history obligation rescan (sequence 0, not the incremental
+// mark), a verified drain pass (signed checkpoint, outbox contents,
+// acks, backlog), and a final readiness check. Only when every stage
+// verifies is the contradiction marker cleared; a failure at any
+// stage leaves REPAIR_REQUIRED open. Repair never clears a forensic
+// contradiction merely because connectivity recovered — the full
+// rescan must prove the stream itself is consistent.
+func (s *Sender) OperatorRepair(ctx context.Context, actor, reason string) error {
+	if actor == "" {
+		return fmt.Errorf("custody repair requires an authenticated actor identity")
+	}
+	if reason == "" {
+		return fmt.Errorf("custody repair requires a non-empty operator reason")
+	}
+	st, err := s.outbox.CustodyStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("custody status before repair: %w", err)
+	}
+	if st.RepairReason == "" {
+		return fmt.Errorf("custody repair refused: no REPAIR_REQUIRED marker is open (state %s)", s.CustodyState(ctx))
+	}
+	if fn, ok := s.fullScan.Load().(func(context.Context) error); ok && fn != nil {
+		if err := fn(ctx); err != nil {
+			return fmt.Errorf("custody repair: full-history obligation rescan failed: %w", err)
+		}
+	}
+	if !s.drain(ctx) {
+		return fmt.Errorf("custody repair: verified drain failed: %s", s.LastError())
+	}
+	// Readiness must hold independent of the open marker: the newest
+	// pass verified inside the freshness bound, no backlog is
+	// undelivered, and no durable degraded marker is open. The repair
+	// marker itself is what this call clears — checking CustodyState
+	// directly would fail on the marker still being open.
+	if ok, why := s.readinessFresh(ctx); !ok {
+		return fmt.Errorf("custody repair: post-repair readiness fails (%s) — marker stays open", why)
+	}
+	st2, err := s.outbox.CustodyStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("custody status after repair: %w", err)
+	}
+	if st2.DegradedReason != "" {
+		return fmt.Errorf("custody repair: durable degraded marker still open — marker stays open")
+	}
+	if n, err := s.outbox.Undelivered(ctx); err != nil || n > 0 {
+		return fmt.Errorf("custody repair: %d obligations undelivered — marker stays open", n)
+	}
+	note := fmt.Sprintf("operator repair actor=%q reason=%q full-rescan=verified", actor, reason)
 	if err := s.outbox.ClearRepairRequired(ctx, note); err != nil {
 		return fmt.Errorf("custody repair marker: %w", err)
 	}

@@ -166,7 +166,16 @@ func ValidateTerminalTransition(record *Record, target State, receipt TerminalRe
 
 // TerminalEvidence implements the SQLite engine.
 func (s *SQLiteStore) TerminalEvidence(ctx context.Context) ([]evidence.TerminalRef, error) {
-	rows, err := s.db.QueryContext(ctx, `
+	return s.TerminalEvidenceAfter(ctx, 0, 0)
+}
+
+// TerminalEvidenceAfter implements the bounded SQLite page read: every
+// terminal record at positions beyond afterSeq, ascending, capped at
+// limit rows (0 = unbounded — the forensic variant). The
+// terminal_seq unique index bounds the rows examined to the page, not
+// the ledger; a NULL position still fails closed.
+func (s *SQLiteStore) TerminalEvidenceAfter(ctx context.Context, afterSeq int64, limit int) ([]evidence.TerminalRef, error) {
+	q := `
 		SELECT terminal_seq, execution_id, state, request_digest,
 		       COALESCE(terminal_result_digest, ''),
 		       COALESCE(terminal_evidence_digest, ''),
@@ -175,7 +184,14 @@ func (s *SQLiteStore) TerminalEvidence(ctx context.Context) ([]evidence.Terminal
 		       updated_at
 		FROM execution_requests
 		WHERE state IN ('COMMITTED', 'FAILED', 'DENIED')
-		ORDER BY terminal_seq`)
+		  AND (terminal_seq > ? OR terminal_seq IS NULL)
+		ORDER BY terminal_seq`
+	args := []any{afterSeq}
+	if limit > 0 {
+		q += ` LIMIT ?`
+		args = append(args, limit)
+	}
+	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +219,14 @@ func (s *SQLiteStore) TerminalEvidence(ctx context.Context) ([]evidence.Terminal
 
 // TerminalEvidence implements the PostgreSQL engine.
 func (s *Store) TerminalEvidence(ctx context.Context) ([]evidence.TerminalRef, error) {
-	rows, err := s.db.QueryContext(ctx, `
+	return s.TerminalEvidenceAfter(ctx, 0, 0)
+}
+
+// TerminalEvidenceAfter implements the bounded PostgreSQL page read —
+// identical semantics to the SQLite engine: positions beyond
+// afterSeq, ascending, capped at limit rows (0 = unbounded).
+func (s *Store) TerminalEvidenceAfter(ctx context.Context, afterSeq int64, limit int) ([]evidence.TerminalRef, error) {
+	q := `
 		SELECT terminal_seq, execution_id, state, request_digest,
 		       COALESCE(terminal_result_digest, ''),
 		       COALESCE(terminal_evidence_digest, ''),
@@ -212,7 +235,14 @@ func (s *Store) TerminalEvidence(ctx context.Context) ([]evidence.TerminalRef, e
 		       updated_at
 		FROM execution_requests
 		WHERE state IN ('COMMITTED', 'FAILED', 'DENIED')
-		ORDER BY terminal_seq`)
+		  AND (terminal_seq > $1 OR terminal_seq IS NULL)
+		ORDER BY terminal_seq`
+	args := []any{afterSeq}
+	if limit > 0 {
+		q += ` LIMIT $2`
+		args = append(args, limit)
+	}
+	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -892,9 +892,11 @@ func isSHA256Hex(s string) bool {
 // fail-closed gate CRITICAL admissions consult, and a wake the sink
 // pulses after each enqueue so the drain runs promptly.
 type custodyHooks struct {
-	sink func(executionID, receiptDigest string, payload []byte)
-	gate func() error
-	wake func()
+	sink   func(executionID, receiptDigest string, payload []byte)
+	gate   func() error
+	wake   func()
+	sender *witness.Sender
+	outbox *witness.Outbox
 }
 
 // wireCustodyBoundary builds the kernel side of the receipt-custody
@@ -954,6 +956,12 @@ func wireCustodyBoundary(ctx context.Context, cfg *ServiceConfig, store idempote
 		}
 		return reconcileCustodyObligations(ctx, store, outbox, producer, hwm)
 	})
+	// The operator repair rescan is a distinct, full-history pass:
+	// an incremental scan since the high-water mark could inherit
+	// exactly the corruption the repair is meant to disprove.
+	sender.SetFullRescanScanner(func(ctx context.Context) error {
+		return CustodyObligationRescan(ctx, store, outbox, producer)
+	})
 	sink := func(executionID, receiptDigest string, payload []byte) {
 		if _, err := outbox.Enqueue(ctx, producer, executionID, receiptDigest, payload); err != nil {
 			// An enqueue failure never rewinds committed terminal
@@ -991,7 +999,7 @@ func wireCustodyBoundary(ctx context.Context, cfg *ServiceConfig, store idempote
 	}()
 	fmt.Fprintf(os.Stderr, "Evidence custody: outbox %s → witness %s (deployment %s, assurance %s)\n",
 		wc.OutboxPath, orElseStr(wc.Socket, wc.TLSAddr), wc.Deployment, cfg.AssuranceProfile)
-	return &custodyHooks{sink: sink, gate: gate, wake: sender.Wake}, nil
+	return &custodyHooks{sink: sink, gate: gate, wake: sender.Wake, sender: sender, outbox: outbox}, nil
 }
 
 func orElseStr(a, b string) string {

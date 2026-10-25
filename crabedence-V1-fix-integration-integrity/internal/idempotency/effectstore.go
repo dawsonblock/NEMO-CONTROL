@@ -97,6 +97,12 @@ type EffectStore interface {
 	// construction. A terminal record lacking a ledger position is a
 	// hard error, never a silently skipped row.
 	TerminalEvidence(ctx context.Context) ([]evidence.TerminalRef, error)
+	// TerminalEvidenceAfter is the bounded variant: terminal records
+	// at positions strictly beyond afterSeq, ascending, capped at
+	// limit rows (limit <= 0 = unbounded, the forensic full stream).
+	// The engine must bound the rows examined to the page — index
+	// access on terminal_seq, not a full-ledger scan.
+	TerminalEvidenceAfter(ctx context.Context, afterSeq int64, limit int) ([]evidence.TerminalRef, error)
 
 	// Cluster-epoch disaster-recovery fencing.
 	// ClusterEpoch returns the epoch this store was admitted under.
