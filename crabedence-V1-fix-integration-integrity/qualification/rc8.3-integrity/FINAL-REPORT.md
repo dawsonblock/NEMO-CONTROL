@@ -20,11 +20,13 @@ qualification and release-attestation prerequisites are not satisfied:
    root: **BLOCKED** (no release key material).
 4. Third-party clean-room verification: **BLOCKED**.
 5. The exact full-tree `go test -race -timeout=20m ./...` gate is **FAIL**:
-   `internal/cli` hit the 20m package timeout (1203.2s) and
-   `providers/{aws,blacksmith,localcontainer,machine0,tart}` failed on
-   deadline/signal-killed paths under full-tree parallelism. A timed-out
-   package is FAIL, and isolated reruns are not substituted. The changed
-   custody/witness/execution packages passed inside the same run.
+   `internal/cli` hit the 20m package timeout (1208.1s) and
+   `providers/aws` plus `providers/localcontainer` failed on load-sensitive
+   deadline/signal-killed paths. A timed-out package is FAIL, and isolated
+   reruns are not substituted. The changed `cmd/custodyctl`,
+   `internal/witness`, `internal/execution`, `internal/idempotency`,
+   `internal/custody`, and `internal/sandboxexecutor` packages all passed
+   inside the same run.
 
 A NO-GO here is not a claim that the security work is incomplete. It is a claim
 that the remaining gates cannot be evidenced in this environment, and the
@@ -71,7 +73,7 @@ Full register: `defect-closure.json` (RC83-IC-01..17, plus residuals).
 | Full Go build (`go build ./...`) | PASS | exit 0 |
 | `go vet ./...` | PASS | exit 0 |
 | Targeted `-race` (witness, execution, idempotency, custody, sandboxexecutor, custodyctl) | PASS | `logs/targeted-race.log`, sha256 `ec388dc5…` |
-| Exact full `go test -race -timeout=20m ./...` | **FAIL** — `internal/cli` timed out at 20m; five provider packages hit deadline/starvation paths | `logs/full-race-20m.log`, sha256 `22385227…` |
+| Exact full `go test -race -timeout=20m ./...` | **FAIL** — `internal/cli` timed out at 20m (1208.1s); `providers/aws` and `providers/localcontainer` hit load-sensitive deadline paths. All changed packages passed inside the same run. | `logs/full-race-20m.log`, sha256 `7097567c…` |
 | SQLite durability | PASS | targeted log |
 | Live PostgreSQL 16 (4 suites) | PASS | `logs/live-postgres.log`, sha256 `d777b0f7…` |
 | Apple Silicon/HVF real microVMs, msb 0.7.8 | PASS (78s) | `logs/live-msb-hvf.log`, sha256 `a891b5ca…` |

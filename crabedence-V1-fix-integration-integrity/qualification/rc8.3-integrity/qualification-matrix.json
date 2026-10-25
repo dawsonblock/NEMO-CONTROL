@@ -51,16 +51,13 @@
       "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -timeout=20m ./...",
       "exit_code": 1,
       "log": "qualification/rc8.3-integrity/logs/full-race-20m.log",
-      "log_sha256": "22385227405e1e7cb542eb4cccc6fec44490d0d45567c8dacaee3482a20a2a04",
+      "log_sha256": "7097567cacf568a7f32de9c5c49c9eb14430011b58624aa7efc198f2329d18c5",
       "failing_packages": [
-        "internal/cli (panic: test timed out after 20m0s; 1203.243s)",
-        "internal/providers/aws (2 readiness tests)",
-        "internal/providers/blacksmith (artifact run budget)",
-        "internal/providers/localcontainer (browser bootstrap)",
-        "internal/providers/machine0 (CLI JSON read deadline)",
-        "internal/providers/tart (startup late exit)"
+        "internal/cli (panic: test timed out after 20m0s; 1208.133s; TestHybridSSHScriptCancellationAndSameLeaseReplay also failed under load and passes isolated — diagnostic only, not a substitute)",
+        "internal/providers/aws (2 readiness tests: status-wait timeout, cloud-init readiness killed)",
+        "internal/providers/localcontainer (browser bootstrap signal: killed)"
       ],
-      "notes": "Exact mandated invocation. A timed-out suite is FAIL, not PASS; isolated reruns are not substituted. The failing providers hit 10s deadline/signal-killed paths under full-tree parallelism, the same starvation class the RC8.3-dev report recorded. sandboxexecutor passed at 1084.6s; witness, execution, idempotency, custody, and all changed packages passed inside this run."
+      "notes": "Exact mandated invocation on the final code. A timed-out suite is FAIL, not PASS; isolated reruns are not substituted. cmd/custodyctl (59.3s), internal/sandboxexecutor (1193.1s), witness (11.5s), execution (64.5s), idempotency, and custody all passed inside this run. The CLI package is structurally at the 20m budget; the provider failures are load-sensitive deadline paths. Sharding or a larger per-package budget is required, not a security waiver."
     },
     {
       "id": "G5-migration-crash-replay",

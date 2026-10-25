@@ -2,15 +2,16 @@
 
 > **Integrity-closure requalification supersedes the G4 claim below.** On
 > branch `codex/rc8.3-integrity-closure`, the exact
-> `go test -race -timeout=20m ./...` invocation was rerun and recorded
-> **FAIL**: `internal/cli` hit the 20m package timeout (1203.2s) and
-> `providers/{aws,blacksmith,localcontainer,machine0,tart}` failed on
-> deadline/signal-killed paths under full-tree parallelism. A timed-out
-> suite is not PASS and isolated reruns are not substituted. The security
-> corrections pass their targeted and live lanes (including live
-> PostgreSQL and Apple Silicon/HVF), but the release decision is **NO-GO**
-> until the remaining independent-witness, Linux-KVM, external-signing,
-> and full-suite gates close. See
+> `go test -race -timeout=20m ./...` invocation was rerun on the final
+> code and recorded **FAIL**: `internal/cli` hit the 20m package timeout
+> (1208.1s) and `providers/aws` plus `providers/localcontainer` failed on
+> load-sensitive deadline/signal-killed paths. A timed-out suite is not
+> PASS and isolated reruns are not substituted. The changed custody,
+> witness, execution, idempotency, and sandbox packages all passed inside
+> the same run. The security corrections pass their targeted and live
+> lanes (including live PostgreSQL and Apple Silicon/HVF), but the
+> release decision is **NO-GO** until the remaining independent-witness,
+> Linux-KVM, external-signing, and full-suite gates close. See
 > `qualification/rc8.3-integrity/FINAL-REPORT.md` and
 > `qualification/rc8.3-integrity/qualification-matrix.json`.
 
