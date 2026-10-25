@@ -346,7 +346,12 @@ type TerminalReceipt struct {
 // would make the digest meaningless. The digest binds the immutable
 // receipt content (identity, result, provider, evidence, version) but
 // not the transient finalization timestamp.
-func (r TerminalReceipt) Digest() (string, error) {
+// canonicalPreimage serializes the receipt's immutable fields — the
+// byte string Digest() hashes and CustodyPayload() emits for records
+// without a signed evidence receipt. FinalizedAt is excluded (it is
+// store-assigned inside the terminalization transaction, so it is not
+// part of the receipt's caller-visible identity).
+func (r TerminalReceipt) canonicalPreimage() ([]byte, error) {
 	// P2 #8: Canonicalize the result JSON before hashing. A json.RawMessage
 	// preserves the original byte ordering of object keys, which means
 	// {"a":1,"b":2} and {"b":2,"a":1} produce different digests despite
@@ -354,11 +359,9 @@ func (r TerminalReceipt) Digest() (string, error) {
 	// so the digest is canonical.
 	canonicalResult, err := canonicalizeJSON(r.CanonicalResult)
 	if err != nil {
-		return "", fmt.Errorf("failed to canonicalize result: %w", err)
+		return nil, fmt.Errorf("failed to canonicalize result: %w", err)
 	}
-
-	// Marshal with FinalizedAt excluded.
-	canonical, err := json.Marshal(struct {
+	return json.Marshal(struct {
 		ExecutionID     string          `json:"execution_id"`
 		Capability      string          `json:"capability"`
 		Principal       string          `json:"principal"`
@@ -381,11 +384,57 @@ func (r TerminalReceipt) Digest() (string, error) {
 		EvidenceDigest:  r.EvidenceDigest,
 		ReceiptVersion:  r.ReceiptVersion,
 	})
+}
+
+func (r TerminalReceipt) Digest() (string, error) {
+	canonical, err := r.canonicalPreimage()
 	if err != nil {
 		return "", err
 	}
 	hash := sha256.Sum256(canonical)
 	return hex.EncodeToString(hash[:]), nil
+}
+
+// CustodyPayload returns the byte record a custody obligation wraps:
+// the signed evidence receipt when one exists (CRITICAL — the
+// independently verifiable artifact), else the receipt's canonical
+// preimage. The two producers of this payload — the dispatch-time
+// terminalization and the custody obligation replay scanner — build
+// it from the same canonicalization, so a replay yields byte-identical
+// content and the enqueue is genuinely idempotent. An empty payload
+// is never a legitimate obligation: a record that cannot produce one
+// is a custody failure, not a nil-content envelope the witness would
+// refuse forever.
+func (r TerminalReceipt) CustodyPayload() ([]byte, error) {
+	if len(r.EvidenceReceipt) > 0 {
+		return r.EvidenceReceipt, nil
+	}
+	return r.canonicalPreimage()
+}
+
+// TerminalReceiptFromRecord rebuilds the terminal receipt view of a
+// durably terminal record — the mapping the custody obligation replay
+// scanner uses to reconstruct the exact obligation payload the
+// terminalization path emitted. Every field comes from the persisted
+// record, never asserted by the caller.
+func TerminalReceiptFromRecord(rec *Record) TerminalReceipt {
+	evidenceDigest := rec.TerminalEvidenceDigest
+	if evidenceDigest == "" {
+		evidenceDigest = rec.EvidenceDigest
+	}
+	return TerminalReceipt{
+		ExecutionID:     rec.ExecutionID,
+		Capability:      rec.CapabilityID,
+		Principal:       rec.PrincipalID,
+		RequestDigest:   rec.RequestDigest,
+		TerminalStatus:  rec.State,
+		CanonicalResult: rec.Result,
+		ProviderID:      rec.ProviderID,
+		ProviderRunID:   rec.ProviderRunID,
+		EvidenceDigest:  evidenceDigest,
+		ReceiptVersion:  rec.ReceiptVersion,
+		EvidenceReceipt: rec.EvidenceReceipt,
+	}
 }
 
 // canonicalizeJSON parses a json.RawMessage and re-marshals it with

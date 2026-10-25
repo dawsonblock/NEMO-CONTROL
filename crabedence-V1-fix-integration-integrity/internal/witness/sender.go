@@ -32,11 +32,19 @@ type Sender struct {
 	custodianTrust *custody.TrustSet
 	log            *slog.Logger
 
-	lastErr atomic.Value // string — most recent transport/refusal error
-	stopped chan struct{}
-	once    sync.Once
-	wake    chan struct{} // enqueue notification — prompt drain
+	lastErr    atomic.Value // string — most recent transport/refusal error
+	verifiedAt atomic.Value // time.Time — last fully verified drain
+	freshness  atomic.Int64 // readiness freshness bound, ns (0 = default)
+	scanner    atomic.Value // func(ctx) error — obligation replay scanner
+	stopped    chan struct{}
+	once       sync.Once
+	wake       chan struct{} // enqueue notification — prompt drain
 }
+
+// DefaultReadinessTTL bounds how old verified-custody evidence may be
+// before the readiness claim goes stale — the fail-closed gate treats
+// stale readiness as no readiness.
+const DefaultReadinessTTL = 30 * time.Second
 
 // NewSender wires the kernel-side drain loop. custodianTrust is the
 // pinned custodian key set — checkpoints and acknowledgements verify
@@ -56,15 +64,79 @@ func NewSender(client *Client, outbox *Outbox, deploymentID string, custodianTru
 	}
 }
 
-// CustodyHealthy reports whether the custody path is clean: no pending
-// backlog and no recent transport or refusal failure. The fail-closed
-// gate for CRITICAL admissions consults it.
-func (s *Sender) CustodyHealthy(ctx context.Context) bool {
-	if err, _ := s.lastErr.Load().(string); err != "" {
-		return false
+// SetFreshnessBound sets the verified-readiness freshness bound — the
+// maximum age of the last verified drain the custody gate accepts.
+// Zero restores DefaultReadinessTTL.
+func (s *Sender) SetFreshnessBound(d time.Duration) {
+	if d <= 0 {
+		d = DefaultReadinessTTL
+	}
+	s.freshness.Store(int64(d))
+}
+
+func (s *Sender) freshnessBound() time.Duration {
+	if d := time.Duration(s.freshness.Load()); d > 0 {
+		return d
+	}
+	return DefaultReadinessTTL
+}
+
+// SetObligationScanner installs the terminal-obligation replay scanner
+// run at the head of every drain pass. It must enumerate the committed
+// terminal stream, enqueue every missing obligation into the outbox,
+// and advance the high-water mark — after it completes clean, the
+// outbox holds every obligation the authoritative ledger owes custody.
+func (s *Sender) SetObligationScanner(fn func(ctx context.Context) error) {
+	s.scanner.Store(fn)
+}
+
+// CustodyState reports the effective custody posture — the
+// machine-readable state the authenticated operational status
+// surfaces. States:
+//
+//	UNVERIFIED_STARTUP — no verified drain has completed this boot;
+//	  nothing about custody is proven yet.
+//	HEALTHY — verified drain within the freshness bound, no backlog,
+//	  no durable degraded or repair markers.
+//	DEGRADED — backlog pending, freshness stale, or a durable
+//	  obligation-failure marker awaiting verified repair.
+//	REPAIR_REQUIRED — a durable evidence contradiction (fork,
+//	  conflicting ack, contradictory obligation) awaits an explicit
+//	  verified operator repair.
+func (s *Sender) CustodyState(ctx context.Context) string {
+	st, err := s.outbox.CustodyStatus(ctx)
+	if err != nil {
+		return "DEGRADED"
+	}
+	if st.RepairReason != "" {
+		return "REPAIR_REQUIRED"
+	}
+	if st.DegradedReason != "" {
+		return "DEGRADED"
+	}
+	verified, ok := s.verifiedAt.Load().(time.Time)
+	if !ok {
+		return "UNVERIFIED_STARTUP"
+	}
+	if time.Since(verified) > s.freshnessBound() {
+		return "DEGRADED"
 	}
 	n, err := s.outbox.Undelivered(ctx)
-	return err == nil && n == 0
+	if err != nil || n > 0 {
+		return "DEGRADED"
+	}
+	return "HEALTHY"
+}
+
+// CustodyHealthy reports whether the custody path is verified clean:
+// a drain pass that reached the witness, verified its signed
+// checkpoint, reconciled obligations, and delivered the backlog
+// completed inside the freshness bound — and no durable degraded or
+// repair marker is open. A fresh sender is UNVERIFIED_STARTUP, not
+// healthy: CRITICAL admission never rests on the absence of an
+// observed failure.
+func (s *Sender) CustodyHealthy(ctx context.Context) bool {
+	return s.CustodyState(ctx) == "HEALTHY"
 }
 
 // LastError is the most recent sender failure, for diagnostics.
@@ -73,11 +145,17 @@ func (s *Sender) LastError() string {
 	return err
 }
 
-// MarkDegraded records an outbox-side failure (enqueue/persist) so the
-// custody gate and LastError reflect a broken local queue too — a
-// receipt that never reached the outbox must not look like delivered
-// custody.
-func (s *Sender) MarkDegraded(msg string) { s.lastErr.Store(msg) }
+// MarkDegraded records an outbox-side obligation failure (enqueue or
+// persistence) in the durable custody state — a receipt that never
+// reached the outbox must not look like delivered custody, and a
+// restart or an unrelated successful drain can never erase the
+// record. It is discharged only by the verified repair path.
+func (s *Sender) MarkDegraded(msg string) {
+	s.lastErr.Store(msg)
+	if err := s.outbox.MarkDegraded(context.Background(), msg); err != nil {
+		s.log.Error("custody degraded marker could not be persisted — custody state is itself degraded", "error", err)
+	}
+}
 
 // Stop ends the drain loop.
 func (s *Sender) Stop() {
@@ -126,9 +204,22 @@ func (s *Sender) Run(ctx context.Context, interval time.Duration) {
 }
 
 // drain runs one checkpoint-and-submit pass. It reports whether the
-// pass ended clean — a clean pass clears the error state; a failed
-// pass leaves the sender degraded.
+// pass ended clean — a clean pass records the verified-readiness mark
+// and discharges any degraded marker the verified rescan repaired;
+// a failed pass leaves the sender degraded.
+//
+// Order matters: the obligation replay scanner runs first so a gap
+// the kernel committed but never queued is restored before the
+// custody-head exchange. A scanner failure fails the pass — custody
+// cannot prove completeness it never verified.
 func (s *Sender) drain(ctx context.Context) bool {
+	if fn, ok := s.scanner.Load().(func(context.Context) error); ok && fn != nil {
+		if err := fn(ctx); err != nil {
+			s.lastErr.Store(fmt.Sprintf("custody obligation rescan: %v", err))
+			s.log.Warn("custody obligation rescan failed", "error", err)
+			return false
+		}
+	}
 	head, err := s.client.Checkpoint(ctx, s.deploymentID)
 	if err != nil {
 		s.lastErr.Store(fmt.Sprintf("witness checkpoint: %v", err))
@@ -152,8 +243,12 @@ func (s *Sender) drain(ctx context.Context) bool {
 			s.lastErr.Store(fmt.Sprintf("custody outbox read: %v", err))
 			return false
 		} else if local != "" && local != head.Hash {
-			s.lastErr.Store(fmt.Sprintf("contradictory custody head: witness seq %d custodies %s, outbox holds %s — escalated, never reconciled silently", head.Seq, head.Hash, local))
+			reason := fmt.Sprintf("contradictory custody head: witness seq %d custodies %s, outbox holds %s — escalated, never reconciled silently", head.Seq, head.Hash, local)
+			s.lastErr.Store(reason)
 			s.log.Error("custody stores have forked", "seq", head.Seq, "witness", head.Hash, "local", local)
+			if err := s.outbox.MarkRepairRequired(ctx, reason); err != nil {
+				s.log.Error("custody repair marker could not be persisted", "error", err)
+			}
 			return false
 		}
 	}
@@ -191,7 +286,11 @@ func (s *Sender) drain(ctx context.Context) bool {
 			s.lastErr.Store(fmt.Sprintf("custody outbox read: %v", err))
 			return false
 		} else if existing != nil && existing.Signature != ack.Signature {
-			s.lastErr.Store(fmt.Sprintf("custody ack seq %d conflicts with the recorded acknowledgement — escalated, never overwritten", r.Seq))
+			reason := fmt.Sprintf("custody ack seq %d conflicts with the recorded acknowledgement — escalated, never overwritten", r.Seq)
+			s.lastErr.Store(reason)
+			if err := s.outbox.MarkRepairRequired(ctx, reason); err != nil {
+				s.log.Error("custody repair marker could not be persisted", "error", err)
+			}
 			return false
 		}
 		if err := s.outbox.markDelivered(ctx, r.Seq, ack); err != nil {
@@ -200,5 +299,29 @@ func (s *Sender) drain(ctx context.Context) bool {
 		}
 	}
 	s.lastErr.Store("")
+	s.verifiedAt.Store(time.Now())
+	// Verified repair: this pass re-scanned the obligation stream
+	// (when a scanner is installed) and completed a verified drain —
+	// the only path that may discharge a degraded marker. A repair
+	// marker is untouched: contradiction repair is an operator act.
+	if err := s.outbox.RepairDegraded(ctx, "obligation rescan + verified drain completed"); err != nil {
+		s.lastErr.Store(fmt.Sprintf("custody degraded repair: %v", err))
+		return false
+	}
 	return true
+}
+
+// OperatorRepair is the explicit repair path for a REPAIR_REQUIRED
+// custody state: it runs a full verified pass — obligation rescan,
+// signed-checkpoint verification, backlog delivery — and only then
+// clears the contradiction marker with the operator's evidence note
+// in the audit log. A failed pass clears nothing.
+func (s *Sender) OperatorRepair(ctx context.Context, note string) error {
+	if !s.drain(ctx) {
+		return fmt.Errorf("custody repair failed: %s", s.LastError())
+	}
+	if err := s.outbox.ClearRepairRequired(ctx, note); err != nil {
+		return fmt.Errorf("custody repair marker: %w", err)
+	}
+	return nil
 }

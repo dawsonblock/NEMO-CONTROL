@@ -474,10 +474,16 @@ func (w *Worker) reconcileOne(ctx context.Context, rec *idempotency.Record) erro
 	// Evidence custody: enqueue the resolved record's terminal receipt
 	// toward the independent witness. Enqueue failure never rewinds a
 	// committed terminal state — the backlog surfaces through custody
-	// health at the next mandated admission instead.
+	// health at the next mandated admission instead. The payload is
+	// rebuilt from the durable record through the same canonicalization
+	// the dispatch path uses, so the obligation bytes are identical.
 	if w.custodySink != nil {
 		if resolved, err := w.store.Lookup(ctx, rec.ExecutionID); err == nil && resolved.TerminalReceiptDigest != "" {
-			w.custodySink(resolved.ExecutionID, resolved.TerminalReceiptDigest, resolved.EvidenceReceipt)
+			payload, perr := idempotency.TerminalReceiptFromRecord(resolved).CustodyPayload()
+			if perr != nil {
+				payload = nil
+			}
+			w.custodySink(resolved.ExecutionID, resolved.TerminalReceiptDigest, payload)
 		}
 	}
 

@@ -4,9 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -77,6 +80,12 @@ func OpenOutbox(path string) (*Outbox, error) {
 			key TEXT PRIMARY KEY,
 			value TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS custody_events (
+			seq INTEGER PRIMARY KEY AUTOINCREMENT,
+			event TEXT NOT NULL,
+			detail TEXT NOT NULL,
+			created_at TEXT NOT NULL
+		)`,
 	} {
 		if _, err := db.Exec(stmt); err != nil {
 			db.Close()
@@ -98,6 +107,13 @@ func (o *Outbox) Close() error { return o.db.Close() }
 // idempotent; the same execution with different bytes is a
 // contradiction the ledger refuses rather than overwriting.
 func (o *Outbox) Enqueue(ctx context.Context, p Producer, executionID, receiptDigest string, native []byte) (int64, error) {
+	// An empty payload is never a legitimate obligation — an envelope
+	// with no content is evidence the witness can never verify, so the
+	// obligation is refused here at the boundary and the caller marks
+	// custody degraded.
+	if len(native) == 0 {
+		return 0, fmt.Errorf("%w: execution %s has no receipt payload to custody", ErrEvidenceContradiction, executionID)
+	}
 	tx, err := o.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("custody outbox enqueue: %w", err)
@@ -121,7 +137,7 @@ func (o *Outbox) Enqueue(ctx context.Context, p Producer, executionID, receiptDi
 			}
 		}
 		tx.Rollback()
-		return 0, fmt.Errorf("custody outbox enqueue: execution %s already queued with different receipt bytes — an evidence contradiction, never overwritten", executionID)
+		return 0, fmt.Errorf("%w: execution %s already queued with different receipt bytes — never overwritten", ErrEvidenceContradiction, executionID)
 	}
 	if err != sql.ErrNoRows {
 		return 0, fmt.Errorf("custody outbox enqueue: %w", err)
@@ -211,6 +227,13 @@ func (o *Outbox) Undelivered(ctx context.Context) (int64, error) {
 	return n, err
 }
 
+// Pending lists every queued custody obligation from sequence 1 —
+// the operator/forensic view of the durable queue (delivered rows
+// are retained, so this includes obligations already acknowledged).
+func (o *Outbox) Pending(ctx context.Context) ([]PendingRow, error) {
+	return o.rowsFrom(ctx, 1)
+}
+
 // PendingRow is one queued custody obligation.
 type PendingRow struct {
 	Seq          int64
@@ -247,6 +270,31 @@ func (o *Outbox) rowsFrom(ctx context.Context, fromSeq int64) ([]PendingRow, err
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// StoredPayload returns the custody content bytes recorded for an
+// execution — the obligation replay scanner's byte-level coverage
+// check: presence alone is not coverage, the same execution must
+// hold the same receipt.
+func (o *Outbox) StoredPayload(ctx context.Context, executionID string) ([]byte, bool, error) {
+	var envJSON string
+	err := o.db.QueryRowContext(ctx,
+		`SELECT envelope_json FROM custody_outbox WHERE execution_id = $1`, executionID).Scan(&envJSON)
+	if err == sql.ErrNoRows {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	var env custody.Envelope
+	if err := json.Unmarshal([]byte(envJSON), &env); err != nil {
+		return nil, false, fmt.Errorf("stored outbox envelope for %s does not parse: %w", executionID, err)
+	}
+	content, err := env.ContentBytes()
+	if err != nil {
+		return nil, false, fmt.Errorf("stored outbox envelope for %s has no verifiable content: %w", executionID, err)
+	}
+	return content, true, nil
 }
 
 // StoredHash returns the envelope hash recorded at seq — the
@@ -298,4 +346,274 @@ func (o *Outbox) StoredAck(ctx context.Context, seq int64) (*Ack, error) {
 		return nil, nil
 	}
 	return decodeAck(raw)
+}
+
+// ─── Durable custody state ───────────────────────────────────────────
+//
+// Custody health is durable state, not a process-memory observation:
+// an enqueue failure or an evidence contradiction survives restart and
+// can never be cleared by an unrelated successful drain. The events
+// table is the append-only audit trail — every transition records what
+// changed, why, and the evidence that authorized it.
+//
+// ErrEvidenceContradiction marks contradictions the store refuses to
+// overwrite — an obligation queued under different bytes than the
+// record claims, or a conflicting acknowledgement. Contradictions are
+// sticky: they move custody to REPAIR_REQUIRED, which only an explicit
+// verified repair clears.
+var ErrEvidenceContradiction = errors.New("custody outbox: evidence contradiction")
+
+const (
+	metaDegradedReason = "degraded_reason"
+	metaRepairReason   = "repair_reason"
+	metaObligationHWM  = "obligation_hwm"
+)
+
+// CustodyStatus is the durable custody posture persisted in the outbox.
+type CustodyStatus struct {
+	// DegradedReason, when non-empty, is a recorded custody-obligation
+	// failure (enqueue/persist) that has not been discharged by a
+	// verified repair. Durable — survives restart.
+	DegradedReason string
+	// RepairReason, when non-empty, is a recorded evidence
+	// contradiction or fork — sticky until an explicit verified
+	// operator repair clears it.
+	RepairReason string
+	// ObligationHWM is the high-water terminal_seq below which every
+	// terminal record was verified to hold an outbox obligation.
+	ObligationHWM int64
+}
+
+func (o *Outbox) meta(ctx context.Context, key string) (string, error) {
+	var v string
+	err := o.db.QueryRowContext(ctx, `SELECT value FROM outbox_meta WHERE key = $1`, key).Scan(&v)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return v, err
+}
+
+func (o *Outbox) setMeta(ctx context.Context, key, value string) error {
+	_, err := o.db.ExecContext(ctx, `INSERT INTO outbox_meta (key, value) VALUES ($1, $2)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
+	return err
+}
+
+func (o *Outbox) recordEvent(ctx context.Context, event, detail string) {
+	// The event row is best-effort relative to the state write it
+	// describes — a state write that landed but whose event failed is
+	// still authoritative (the state itself is the evidence).
+	_, _ = o.db.ExecContext(ctx,
+		`INSERT INTO custody_events (event, detail, created_at) VALUES ($1, $2, $3)`,
+		event, detail, time.Now().UTC().Format(time.RFC3339Nano))
+}
+
+// CustodyStatus reads the durable custody posture.
+func (o *Outbox) CustodyStatus(ctx context.Context) (CustodyStatus, error) {
+	var st CustodyStatus
+	var err error
+	if st.DegradedReason, err = o.meta(ctx, metaDegradedReason); err != nil {
+		return st, err
+	}
+	if st.RepairReason, err = o.meta(ctx, metaRepairReason); err != nil {
+		return st, err
+	}
+	hw, err := o.meta(ctx, metaObligationHWM)
+	if err != nil {
+		return st, err
+	}
+	if hw != "" {
+		st.ObligationHWM, err = strconv.ParseInt(hw, 10, 64)
+		if err != nil {
+			return st, fmt.Errorf("custody outbox: corrupt obligation_hwm %q", hw)
+		}
+	}
+	return st, nil
+}
+
+// MarkDegraded durably records a custody-obligation failure — a
+// terminal receipt whose enqueue or persistence failed. The marker
+// survives restart and is never cleared by an unrelated successful
+// drain: only RepairDegraded's verified rescan discharges it. A write
+// failure here is itself the custody failure domain — callers treat
+// it as degraded.
+func (o *Outbox) MarkDegraded(ctx context.Context, reason string) error {
+	if err := o.setMeta(ctx, metaDegradedReason, reason); err != nil {
+		return fmt.Errorf("custody degraded marker: %w", err)
+	}
+	o.recordEvent(ctx, "degraded", reason)
+	return nil
+}
+
+// MarkRepairRequired durably records an evidence contradiction — a
+// fork, a conflicting ack, or a contradictory obligation. Sticky:
+// cleared only by an explicit verified operator repair.
+func (o *Outbox) MarkRepairRequired(ctx context.Context, reason string) error {
+	if err := o.setMeta(ctx, metaRepairReason, reason); err != nil {
+		return fmt.Errorf("custody repair marker: %w", err)
+	}
+	o.recordEvent(ctx, "repair_required", reason)
+	return nil
+}
+
+// RepairDegraded discharges a degraded marker after a verified repair:
+// the caller must have re-scanned the terminal-obligation stream,
+// restored every missing obligation, and completed a verified drain —
+// the evidence string records that fact for audit. It never touches a
+// repair-required marker: a contradiction is a separate operator act,
+// and a degraded marker is never an excuse to clear it.
+func (o *Outbox) RepairDegraded(ctx context.Context, evidence string) error {
+	st, err := o.CustodyStatus(ctx)
+	if err != nil {
+		return err
+	}
+	if st.DegradedReason == "" {
+		return nil
+	}
+	if err := o.setMeta(ctx, metaDegradedReason, ""); err != nil {
+		return fmt.Errorf("custody degraded clear: %w", err)
+	}
+	o.recordEvent(ctx, "degraded_repaired", evidence+" | was: "+st.DegradedReason)
+	return nil
+}
+
+// ClearRepairRequired is the operator repair path for a contradiction
+// marker: it clears only after the caller's verified rescan, and
+// records the operator-supplied evidence note. Refuses to run while a
+// degraded marker is still open — the obligation failure must be
+// discharged first.
+func (o *Outbox) ClearRepairRequired(ctx context.Context, evidence string) error {
+	st, err := o.CustodyStatus(ctx)
+	if err != nil {
+		return err
+	}
+	if st.DegradedReason != "" {
+		return fmt.Errorf("custody still degraded (%s) — discharge it before clearing repair", st.DegradedReason)
+	}
+	if st.RepairReason == "" {
+		return nil
+	}
+	if err := o.setMeta(ctx, metaRepairReason, ""); err != nil {
+		return fmt.Errorf("custody repair clear: %w", err)
+	}
+	o.recordEvent(ctx, "repair_completed", evidence+" | was: "+st.RepairReason)
+	return nil
+}
+
+// ObligationHighWater records the verified obligation high-water mark:
+// every terminal record at or below seq was confirmed to hold an
+// outbox obligation. Monotonic — regression writes are refused.
+func (o *Outbox) ObligationHighWater(ctx context.Context) (int64, error) {
+	hw, err := o.meta(ctx, metaObligationHWM)
+	if err != nil || hw == "" {
+		return 0, err
+	}
+	return strconv.ParseInt(hw, 10, 64)
+}
+
+// AdvanceObligationHWM raises the obligation high-water mark to seq —
+// or leaves it. The mark only moves forward.
+func (o *Outbox) AdvanceObligationHWM(ctx context.Context, seq int64) error {
+	cur, err := o.ObligationHighWater(ctx)
+	if err != nil {
+		return err
+	}
+	if seq <= cur {
+		return nil
+	}
+	if err := o.setMeta(ctx, metaObligationHWM, strconv.FormatInt(seq, 10)); err != nil {
+		return err
+	}
+	o.recordEvent(ctx, "obligation_hwm", fmt.Sprintf("advanced %d → %d", cur, seq))
+	return nil
+}
+
+// MissingObligations returns the subset of executionIDs that hold no
+// outbox row — the obligations the replay scanner must restore.
+func (o *Outbox) MissingObligations(ctx context.Context, executionIDs []string) (map[string]bool, error) {
+	missing := make(map[string]bool, len(executionIDs))
+	if len(executionIDs) == 0 {
+		return missing, nil
+	}
+	for _, id := range executionIDs {
+		missing[id] = true
+	}
+	present, err := o.obligationsPresent(ctx, executionIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range present {
+		delete(missing, id)
+	}
+	return missing, nil
+}
+
+func (o *Outbox) obligationsPresent(ctx context.Context, executionIDs []string) ([]string, error) {
+	var present []string
+	// Chunked IN() lookups — bounded placeholder lists keep the driver
+	// happy on large backlogs.
+	const chunk = 500
+	for i := 0; i < len(executionIDs); i += chunk {
+		end := i + chunk
+		if end > len(executionIDs) {
+			end = len(executionIDs)
+		}
+		part := executionIDs[i:end]
+		var sb strings.Builder
+		sb.WriteString(`SELECT execution_id FROM custody_outbox WHERE execution_id IN (`)
+		args := make([]any, len(part))
+		for j, id := range part {
+			if j > 0 {
+				sb.WriteByte(',')
+			}
+			fmt.Fprintf(&sb, "$%d", j+1)
+			args[j] = id
+		}
+		sb.WriteByte(')')
+		rows, err := o.db.QueryContext(ctx, sb.String(), args...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			present = append(present, id)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rows.Close()
+	}
+	return present, nil
+}
+
+// CustodyEvents returns the durable transition audit log, oldest
+// first — the independently auditable record of every degraded,
+// repair, and high-water transition.
+func (o *Outbox) CustodyEvents(ctx context.Context, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := o.db.QueryContext(ctx,
+		`SELECT created_at, event, detail FROM custody_events ORDER BY seq DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var at, ev, d string
+		if err := rows.Scan(&at, &ev, &d); err != nil {
+			return nil, err
+		}
+		out = append(out, fmt.Sprintf("%s %-18s %s", at, ev, d))
+	}
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, rows.Err()
 }

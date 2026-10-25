@@ -1087,10 +1087,17 @@ func (e *DispatchExecutor) ExecuteWithIdempotency(ctx context.Context, req Reque
 	// Evidence custody: enqueue the terminal receipt toward the
 	// independent witness. The sink is the durable outbox — a failure
 	// there is the store's own failure domain; the sink records it and
-	// the custody gate surfaces it at the next CRITICAL admission.
+	// the custody gate surfaces it at the next CRITICAL admission. The
+	// payload is the signed evidence receipt for CRITICAL, else the
+	// receipt's canonical preimage — an empty payload is itself a
+	// custody failure, never a nil-content obligation.
 	if e.custodySink != nil {
 		if receiptDigest, err := receipt.Digest(); err == nil {
-			e.custodySink(executionID, receiptDigest, receipt.EvidenceReceipt)
+			payload, perr := receipt.CustodyPayload()
+			if perr != nil {
+				payload = nil
+			}
+			e.custodySink(executionID, receiptDigest, payload)
 		}
 	}
 
