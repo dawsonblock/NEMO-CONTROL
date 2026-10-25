@@ -134,6 +134,8 @@ func main() {
 	runtimeManifest := flag.String("runtime-manifest", os.Getenv("SANDBOX_EXECUTOR_RUNTIME_MANIFEST"), "qualified runtime manifest (JSON) pinning the msb executable and libkrunfw firmware SHA-256 (or SANDBOX_EXECUTOR_RUNTIME_MANIFEST); required for the microsandbox backend")
 	msbProfile := flag.String("msb-deployment-profile", sandboxexecutor.DeploymentSingleTenant, "host-runtime isolation profile every sandbox boots under (single-tenant or multi-tenant)")
 	msbNamespace := flag.String("msb-namespace", os.Getenv("SANDBOX_EXECUTOR_MSB_NAMESPACE"), "deployment-exclusive sandbox namespace (or SANDBOX_EXECUTOR_MSB_NAMESPACE): handles mint under sx-<ns>- and a crabedence.namespace label is verified on cleanup; empty shares the sx- namespace — the shared posture cannot carry high-assurance cleanup claims")
+	msbHome := flag.String("msb-home", os.Getenv("SANDBOX_EXECUTOR_MSB_HOME"), "deployment-exclusive microsandbox catalog home (or SANDBOX_EXECUTOR_MSB_HOME): every msb call runs with MSB_HOME pinned to this operator-provisioned owner-only directory — required under -assurance-profile=high-assurance")
+	assuranceProfile := flag.String("assurance-profile", os.Getenv("SANDBOX_EXECUTOR_ASSURANCE_PROFILE"), "cleanup assurance profile: \"\", development, reduced or high-assurance (or SANDBOX_EXECUTOR_ASSURANCE_PROFILE); high-assurance refuses startup unless an exclusive namespaced-catalog posture verifies")
 	msbPull := flag.String("msb-pull", "never", "image fetch policy for the microsandbox backend: never (require the pinned image locally) or if-missing")
 	stateDir := flag.String("state-dir", os.Getenv("SANDBOX_EXECUTOR_STATE_DIR"), "artifact directory for captured output (or SANDBOX_EXECUTOR_STATE_DIR)")
 	ledgerPath := flag.String("ledger", os.Getenv("SANDBOX_EXECUTOR_LEDGER"), "durable job ledger path (or SANDBOX_EXECUTOR_LEDGER)")
@@ -220,7 +222,23 @@ func main() {
 		mb := &sandboxexecutor.MSBBackend{
 			Bin: bin, StateDir: artifacts, PullPolicy: *msbPull,
 			RequiredVersion: *msbVersion, DeploymentProfile: *msbProfile,
-			Namespace: *msbNamespace,
+			Namespace: *msbNamespace, MSBHome: *msbHome,
+		}
+		switch *assuranceProfile {
+		case "", "development", "reduced":
+			// Shared or merely namespaced postures are qualified for
+			// lower assurance — never silently upgraded.
+		case "high-assurance":
+			mb.HighAssurance = true
+		default:
+			log.Fatalf("sandbox-executord: unknown assurance profile %q", *assuranceProfile)
+		}
+		if mb.HighAssurance {
+			proof, perr := mb.DeploymentPosture()
+			if perr != nil {
+				log.Fatalf("sandbox-executord: high-assurance startup refused: %v", perr)
+			}
+			log.Printf("sandbox-executord: %s", proof)
 		}
 		// The qualified runtime manifest is mandatory: the version
 		// string is a claim, the digests are the identity. A runtime

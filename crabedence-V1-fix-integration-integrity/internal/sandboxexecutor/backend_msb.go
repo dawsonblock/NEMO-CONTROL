@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -173,6 +174,18 @@ type MSBBackend struct {
 	// shared-namespace deployments do not qualify for high-assurance
 	// cleanup claims.
 	Namespace string
+	// MSBHome, when set, is the deployment-exclusive microsandbox
+	// catalog home — exported to every msb invocation as MSB_HOME so
+	// the runtime resolves names inside this deployment's own
+	// catalog, never a shared one (RC8.3 PR-01).
+	MSBHome string
+	// HighAssurance declares that every destructive admission must
+	// carry an enforceable runtime-ownership posture: a non-empty
+	// exclusive namespace plus a dedicated MSB_HOME catalog that is
+	// owner-only on disk. Cleanup and Dispatch fail closed when the
+	// posture cannot be proven — never a silent fallback to the
+	// shared/empty namespace.
+	HighAssurance bool
 	// PullPolicy pins the image-fetch policy on every create: "never"
 	// (default) requires the authorized image to be present locally
 	// and refuses fast otherwise; "if-missing" lets the CLI fetch the
@@ -541,6 +554,12 @@ func dispatchNonce() (string, error) {
 // floods a utility call is refused, never accumulated.
 func (b *MSBBackend) runOnce(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, b.Bin, args...)
+	if b.MSBHome != "" {
+		// The dedicated catalog home is pinned per call, not
+		// inherited: no ambient MSB_HOME can redirect the runtime
+		// outside the deployment's verified catalog.
+		cmd.Env = append(os.Environ(), "MSB_HOME="+b.MSBHome)
+	}
 	cmd.Stdin = nil
 	out := newBoundedBuffer(maxCLIOutputBytes)
 	cmd.Stdout, cmd.Stderr = out, out
@@ -807,6 +826,9 @@ func (b *MSBBackend) Prepare(ctx context.Context, job *JobContractV2) (*Dispatch
 func (b *MSBBackend) Dispatch(ctx context.Context, job *JobContractV2, plan *DispatchPlan) (RunIdentity, error) {
 	if job == nil {
 		return RunIdentity{}, fmt.Errorf("dispatch requires a signed job contract")
+	}
+	if err := b.requireCleanupPosture(); err != nil {
+		return RunIdentity{}, fmt.Errorf("%w: %v", ErrDispatchRefused, err)
 	}
 	if plan == nil {
 		// The caller did not pre-persist a plan (a direct/test call):
@@ -1521,6 +1543,13 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 	if err := req.Validate(); err != nil {
 		return refuse(CleanupIdentityUnverifiable, "%v", err)
 	}
+	if err := b.requireCleanupPosture(); err != nil {
+		return refuse(CleanupIdentityUnverifiable, "%v", err)
+	}
+	if b.Namespace != "" && ValidateNamespace(b.Namespace) != nil {
+		return refuse(CleanupIdentityUnverifiable,
+			"configured namespace %q is invalid — a malformed namespace boundary cannot authorize destruction", b.Namespace)
+	}
 	prefix := b.handlePrefix()
 	if !strings.HasPrefix(req.Handle, prefix) {
 		return refuse(CleanupIdentityUnverifiable,
@@ -1536,9 +1565,11 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 	}
 
 	// Step 1 — verify what the handle currently names. Bounded
-	// independently of the caller: a wedged inspect degrades to
-	// "cannot classify" and the conditioned removal still runs — the
-	// post-check, not the inspect, is the verdict.
+	// independently of the caller: a wedged, failed, malformed or
+	// unclassifiable inspect degrades to IDENTITY_UNVERIFIABLE and no
+	// destructive command is issued — deletion requires a classified
+	// occupant, never an assumed one. Positive verified absence is
+	// distinguished from unknown/unreachable inspect.
 	var notes string
 	ictx, icancel := context.WithTimeout(ctx, b.cleanupStepTimeout())
 	doc, ierr := b.inspectRaw(ictx, req.Handle)
@@ -1578,10 +1609,16 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 		return refuse(CleanupAlreadyAbsentVerified,
 			"sandbox %s is already absent — the authorized instance is gone", req.Handle)
 	default:
-		// The current occupant cannot be classified: we cannot prove
-		// the label-conditioned removal would hit only the authorized
-		// instance — but the removal itself is still conditioned, so
-		// issue it and let the post-check resolve the outcome.
+		// The current occupant cannot be classified — a transport
+		// failure, timeout, malformed response, or unparseable
+		// document. There is no atomic identity-conditioned delete in
+		// msb: `rm` resolves whatever record sits at the name when it
+		// executes. Issuing it now could destroy an occupant that was
+		// never identified, so nothing is removed and the obligation
+		// stays pending for a retry that can classify.
+		return refuse(CleanupIdentityUnverifiable,
+			"cannot classify the occupant of %s (%v) — no destructive command issued; the cleanup obligation stays pending",
+			req.Handle, ierr)
 	}
 
 	// Step 2 — identity-bound removal. The handle is the deletion
@@ -1621,6 +1658,59 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 	vctx, vcancel := b.postCleanupCtx(ctx)
 	defer vcancel()
 	return b.postCleanupVerify(vctx, req, notes)
+}
+
+// requireCleanupPosture enforces the deployment's runtime-ownership
+// posture before any destructive admission (Cleanup) or instance
+// creation (Dispatch). A high-assurance backend admits nothing it
+// cannot scope to a proven-exclusive runtime: non-empty namespace
+// plus a dedicated, owner-only MSB_HOME catalog. The check re-runs on
+// every call — posture verified at startup can be degraded later, and
+// a degraded posture must fail closed, not be grandfathered.
+func (b *MSBBackend) requireCleanupPosture() error {
+	if !b.HighAssurance {
+		if b.Namespace != "" && ValidateNamespace(b.Namespace) != nil {
+			return fmt.Errorf("configured namespace %q is invalid — a malformed namespace boundary cannot authorize destruction", b.Namespace)
+		}
+		return nil
+	}
+	_, err := b.DeploymentPosture()
+	return err
+}
+
+// DeploymentPosture proves — or fails to prove — the exclusive
+// runtime-ownership posture a high-assurance deployment requires:
+// a non-empty validated namespace, a dedicated MSB_HOME catalog
+// directory that exists, is a directory, is owned by this process's
+// effective user, and grants no group/other access. The returned
+// string is the auditable posture proof operators record at startup.
+// Nothing is created here: an operator must provision the catalog
+// explicitly so a silent auto-creation cannot mask a misconfigured
+// shared deployment.
+func (b *MSBBackend) DeploymentPosture() (string, error) {
+	if b.Namespace == "" {
+		return "", fmt.Errorf("high-assurance cleanup requires an exclusive namespace — shared/empty namespace is UNSUPPORTED and cannot claim high assurance")
+	}
+	if err := ValidateNamespace(b.Namespace); err != nil {
+		return "", fmt.Errorf("high-assurance namespace %q invalid: %v", b.Namespace, err)
+	}
+	if b.MSBHome == "" {
+		return "", fmt.Errorf("high-assurance cleanup requires a dedicated MSB_HOME catalog — the shared default catalog gives every co-tenant resolve-and-delete reach on this deployment's names")
+	}
+	info, err := os.Stat(b.MSBHome)
+	if err != nil {
+		return "", fmt.Errorf("dedicated catalog %s not usable: %v", b.MSBHome, err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("dedicated catalog %s is not a directory", b.MSBHome)
+	}
+	if perm := info.Mode().Perm(); perm&0o077 != 0 {
+		return "", fmt.Errorf("dedicated catalog %s mode %o grants group/other access — a co-tenant with catalog access can substitute and destroy this deployment's instances", b.MSBHome, perm)
+	}
+	if st, ok := info.Sys().(*syscall.Stat_t); ok && int(st.Uid) != os.Geteuid() {
+		return "", fmt.Errorf("dedicated catalog %s is owned by uid %d, not this daemon's uid %d", b.MSBHome, st.Uid, os.Geteuid())
+	}
+	return fmt.Sprintf("exclusive runtime posture: namespace=%s catalog=%s (owner-only, uid %d)", b.Namespace, b.MSBHome, os.Geteuid()), nil
 }
 
 // cleanupStepTimeout bounds each external call inside Cleanup — the

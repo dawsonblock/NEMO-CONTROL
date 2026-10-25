@@ -326,6 +326,32 @@ func fakeMSBMain() int {
 			// every cleanup bound the adapter is allowed to take.
 			time.Sleep(time.Duration(secs) * time.Second)
 		}
+		if os.Getenv("MSB_FAKE_INSPECT_FAIL") != "" {
+			// A transport failure that is not "not found" — the
+			// occupant cannot be classified at all.
+			fmt.Fprintln(os.Stderr, "error: transport unreachable")
+			return 1
+		}
+		if os.Getenv("MSB_FAKE_INSPECT_GARBAGE") != "" {
+			// A response that arrives but cannot be parsed —
+			// identity must never be inferred from garbage.
+			fmt.Fprintln(os.Stdout, "{not-json")
+			return 0
+		}
+		if n := fakeEnvInt("MSB_FAKE_INSPECT_SLOW_ON", 0); n > 0 {
+			// Answer the first n-1 inspects of this name, then wedge:
+			// models a runtime whose post-removal verification hangs
+			// after a successful pre-check.
+			name := fakeName(rest)
+			countPath := filepath.Join(dir, name+".inspect-count")
+			raw, _ := os.ReadFile(countPath)
+			count, _ := strconv.Atoi(strings.TrimSpace(string(raw)))
+			count++
+			_ = os.WriteFile(countPath, []byte(strconv.Itoa(count)), 0o600)
+			if count >= n {
+				time.Sleep(10 * time.Second)
+			}
+		}
 		return fakeInspect(dir, rest)
 	case "image":
 		return fakeImageCmd(rest)
@@ -336,6 +362,13 @@ func fakeMSBMain() int {
 	case "logs":
 		return fakeLogs(dir, rest)
 	case "rm":
+		// Every destructive invocation is recorded — a cleanup that
+		// must not remove anything proves it on this counter, not on
+		// an outcome alone.
+		if f, ferr := os.OpenFile(filepath.Join(dir, "rm.count"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); ferr == nil {
+			fmt.Fprintf(f, "%s\n", strings.Join(rest, "\x00"))
+			f.Close()
+		}
 		return fakeRemove(dir, rest)
 	case "list":
 		return 0
