@@ -44,6 +44,10 @@ type Producer struct {
 // cannot fork the stream.
 type Outbox struct {
 	db *sql.DB
+	// migrationHook is a test-only fault-injection seam used to prove
+	// crash-before-commit and crash-after-commit recovery. Nil in
+	// production.
+	migrationHook func(stage string) error
 }
 
 // OpenOutbox opens the kernel custody outbox. The containing directory
@@ -87,11 +91,16 @@ func OpenOutbox(path string) (*Outbox, error) {
 			created_at TEXT NOT NULL
 		)`,
 		legacyJournalDDL,
+		nonceLedgerDDL,
 	} {
 		if _, err := db.Exec(stmt); err != nil {
 			db.Close()
 			return nil, fmt.Errorf("custody outbox schema: %w", err)
 		}
+	}
+	if err := ensureLegacyJournalSchema(context.Background(), db); err != nil {
+		db.Close()
+		return nil, err
 	}
 	return &Outbox{db: db}, nil
 }
@@ -231,8 +240,19 @@ func (o *Outbox) Undelivered(ctx context.Context) (int64, error) {
 // Pending lists every queued custody obligation from sequence 1 —
 // the operator/forensic view of the durable queue (delivered rows
 // are retained, so this includes obligations already acknowledged).
+// It materializes the whole queue; bounded callers use PendingPage.
 func (o *Outbox) Pending(ctx context.Context) ([]PendingRow, error) {
 	return o.rowsFrom(ctx, 1)
+}
+
+// PendingPage returns at most limit queued obligations strictly after
+// afterSeq — SQL cursor pagination with no whole-queue materialization.
+// limit must be positive and is capped by the caller.
+func (o *Outbox) PendingPage(ctx context.Context, afterSeq int64, limit int) ([]PendingRow, error) {
+	if limit <= 0 {
+		return nil, fmt.Errorf("custody outbox page: limit must be positive")
+	}
+	return o.rowsPage(ctx, afterSeq, limit)
 }
 
 // PendingRow is one queued custody obligation.
@@ -245,9 +265,20 @@ type PendingRow struct {
 }
 
 func (o *Outbox) rowsFrom(ctx context.Context, fromSeq int64) ([]PendingRow, error) {
-	rows, err := o.db.QueryContext(ctx,
-		`SELECT seq, execution_id, envelope_hash, envelope_json, COALESCE(ack, '')
-		 FROM custody_outbox WHERE seq >= $1 ORDER BY seq`, fromSeq)
+	return o.rowsPage(ctx, fromSeq-1, 0)
+}
+
+// rowsPage reads rows strictly after afterSeq, capped at limit (0 =
+// unbounded). The cursor lives in SQL; only one page is materialized.
+func (o *Outbox) rowsPage(ctx context.Context, afterSeq int64, limit int) ([]PendingRow, error) {
+	q := `SELECT seq, execution_id, envelope_hash, envelope_json, COALESCE(ack, '')
+	      FROM custody_outbox WHERE seq > $1 ORDER BY seq`
+	args := []any{afterSeq}
+	if limit > 0 {
+		q += ` LIMIT $2`
+		args = append(args, limit)
+	}
+	rows, err := o.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -499,6 +530,58 @@ func (o *Outbox) ClearRepairRequired(ctx context.Context, evidence string) error
 	}
 	o.recordEvent(ctx, "repair_completed", evidence+" | was: "+st.RepairReason)
 	return nil
+}
+
+// ErrStaleRepairVerification marks a repair whose verification no
+// longer describes the marker it is about to clear — a concurrent
+// contradiction or degraded event landed after the scan began.
+var ErrStaleRepairVerification = errors.New("custody repair: verification is stale — the repair marker changed after the scan")
+
+// ClearRepairRequiredIfUnchanged is the transactionally safe repair
+// clear: it compares the marker to the exact reason the verified scan
+// observed and refuses if anything changed, so a stale verification can
+// never discharge a newly required repair. The event row is written in
+// the same transaction as the state change.
+func (o *Outbox) ClearRepairRequiredIfUnchanged(ctx context.Context, expectedReason, evidence string) error {
+	if expectedReason == "" {
+		return fmt.Errorf("custody repair clear: expected marker reason is empty")
+	}
+	tx, err := o.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var degraded, repair string
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COALESCE((SELECT value FROM outbox_meta WHERE key = $1), '')`,
+		metaDegradedReason).Scan(&degraded); err != nil {
+		return err
+	}
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COALESCE((SELECT value FROM outbox_meta WHERE key = $1), '')`,
+		metaRepairReason).Scan(&repair); err != nil {
+		return err
+	}
+	if degraded != "" {
+		return fmt.Errorf("custody still degraded (%s) — discharge it before clearing repair", degraded)
+	}
+	if repair == "" {
+		return nil
+	}
+	if repair != expectedReason {
+		return fmt.Errorf("%w: marker is now %q, scan verified %q", ErrStaleRepairVerification, repair, expectedReason)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE outbox_meta SET value = '' WHERE key = $1`, metaRepairReason); err != nil {
+		return fmt.Errorf("custody repair clear: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO custody_events (event, detail, created_at) VALUES ($1, $2, $3)`,
+		"repair_completed", evidence+" | was: "+repair,
+		time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		return fmt.Errorf("custody repair event: %w", err)
+	}
+	return tx.Commit()
 }
 
 // ObligationHighWater records the verified obligation high-water mark:

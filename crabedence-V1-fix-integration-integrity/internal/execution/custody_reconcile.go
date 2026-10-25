@@ -14,30 +14,43 @@ package execution
 // below it were verified covered and outbox rows have no delete path,
 // so coverage there is structural. The operator-repair variant
 // (fromSeq = 0) re-verifies the entire stream.
+//
+// RC8.3 integrity closure: a legacy empty-payload row is never covered
+// merely because some migration-journal entry exists. Coverage is a
+// typed verdict re-verified from the journal identity, terminal receipt
+// digest, envelope hash, row sequence, signed operator authorization,
+// and disposition. An unresolved or contradictory record keeps
+// REPAIR_REQUIRED open and blocks high-water advancement across its
+// sequence.
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/openclaw/crabbox/internal/custody"
 	"github.com/openclaw/crabbox/internal/evidence"
 	"github.com/openclaw/crabbox/internal/idempotency"
 	"github.com/openclaw/crabbox/internal/witness"
 )
 
-// reconcileCustodyObligations restores missing custody obligations for
-// every terminal record at positions beyond fromSeq. A record that
-// cannot produce a payload, an enqueue that fails, and a contradiction
-// the outbox refuses are distinct outcomes: the first two are
-// retryable failures (the pass reports an error and custody stays
-// degraded); a contradiction is an evidence fault escalated to
-// REPAIR_REQUIRED — never overwritten, never silently skipped.
+// CustodyCoveragePolicy is the externally pinned context legacy
+// coverage verification needs. An empty policy fails closed: no
+// authorization verifies without a pinned repair-authority set, so a
+// journal entry can never be trusted by default.
+type CustodyCoveragePolicy struct {
+	DeploymentID   string
+	RepairTrust    *custody.TrustSet
+	CustodianTrust *custody.TrustSet
+}
+
 // custodyReconcilePageSize bounds the terminal-evidence rows one
 // reconciliation page examines. Per-pass work scales with new
 // terminal rows, never the total ledger.
 const custodyReconcilePageSize = 256
 
-func reconcileCustodyObligations(ctx context.Context, store idempotency.EffectStore, outbox *witness.Outbox, producer witness.Producer, fromSeq int64) error {
+func reconcileCustodyObligations(ctx context.Context, store idempotency.EffectStore, outbox *witness.Outbox, producer witness.Producer, fromSeq int64, policy CustodyCoveragePolicy) error {
 	cursor := fromSeq
 	for {
 		page, err := store.TerminalEvidenceAfter(ctx, cursor, custodyReconcilePageSize)
@@ -47,7 +60,7 @@ func reconcileCustodyObligations(ctx context.Context, store idempotency.EffectSt
 		if len(page) == 0 {
 			return nil
 		}
-		if err := reconcileCustodyPage(ctx, store, outbox, producer, page, fromSeq); err != nil {
+		if err := reconcileCustodyPage(ctx, store, outbox, producer, page, fromSeq, policy); err != nil {
 			return err
 		}
 		last := page[len(page)-1].Seq
@@ -68,7 +81,7 @@ func reconcileCustodyObligations(ctx context.Context, store idempotency.EffectSt
 // bounded page, then advances the durable high-water mark over the
 // page's verified covered prefix — the mark never steps over a gap,
 // a missing row, or a contradiction.
-func reconcileCustodyPage(ctx context.Context, store idempotency.EffectStore, outbox *witness.Outbox, producer witness.Producer, refs []evidence.TerminalRef, fromSeq int64) error {
+func reconcileCustodyPage(ctx context.Context, store idempotency.EffectStore, outbox *witness.Outbox, producer witness.Producer, refs []evidence.TerminalRef, fromSeq int64, policy CustodyCoveragePolicy) error {
 	ids := make([]string, 0, len(refs))
 	var maxSeq int64
 	for _, r := range refs {
@@ -108,25 +121,41 @@ func reconcileCustodyPage(ctx context.Context, store idempotency.EffectStore, ou
 			if err != nil {
 				return fmt.Errorf("obligation coverage read %s: %w", r.ExecutionID, err)
 			}
-			if !ok || string(content) == string(payload) {
+			if !ok {
+				// The row vanished between the batch presence check
+				// and the byte read — never treat that as coverage.
+				if _, err := outbox.Enqueue(ctx, producer, rec.ExecutionID, rec.TerminalReceiptDigest, payload); err != nil {
+					return fmt.Errorf("obligation replay enqueue %s: %w", r.ExecutionID, err)
+				}
+				continue
+			}
+			if string(content) == string(payload) {
 				continue
 			}
 			if len(content) == 0 {
 				// A legacy empty-payload row (RC8.1 durable shape):
-				// classification lives in the migration journal —
-				// an operator-approved entry covers it; an
-				// unjournaled one blocks custody until `custodyctl
-				// migrate` classifies it. Never silently blessed,
-				// never re-faulted once recorded.
-				action, aerr := outbox.LegacyJournalAction(ctx, r.ExecutionID)
-				if aerr != nil {
-					return fmt.Errorf("legacy journal read %s: %w", r.ExecutionID, aerr)
+				// coverage is a typed verdict, not "a journal entry
+				// exists". The journal must bind this row's identity,
+				// the authoritative terminal digest, the envelope hash,
+				// the row sequence, and a signed operator grant, and
+				// the disposition must be one that can cover.
+				cov, cerr := outbox.ResolveLegacyCoverage(ctx, witness.LegacyCoverageRequest{
+					ExecutionID:           r.ExecutionID,
+					TerminalReceiptDigest: r.TerminalReceiptDigest,
+					DeploymentID:          policy.DeploymentID,
+					RepairTrust:           policy.RepairTrust,
+					CustodianTrust:        policy.CustodianTrust,
+					Now:                   time.Now(),
+				})
+				if cerr != nil {
+					return fmt.Errorf("legacy coverage verification %s: %w", r.ExecutionID, cerr)
 				}
-				if action != "" {
+				if cov.Disposition == witness.LegacyCoverageVerified {
 					continue
 				}
-				if merr := outbox.MarkRepairRequired(ctx,
-					fmt.Sprintf("legacy empty custody payload on %s requires operator migration (custodyctl preflight/migrate) — no classification recorded", r.ExecutionID)); merr != nil {
+				reason := fmt.Sprintf("legacy empty custody payload on %s is %s: %s — REPAIR_REQUIRED stays open and the high-water mark cannot advance across seq %d",
+					r.ExecutionID, cov.Disposition, cov.Reason, r.Seq)
+				if merr := outbox.MarkRepairRequired(ctx, reason); merr != nil {
 					return fmt.Errorf("marking custody repair: %w", merr)
 				}
 				repairErr = witness.ErrEvidenceContradiction
@@ -178,14 +207,14 @@ func reconcileCustodyPage(ctx context.Context, store idempotency.EffectStore, ou
 // re-verifies the entire terminal stream from position 0 regardless
 // of the recorded high-water mark — the forensic rescan a verified
 // repair runs.
-func CustodyObligationRescan(ctx context.Context, store idempotency.EffectStore, outbox *witness.Outbox, producer witness.Producer) error {
-	return reconcileCustodyObligations(ctx, store, outbox, producer, 0)
+func CustodyObligationRescan(ctx context.Context, store idempotency.EffectStore, outbox *witness.Outbox, producer witness.Producer, policy CustodyCoveragePolicy) error {
+	return reconcileCustodyObligations(ctx, store, outbox, producer, 0, policy)
 }
 
 // ReconcileCustodyObligationsFrom is the incremental scanner exported
 // for the shipped operator surface (custodyctl): identical semantics
 // to the service's drain-time scanner — bounded pages strictly beyond
 // the durable high-water mark.
-func ReconcileCustodyObligationsFrom(ctx context.Context, store idempotency.EffectStore, outbox *witness.Outbox, producer witness.Producer, fromSeq int64) error {
-	return reconcileCustodyObligations(ctx, store, outbox, producer, fromSeq)
+func ReconcileCustodyObligationsFrom(ctx context.Context, store idempotency.EffectStore, outbox *witness.Outbox, producer witness.Producer, fromSeq int64, policy CustodyCoveragePolicy) error {
+	return reconcileCustodyObligations(ctx, store, outbox, producer, fromSeq, policy)
 }

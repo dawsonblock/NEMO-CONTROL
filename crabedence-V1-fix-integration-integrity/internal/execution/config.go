@@ -454,6 +454,12 @@ type WitnessConfig struct {
 	// (custody.LoadTrustSet file) — the only authority on which
 	// witness keys may vouch.
 	TrustRootsPath string
+	// RepairTrustRootsPath is the separately pinned repair-authority
+	// trust set. It is deliberately distinct from the custodian and
+	// kernel-relay sets: an ordinary evidence signer can never
+	// authorize forensic repair. Empty means no legacy classification
+	// can verify, so unresolved legacy rows stay REPAIR_REQUIRED.
+	RepairTrustRootsPath string
 	// Deployment is the custody scope the envelopes bind — shared with
 	// the release-control deployment identity.
 	Deployment string
@@ -493,15 +499,16 @@ func (c WitnessConfig) Enabled() bool { return c.Socket != "" || c.TLSAddr != ""
 // boundary always installs the fail-closed CRITICAL gate.
 func witnessConfigFromEnv(production bool, deployment string) (WitnessConfig, error) {
 	cfg := WitnessConfig{
-		Socket:         strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_SOCKET")),
-		TLSAddr:        strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TLS")),
-		TLSKeyFP:       strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TLS_KEY")),
-		OutboxPath:     strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_OUTBOX")),
-		TrustRootsPath: strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TRUST_ROOTS")),
-		Deployment:     deployment,
-		PolicyDigest:   strings.TrimSpace(os.Getenv("CRABEDENCE_POLICY_DIGEST")),
-		DrainInterval:  2 * time.Second,
-		ReadinessTTL:   DefaultWitnessReadinessTTL,
+		Socket:               strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_SOCKET")),
+		TLSAddr:              strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TLS")),
+		TLSKeyFP:             strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TLS_KEY")),
+		OutboxPath:           strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_OUTBOX")),
+		TrustRootsPath:       strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TRUST_ROOTS")),
+		RepairTrustRootsPath: strings.TrimSpace(os.Getenv("CRABEDENCE_REPAIR_TRUST_ROOTS")),
+		Deployment:           deployment,
+		PolicyDigest:         strings.TrimSpace(os.Getenv("CRABEDENCE_POLICY_DIGEST")),
+		DrainInterval:        2 * time.Second,
+		ReadinessTTL:         DefaultWitnessReadinessTTL,
 	}
 	if raw := strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_DRAIN_INTERVAL")); raw != "" {
 		d, err := time.ParseDuration(raw)

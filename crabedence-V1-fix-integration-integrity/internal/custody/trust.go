@@ -302,7 +302,7 @@ func decodeTrustKey(kf trustSetKeyFile) (TrustedKey, error) {
 		ValidUntilIndex: kf.ValidUntilIndex,
 	}
 	switch k.Role {
-	case RoleCustodian, RoleKernelRelay:
+	case RoleCustodian, RoleKernelRelay, RoleRepairAuthority:
 	default:
 		return k, fmt.Errorf("unknown signer role %q", kf.Role)
 	}

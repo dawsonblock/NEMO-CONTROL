@@ -58,7 +58,9 @@ func TestLegacyMigrationCompensateAndDrain(t *testing.T) {
 
 	// Compensate in place — same seq, same linkage, canonical payload.
 	payload := []byte(`{"receipt":"v1","exec":"legacy-exec"}`)
-	if err := h.outbox.CompensateLegacyRow(context.Background(), h.prod, 1, "digest-legacy-exec", payload); err != nil {
+	authority, trust := testRepairAuthority(t, h.dep)
+	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
+	if _, err := h.outbox.CompensateLegacyRow(context.Background(), h.prod, 1, "digest-legacy-exec", payload, auth); err != nil {
 		t.Fatalf("compensate: %v", err)
 	}
 	row := h.row(t, 1)
@@ -104,10 +106,13 @@ func TestLegacyMigrationWitnessedAndUnverifiable(t *testing.T) {
 		t.Fatalf("classification = %+v, want one acked legacy row", legacy)
 	}
 	// Evidence bytes are never rewritten.
-	if err := h.outbox.CompensateLegacyRow(context.Background(), h.prod, 1, "d", []byte("x")); err == nil {
+	authority, trust := testRepairAuthority(t, h.dep)
+	refuseAuth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
+	if _, err := h.outbox.CompensateLegacyRow(context.Background(), h.prod, 1, "d", []byte("x"), refuseAuth); err == nil {
 		t.Fatal("compensation rewrote a witnessed row")
 	}
-	if err := h.outbox.JournalLegacyWitnessed(context.Background(), 1, "operator alice: known RC8.1 empty divergence"); err != nil {
+	journalAuth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
+	if err := h.outbox.JournalLegacyWitnessed(context.Background(), 1, "digest-legacy-acked", "operator alice: known RC8.1 empty divergence", journalAuth); err != nil {
 		t.Fatalf("journal witnessed: %v", err)
 	}
 	if action, _ := h.outbox.LegacyJournalAction(context.Background(), "legacy-acked"); action != JournalLegacyWitnessed {
@@ -115,8 +120,9 @@ func TestLegacyMigrationWitnessedAndUnverifiable(t *testing.T) {
 	}
 	// Unverifiable quarantine records without touching the row.
 	insertLegacyRow(t, h, 2, "legacy-ghost", "prev-hash")
+	quarantineAuth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
 	if err := h.outbox.JournalUnverifiable(context.Background(), 2, "legacy-ghost",
-		"operator alice: no authoritative terminal record — quarantined"); err != nil {
+		"operator alice: no authoritative terminal record — quarantined", quarantineAuth); err != nil {
 		t.Fatalf("journal unverifiable: %v", err)
 	}
 	journal, err := h.outbox.MigrationJournal(context.Background())

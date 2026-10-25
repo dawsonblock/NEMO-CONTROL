@@ -108,7 +108,7 @@ func TestObligationReplayRestoresCrashLostEnqueue(t *testing.T) {
 	if len(missing) != 3 {
 		t.Fatalf("missing = %v, want all 3 absent before replay", missing)
 	}
-	if err := reconcileCustodyObligations(context.Background(), store, outbox, prod, 0); err != nil {
+	if err := reconcileCustodyObligations(context.Background(), store, outbox, prod, 0, CustodyCoveragePolicy{}); err != nil {
 		t.Fatalf("obligation replay: %v", err)
 	}
 	missing, err = outbox.MissingObligations(context.Background(), ids)
@@ -160,12 +160,12 @@ func TestObligationReplayIdempotent(t *testing.T) {
 
 	terminalize(t, exec, "ob-idem-1")
 	terminalize(t, exec, "ob-idem-2")
-	if err := reconcileCustodyObligations(context.Background(), store, outbox, prod, 0); err != nil {
+	if err := reconcileCustodyObligations(context.Background(), store, outbox, prod, 0, CustodyCoveragePolicy{}); err != nil {
 		t.Fatal(err)
 	}
 	hw1, _ := outbox.ObligationHighWater(context.Background())
 	rows1, _ := outbox.Pending(context.Background())
-	if err := reconcileCustodyObligations(context.Background(), store, outbox, prod, 0); err != nil {
+	if err := reconcileCustodyObligations(context.Background(), store, outbox, prod, 0, CustodyCoveragePolicy{}); err != nil {
 		t.Fatal(err)
 	}
 	hw2, _ := outbox.ObligationHighWater(context.Background())
@@ -193,7 +193,7 @@ func TestObligationReplayContradictionEscalates(t *testing.T) {
 	if _, err := outbox.Enqueue(context.Background(), prod, execID, "forged", []byte(`{"forged":true}`)); err != nil {
 		t.Fatal(err)
 	}
-	err := reconcileCustodyObligations(context.Background(), store, outbox, prod, 0)
+	err := reconcileCustodyObligations(context.Background(), store, outbox, prod, 0, CustodyCoveragePolicy{})
 	if err == nil {
 		t.Fatal("contradictory obligation replayed silently")
 	}
@@ -227,7 +227,7 @@ func TestObligationReplayBoundedByHighWater(t *testing.T) {
 	prod := obligationProducer(t, "dep-ob4", signer)
 
 	id1 := terminalize(t, exec, "ob-hwm-1")
-	if err := reconcileCustodyObligations(context.Background(), store, outbox, prod, 0); err != nil {
+	if err := reconcileCustodyObligations(context.Background(), store, outbox, prod, 0, CustodyCoveragePolicy{}); err != nil {
 		t.Fatal(err)
 	}
 	hw, _ := outbox.ObligationHighWater(context.Background())
@@ -237,7 +237,7 @@ func TestObligationReplayBoundedByHighWater(t *testing.T) {
 	// New terminal records past the mark are found; the covered
 	// prefix is trusted by construction.
 	id2 := terminalize(t, exec, "ob-hwm-2")
-	if err := reconcileCustodyObligations(context.Background(), store, outbox, prod, hw); err != nil {
+	if err := reconcileCustodyObligations(context.Background(), store, outbox, prod, hw, CustodyCoveragePolicy{}); err != nil {
 		t.Fatal(err)
 	}
 	missing, err := outbox.MissingObligations(context.Background(), []string{id1, id2})

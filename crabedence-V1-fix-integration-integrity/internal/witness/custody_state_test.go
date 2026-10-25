@@ -256,16 +256,20 @@ func TestCustodyRepairRequiredStickyUntilOperatorRepair(t *testing.T) {
 		}
 	}
 	// Unauthorized repairs are refused before any pass runs.
-	if err := h.sender.OperatorRepair(context.Background(), "", "no actor"); err == nil {
-		t.Fatal("repair without an actor was admitted")
+	h.sender.SetFullRescanScanner(func(context.Context) error { return nil })
+	authority, repairTrust := testRepairAuthority(t, h.dep)
+	if err := h.sender.OperatorRepair(context.Background(), OperatorAuthorization{}, "no actor"); err == nil {
+		t.Fatal("repair without a signed grant was admitted")
 	}
-	if err := h.sender.OperatorRepair(context.Background(), "alice", ""); err == nil {
+	noReasonAuth := testAuth(t, h.outbox, authority, repairTrust, h.dep, OperationRepair)
+	if err := h.sender.OperatorRepair(context.Background(), noReasonAuth, ""); err == nil {
 		t.Fatal("repair without a reason was admitted")
 	}
 	if got := h.sender.CustodyState(context.Background()); got != "REPAIR_REQUIRED" {
 		t.Fatalf("unauthorized repair cleared the marker — got %s", got)
 	}
-	if err := h.sender.OperatorRepair(context.Background(), "alice", "operator confirmed fork resolved: witness restored"); err != nil {
+	auth := testAuth(t, h.outbox, authority, repairTrust, h.dep, OperationRepair)
+	if err := h.sender.OperatorRepair(context.Background(), auth, "operator confirmed fork resolved: witness restored"); err != nil {
 		t.Fatalf("operator repair: %v", err)
 	}
 	if got := h.sender.CustodyState(context.Background()); got != "HEALTHY" {

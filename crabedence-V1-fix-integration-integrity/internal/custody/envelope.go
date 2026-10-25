@@ -48,6 +48,10 @@ const (
 const (
 	RoleCustodian   = "custodian"
 	RoleKernelRelay = "kernel-relay"
+	// RoleRepairAuthority is a privileged operator key, pinned
+	// separately from routine evidence signers. It authorizes custody
+	// migration and forensic repair and never signs ordinary receipts.
+	RoleRepairAuthority = "repair-authority"
 )
 
 // families is the family allowlist — an unknown family is a typed

@@ -912,6 +912,18 @@ func wireCustodyBoundary(ctx context.Context, cfg *ServiceConfig, store idempote
 	if err != nil {
 		return nil, fmt.Errorf("custodian trust set: %w", err)
 	}
+	repairTrust := custody.NewTrustSet()
+	if wc.RepairTrustRootsPath != "" {
+		repairTrust, err = custody.LoadTrustSet(wc.RepairTrustRootsPath)
+		if err != nil {
+			return nil, fmt.Errorf("repair-authority trust set: %w", err)
+		}
+	}
+	coveragePolicy := CustodyCoveragePolicy{
+		DeploymentID:   wc.Deployment,
+		RepairTrust:    repairTrust,
+		CustodianTrust: trust,
+	}
 	outbox, err := witness.OpenOutbox(wc.OutboxPath)
 	if err != nil {
 		return nil, fmt.Errorf("custody outbox: %w", err)
@@ -954,13 +966,13 @@ func wireCustodyBoundary(ctx context.Context, cfg *ServiceConfig, store idempote
 		if err != nil {
 			return fmt.Errorf("custody obligation high-water: %w", err)
 		}
-		return reconcileCustodyObligations(ctx, store, outbox, producer, hwm)
+		return reconcileCustodyObligations(ctx, store, outbox, producer, hwm, coveragePolicy)
 	})
 	// The operator repair rescan is a distinct, full-history pass:
 	// an incremental scan since the high-water mark could inherit
 	// exactly the corruption the repair is meant to disprove.
 	sender.SetFullRescanScanner(func(ctx context.Context) error {
-		return CustodyObligationRescan(ctx, store, outbox, producer)
+		return CustodyObligationRescan(ctx, store, outbox, producer, coveragePolicy)
 	})
 	sink := func(executionID, receiptDigest string, payload []byte) {
 		if _, err := outbox.Enqueue(ctx, producer, executionID, receiptDigest, payload); err != nil {
