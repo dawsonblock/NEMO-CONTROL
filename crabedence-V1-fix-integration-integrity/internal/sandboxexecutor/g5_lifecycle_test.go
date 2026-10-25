@@ -533,12 +533,12 @@ func TestConcurrentRetargetedDeletion(t *testing.T) {
 }
 
 // TestSlowInspectBounded — a wedged runtime degrades to honest
-// uncertainty inside a bounded window. The pre-removal inspect, the
-// removal, and the post-removal verification each carry their own
-// deadline; a hung inspect can never park the obligation forever or
-// coerce a verdict it could not observe.
+// uncertainty inside a bounded window. Under the RC8.3 fail-closed
+// contract a hung pre-removal inspect refuses as IDENTITY_UNVERIFIABLE
+// — no destructive command is issued — and can never park the
+// obligation forever or coerce a verdict it could not observe.
 func TestSlowInspectBounded(t *testing.T) {
-	bin, _ := fakeMSB(t, map[string]string{"MSB_FAKE_INSPECT_SLEEP": "10"})
+	bin, stateDir := fakeMSB(t, map[string]string{"MSB_FAKE_INSPECT_SLEEP": "10"})
 	backend := testBackend(t, bin, filepath.Join(t.TempDir(), "artifacts"))
 	backend.stepTimeoutOverride = 250 * time.Millisecond
 	backend.postVerifyOverride = 250 * time.Millisecond
@@ -552,11 +552,15 @@ func TestSlowInspectBounded(t *testing.T) {
 		t.Fatalf("wedged runtime returned an error instead of a classification: %v", err)
 	}
 	if res.Outcome.ProvesAbsent() {
-		t.Fatalf("a wedged post-check claimed verified absence: %s", res.Outcome)
+		t.Fatalf("a wedged inspect claimed verified absence: %s", res.Outcome)
 	}
-	if res.Outcome != CleanupRemovalUncertain {
-		t.Fatalf("wedged runtime outcome %s, want REMOVAL_UNCERTAIN", res.Outcome)
+	if res.Outcome != CleanupIdentityUnverifiable {
+		t.Fatalf("wedged pre-removal inspect outcome %s, want IDENTITY_UNVERIFIABLE", res.Outcome)
 	}
+	if destructiveCount(t, stateDir) != 0 {
+		t.Fatal("a destructive command was issued against an unverified occupant")
+	}
+	survive(t, stateDir, disp.Handle)
 	// The bound is ~2 step deadlines + ~2 post-verify deadlines; five
 	// seconds is generous headroom over the 250ms test overrides and
 	// orders of magnitude below the 10s wedge.

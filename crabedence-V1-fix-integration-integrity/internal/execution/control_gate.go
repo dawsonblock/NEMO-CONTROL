@@ -74,14 +74,10 @@ func newControlGate(cfg ControlLedgerConfig, production bool) (func() error, err
 
 // controlGateFlight is one shared in-flight ledger probe. Completion
 // is broadcast — done is closed, never sent on — so every waiter
-// parked on this generation observes the same stored result. gen is
-// the flight's generation identifier: the worker retires the shared
-// slot only while its own generation is still current, so a stale
-// worker can never clear a newer probe's slot.
+// parked on this flight observes the same stored result.
 type controlGateFlight struct {
 	done chan struct{} // closed exactly once, when err is readable
 	err  error         // valid only after done is closed
-	gen  uint64
 }
 
 // controlGateProbe wraps the admission check with a soft timeout so a
@@ -107,20 +103,18 @@ type controlGateFlight struct {
 func controlGateProbe(check func() error, budget time.Duration) func() error {
 	var mu sync.Mutex
 	var current *controlGateFlight
-	var nextGen uint64
 	return func() error {
 		mu.Lock()
 		if current == nil {
-			f := &controlGateFlight{done: make(chan struct{}), gen: nextGen}
-			nextGen++
+			f := &controlGateFlight{done: make(chan struct{})}
 			current = f
 			go func() {
 				err := check()
 				// Publish, broadcast, and retire under one lock: a
 				// caller arriving after this step starts a fresh
-				// probe rather than attaching to a completed
-				// generation, and the generation guard keeps a stale
-				// worker from clearing a newer flight's slot.
+				// probe rather than attaching to a completed flight,
+				// and pointer identity keeps a stale worker from
+				// clearing a newer flight's slot.
 				mu.Lock()
 				f.err = err
 				close(f.done)

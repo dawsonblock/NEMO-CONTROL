@@ -138,6 +138,11 @@ func (s *Sender) CustodyState(ctx context.Context) string {
 		// another complete verified pass restores readiness.
 		return "DEGRADED"
 	}
+	if err, _ := s.lastErr.Load().(string); err != "" {
+		// A recorded failure with no completed pass yet (e.g. a
+		// degraded-marker write failure) never reads HEALTHY.
+		return "DEGRADED"
+	}
 	if time.Since(verified) > s.freshnessBound() {
 		return "DEGRADED"
 	}

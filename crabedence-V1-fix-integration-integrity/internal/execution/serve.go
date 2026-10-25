@@ -988,7 +988,11 @@ func wireCustodyBoundary(ctx context.Context, cfg *ServiceConfig, store idempote
 			case "REPAIR_REQUIRED":
 				reason = "evidence contradiction escalated — operator repair required"
 			default:
-				reason = "custody backlog pending — witness has not acknowledged queued receipts"
+				if n, err := outbox.Undelivered(context.Background()); err == nil && n == 0 {
+					reason = "verified readiness stale or newest drain failed — custody not currently verified"
+				} else {
+					reason = "custody backlog pending — witness has not acknowledged queued receipts"
+				}
 			}
 		}
 		return fmt.Errorf("evidence custody %s: %s", state, reason)
