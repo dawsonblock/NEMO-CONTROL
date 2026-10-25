@@ -468,7 +468,7 @@ const validStream = `{"Package":"p","Action":"start"}
 
 func TestIngestTestStream(t *testing.T) {
 	s := openStore(t)
-	n, err := s.IngestTestStream(strings.NewReader(validStream), "suite-x")
+	n, err := s.IngestTestStream(strings.NewReader(validStream), "suite-x", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -487,7 +487,7 @@ func TestIngestTestStream(t *testing.T) {
 		t.Fatalf("run record %+v", run)
 	}
 	// Idempotent: the same stream digests to the same run.
-	if n, err := s.IngestTestStream(strings.NewReader(validStream), "suite-x"); err != nil || n != 0 {
+	if n, err := s.IngestTestStream(strings.NewReader(validStream), "suite-x", nil); err != nil || n != 0 {
 		t.Fatalf("re-ingest: n=%d err=%v", n, err)
 	}
 }
@@ -537,7 +537,7 @@ func TestIngestTestStreamRefusesMalformed(t *testing.T) {
 `,
 	}
 	for i, stream := range cases {
-		if _, err := s.IngestTestStream(strings.NewReader(stream), fmt.Sprint(i)); err == nil {
+		if _, err := s.IngestTestStream(strings.NewReader(stream), fmt.Sprint(i), nil); err == nil {
 			t.Fatalf("case %d: malformed stream accepted", i)
 		}
 	}

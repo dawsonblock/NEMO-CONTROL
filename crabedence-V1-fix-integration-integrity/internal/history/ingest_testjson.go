@@ -294,8 +294,13 @@ type testResultRecord struct {
 // event keyed on the stream's own digest plus one test_result event
 // per case. The stream must satisfy the canonical lifecycle — a
 // malformed stream is refused whole, never normalized into
-// plausible-looking history.
-func (s *Store) IngestTestStream(r io.Reader, label string) (int, error) {
+// plausible-looking history. When cs is non-nil the raw stream bytes
+// are also committed to the content store under the run digest, so
+// the observation-v1 verifier can independently re-derive every case
+// outcome from held evidence rather than trusting the recorded
+// payload; a nil content store still records, but those results can
+// never reach VERIFIED.
+func (s *Store) IngestTestStream(r io.Reader, label string, cs *ContentStore) (int, error) {
 	raw, err := io.ReadAll(io.LimitReader(r, 256<<20))
 	if err != nil {
 		return 0, fmt.Errorf("read test stream: %w", err)
@@ -306,6 +311,15 @@ func (s *Store) IngestTestStream(r io.Reader, label string) (int, error) {
 	}
 	sum := sha256.Sum256(raw)
 	runDigest := hex.EncodeToString(sum[:])
+	if cs != nil {
+		stored, _, err := cs.Put(bytes.NewReader(raw))
+		if err != nil {
+			return 0, fmt.Errorf("store test stream: %w", err)
+		}
+		if stored != runDigest {
+			return 0, fmt.Errorf("content store digest %q disagrees with stream digest %q", stored, runDigest)
+		}
+	}
 
 	run := testRunRecord{StreamSHA256: runDigest, Label: label}
 	var events []*Event

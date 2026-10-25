@@ -176,7 +176,12 @@ func main() {
 			os.Exit(1)
 		}
 		defer f.Close()
-		n, err := s.IngestTestStream(f, *label)
+		cs, err := openContentStore(*dbPath, *contentDir)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "content store:", err)
+			os.Exit(1)
+		}
+		n, err := s.IngestTestStream(f, *label, cs)
 		done(n, err, "test records")
 
 	case "ingest-conversations", "ingest-traces", "ingest-experiments", "ingest-archive":
@@ -200,6 +205,21 @@ func main() {
 			n, err = s.IngestArchive(rest[0], cs)
 		}
 		done(n, err, "records")
+
+	case "verify-observations":
+		cs, err := openContentStore(*dbPath, *contentDir)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "content store:", err)
+			os.Exit(1)
+		}
+		v := &history.ObservationVerifier{Content: cs}
+		rep, err := v.VerifyObservations(s, history.TrustSetSHA256(trustedSet))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "verify observations:", err)
+			os.Exit(1)
+		}
+		out, _ := json.MarshalIndent(rep, "", "  ")
+		fmt.Println(string(out))
 
 	case "ingest-recovery":
 		if len(rest) != 1 {

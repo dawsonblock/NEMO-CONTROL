@@ -129,7 +129,7 @@
    ]
   },
   "g6-research-boundary": {
-   "status": "specified",
+   "status": "executed",
    "package": ["internal/history", "internal/experience", "internal/research", "internal/dream"],
    "required_tests": [
     "TestProposalImmutable",
