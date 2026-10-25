@@ -1313,8 +1313,13 @@ func rsync(ctx context.Context, target SSHTarget, src, dst string, excludes []st
 		cmd.Stdin = bytes.NewReader(opts.FilesFrom)
 	}
 	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	stopHeartbeat := startSyncHeartbeat(stderr, start, opts.HeartbeatInterval)
+	// The heartbeat and the child's stderr share this writer. Serialize
+	// both: exec.Cmd copies stderr on its own goroutine, and a
+	// bytes.Buffer (or any non-thread-safe writer) must not be written
+	// concurrently by the heartbeat.
+	lockedErr := &lockedWriter{w: stderr}
+	cmd.Stderr = lockedErr
+	stopHeartbeat := startSyncHeartbeat(lockedErr, start, opts.HeartbeatInterval)
 	err = handle.Start()
 	if err == nil {
 		err = handle.Wait()
@@ -1378,12 +1383,29 @@ try {
 exit $code`)
 }
 
+// lockedWriter serializes writes from the exec stderr copier and the
+// sync heartbeat. Without it, a bytes.Buffer destination is written by
+// two goroutines and the race detector correctly reports a data race.
+type lockedWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (l *lockedWriter) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.w.Write(p)
+}
+
 func startSyncHeartbeat(stderr io.Writer, start time.Time, interval time.Duration) func() {
 	if interval <= 0 {
 		return func() {}
 	}
 	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
@@ -1400,7 +1422,10 @@ func startSyncHeartbeat(stderr io.Writer, start time.Time, interval time.Duratio
 			}
 		}
 	}()
-	return func() { close(done) }
+	return func() {
+		close(done)
+		wg.Wait()
+	}
 }
 
 func ensureTrailingSlash(path string) string {

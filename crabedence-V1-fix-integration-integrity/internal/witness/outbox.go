@@ -102,7 +102,24 @@ func OpenOutbox(path string) (*Outbox, error) {
 		db.Close()
 		return nil, err
 	}
+	// SQLite creates the database and its WAL/SHM siblings with the
+	// process umask (typically 0644). The outbox holds custody evidence;
+	// tighten the files to owner-only at open so read-only inspection can
+	// require an owner-only artifact without rejecting valid outboxes.
+	if err := tightenOutboxPermissions(path); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Outbox{db: db}, nil
+}
+
+func tightenOutboxPermissions(path string) error {
+	for _, p := range []string{path, path + "-wal", path + "-shm"} {
+		if err := os.Chmod(p, 0o600); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("custody outbox permissions %s: %w", p, err)
+		}
+	}
+	return nil
 }
 
 // OpenOutboxReadOnly opens an existing custody outbox for forensic

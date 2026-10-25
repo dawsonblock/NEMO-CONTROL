@@ -6,11 +6,33 @@ package witness
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/openclaw/crabbox/internal/custody"
 )
+
+// TestOutboxFileModeOwnerOnly: opening an outbox tightens the database
+// and its WAL/SHM siblings to 0600, so read-only inspection can require
+// an owner-only artifact without rejecting valid outboxes.
+func TestOutboxFileModeOwnerOnly(t *testing.T) {
+	h := newHarness(t, true)
+	defer h.cancel()
+	for _, name := range []string{"outbox.db", "outbox.db-wal", "outbox.db-shm"} {
+		info, err := os.Stat(filepath.Join(h.dir, name))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if perm := info.Mode().Perm(); perm&0o077 != 0 {
+			t.Fatalf("%s mode %04o grants group/other access", name, perm)
+		}
+	}
+}
 
 // TestJournalDBErrorNotSwallowed: a broken journal read is an error,
 // never "no classification recorded". Swallowing it would let an
