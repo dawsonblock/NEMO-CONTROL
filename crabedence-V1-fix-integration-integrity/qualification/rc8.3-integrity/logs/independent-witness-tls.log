@@ -1,0 +1,17 @@
+PASS  mTLS transport established: kernel f8910a299435 ↔ witness ff786c5050a7
+PASS  witness rejected unpinned client key: witness read: remote error: tls: bad certificate
+PASS  client rejected unpinned witness key: witness dial: custody witness authenticated as key ff786c5050a74259ad7ff6c3c3e81ded695b5a3519e1e6e60a41a63243f30ba8, expected pinned key dfccae17e486dd237e090694216ebbc4d6aea9b0a788e218d89c629567502bad — refusing unconfigured peer
+PASS  initial signed checkpoint verifies (seq=0)
+PASS  valid envelope custodied and ack verifies (seq=1)
+PASS  identical replay returned the stored ack
+PASS  conflicting envelope refused: witness submit refused: witness: contradictory checkpoint — same index, different record: index 1 already custodies a264e6511e12acb4992f3ae61f81428a9bd9cfab42839705cc89e25806f8e4d7, submission presents 884dc21296d5935f1dfde641dfd4202f61d9c245a3cf85feb68dfacfdb37a848
+PASS  forged kernel signature refused by signature verification: witness submit refused: witness: envelope rejected: custody envelope: signer key is not pinned in the trust set: no pinned kernel-relay key dfccae17e486dd237e090694216ebbc4d6aea9b0a788e218d89c629567502bad valid at index 2 for deployment "dep-independent-a"
+PASS  substituted checkpoint hash rejected: record signature invalid
+PASS  substituted witness identity rejected: custody envelope: signer key is not pinned in the trust set: no pinned custodian key dfccae17e486dd237e090694216ebbc4d6aea9b0a788e218d89c629567502bad for deployment "dep-independent-a"
+PASS  network partition refused custody: witness dial: dial tcp 127.0.0.1:61026: connect: connection refused
+PASS  crash/restart preserved the custody head (seq=1)
+PASS  post-restart replay returned the stored ack
+PASS  stale acknowledgement rejected for a later envelope: custody acknowledgement does not bind this envelope (hash, sequence, execution, deployment, or family differs)
+PASS  second valid envelope custodied and ack verifies (seq=2)
+RESULT PASS: independent TLS witness lane
+EXIT=0

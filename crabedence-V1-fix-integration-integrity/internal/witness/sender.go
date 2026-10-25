@@ -485,6 +485,7 @@ func (s *Sender) OperatorRepair(ctx context.Context, auth OperatorAuthorization,
 		return fmt.Errorf("custody repair refused: no REPAIR_REQUIRED marker is open (state %s)", s.CustodyState(ctx))
 	}
 	expectedReason := st.RepairReason
+	expectedGeneration := st.RepairGeneration
 	// The operator surface consumes the grant nonce exactly once before
 	// calling in; an unconsumed grant is not live authority. This is the
 	// durable replay fence — a captured grant presented to a later
@@ -543,7 +544,7 @@ func (s *Sender) OperatorRepair(ctx context.Context, auth OperatorAuthorization,
 	}
 	note := fmt.Sprintf("operator repair subject=%q reason=%q grant=%s pre=%s post=%s full-rescan=verified",
 		auth.Grant.Subject, reason, postEvidence.GrantDigest, preEvidence.Digest, postEvidence.Digest)
-	if err := s.outbox.ClearRepairRequiredIfUnchanged(ctx, expectedReason, note); err != nil {
+	if err := s.outbox.ClearRepairRequiredIfUnchanged(ctx, expectedReason, expectedGeneration, note); err != nil {
 		return fmt.Errorf("custody repair marker: %w", err)
 	}
 	return nil

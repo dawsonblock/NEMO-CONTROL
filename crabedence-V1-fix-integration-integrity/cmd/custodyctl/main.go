@@ -628,19 +628,23 @@ func runMutating(op string, args []string) {
 
 func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.EffectStore, producer witness.Producer, policy execution.CustodyCoveragePolicy, f mutateFlags, auth witness.OperatorAuthorization, grant *witness.OperatorGrant, grantDigest string, client *witness.Client) {
 	out := migrateOutput{Operation: "migrate", Subject: grant.Subject, Grant: grantDigest}
-	var checkpointSeq int64
-	var checkpointHash string
-	if client != nil {
-		head, err := client.Checkpoint(ctx, f.deployment)
-		if err != nil {
-			fatalf("migrate: witness checkpoint: %v", err)
-		}
-		if err := witness.VerifyCheckpoint(head, f.deployment, policy.CustodianTrust); err != nil {
-			fatalf("migrate: witness checkpoint unverifiable — refusing offline rewrite of possibly checkpointed history: %v", err)
-		}
-		checkpointSeq, checkpointHash = head.Seq, head.Hash
-		out.Checkpoint = true
+	// Offline suffix rewriting is not authorized: a local outbox that
+	// lost an acknowledgement must not rewrite history the custodian may
+	// already hold. The checkpoint is fetched live and verified under the
+	// pinned custodian set; its identity, sequence, and hash are bound
+	// into the signed migration proof and journal.
+	if client == nil {
+		fatalf("migrate requires -witness-socket or -witness-tls — offline suffix rewriting is not authorized without a verified custodian checkpoint")
 	}
+	head, err := client.Checkpoint(ctx, f.deployment)
+	if err != nil {
+		fatalf("migrate: witness checkpoint: %v", err)
+	}
+	if err := witness.VerifyCheckpoint(head, f.deployment, policy.CustodianTrust); err != nil {
+		fatalf("migrate: witness checkpoint unverifiable — refusing rewrite of possibly checkpointed history: %v", err)
+	}
+	checkpoint := witness.CheckpointRef{Seq: head.Seq, Hash: head.Hash, WitnessFP: head.WitnessFP}
+	out.Checkpoint = true
 	cursor := f.cursor
 	processed := 0
 	for {
@@ -685,7 +689,7 @@ func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.E
 				out.Quarantined++
 				continue
 			}
-			pf, err := outbox.MigrationPreflight(ctx, r.Seq, checkpointSeq, checkpointHash)
+			pf, err := outbox.MigrationPreflight(ctx, r.Seq, checkpoint)
 			if err != nil {
 				fatalf("migrate seq %d preflight: %v", r.Seq, err)
 			}
@@ -698,7 +702,7 @@ func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.E
 				out.Compensated++
 				continue
 			}
-			res, err := outbox.MigrateLegacySuffix(ctx, producer, r.Seq, rec.TerminalReceiptDigest, payload, checkpointSeq, checkpointHash, auth)
+			res, err := outbox.MigrateLegacySuffix(ctx, producer, r.Seq, rec.TerminalReceiptDigest, payload, checkpoint, auth)
 			if err != nil {
 				fatalf("migrate seq %d: %v", r.Seq, err)
 			}

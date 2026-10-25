@@ -32,7 +32,7 @@ def main() -> int:
     for name in sorted(os.listdir(logs_dir)):
         if name.endswith(".log"):
             path = os.path.join(logs_dir, name)
-            logs[name] = {"sha256": sha256(path), "size": os.path.getsize(path)}
+            logs[name] = {"path": "logs/" + name, "sha256": sha256(path), "size": os.path.getsize(path)}
     doc = {
         "schema": "rc83-integrity-attestation-v1",
         "release": "0.55.0-rc8.3-integrity-closure",

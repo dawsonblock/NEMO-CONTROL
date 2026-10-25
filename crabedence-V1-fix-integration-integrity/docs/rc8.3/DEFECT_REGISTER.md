@@ -41,3 +41,16 @@ the stricter register in
   inspection refused valid outboxes. Both are fixed (serialized writer; 0600
   at open) and covered by `TestSyncLocalActionsWorkspaceIsolatesNonForwardableOrigin`
   under `-race` and `TestOutboxFileModeOwnerOnly`.
+- **RC83-IC-20/21/22 (independent audit closure).** Offline migration without a
+  verified custodian checkpoint is now refused; the checkpoint sequence, hash,
+  and witness fingerprint are bound into the signed migration proof and journal.
+  Repair-marker clearing now compares a monotonic `repair_generation` as well
+  as the reason, closing the same-reason ABA window. Cleanup intents require a
+  durable state directory, are file- and directory-fsynced before `rm`, and
+  clear failures are surfaced and left visible to `PendingCleanupObligations`.
+- **RC83-IC-23/24 (release evidence).** The release bundle is self-contained:
+  relative content-addressed paths, attached logs, a signed canonical
+  attestation, a full-race completeness check, and a detached bundle verifier.
+  The exact 20m full-tree gate remains FAIL; the operator-directed
+  requalification uses a 30m per-package budget with `GOFLAGS=-p=4`, recorded
+  separately from the retained 20m failure.

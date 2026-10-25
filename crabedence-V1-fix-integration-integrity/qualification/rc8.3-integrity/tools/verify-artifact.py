@@ -32,7 +32,10 @@ def main() -> int:
         return 1
     inv = att.get("source_inventory", {})
     if inv.get("path") and inv.get("sha256"):
-        got_inv = sha256(inv["path"])
+        inv_path = inv["path"]
+        if not os.path.isabs(inv_path):
+            inv_path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), inv_path)
+        got_inv = sha256(inv_path)
         if got_inv != inv["sha256"]:
             print(f"REJECT: inventory sha256 {got_inv} != attested {inv['sha256']}", file=sys.stderr)
             return 1

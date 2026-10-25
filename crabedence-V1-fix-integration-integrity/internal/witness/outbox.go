@@ -436,9 +436,10 @@ func (o *Outbox) StoredAck(ctx context.Context, seq int64) (*Ack, error) {
 var ErrEvidenceContradiction = errors.New("custody outbox: evidence contradiction")
 
 const (
-	metaDegradedReason = "degraded_reason"
-	metaRepairReason   = "repair_reason"
-	metaObligationHWM  = "obligation_hwm"
+	metaDegradedReason   = "degraded_reason"
+	metaRepairReason     = "repair_reason"
+	metaRepairGeneration = "repair_generation"
+	metaObligationHWM    = "obligation_hwm"
 )
 
 // CustodyStatus is the durable custody posture persisted in the outbox.
@@ -451,6 +452,12 @@ type CustodyStatus struct {
 	// contradiction or fork — sticky until an explicit verified
 	// operator repair clears it.
 	RepairReason string
+	// RepairGeneration increments on every contradiction assertion,
+	// including a repeat of the same reason. A repair captures it
+	// before scanning and clears only if it is unchanged, so a
+	// same-reason contradiction during the scan cannot be erased by a
+	// string-only comparison (ABA).
+	RepairGeneration int64
 	// ObligationHWM is the high-water terminal_seq below which every
 	// terminal record was verified to hold an outbox obligation.
 	ObligationHWM int64
@@ -490,6 +497,16 @@ func (o *Outbox) CustodyStatus(ctx context.Context) (CustodyStatus, error) {
 	if st.RepairReason, err = o.meta(ctx, metaRepairReason); err != nil {
 		return st, err
 	}
+	gen, err := o.meta(ctx, metaRepairGeneration)
+	if err != nil {
+		return st, err
+	}
+	if gen != "" {
+		st.RepairGeneration, err = strconv.ParseInt(gen, 10, 64)
+		if err != nil {
+			return st, fmt.Errorf("custody outbox: corrupt repair_generation %q", gen)
+		}
+	}
 	hw, err := o.meta(ctx, metaObligationHWM)
 	if err != nil {
 		return st, err
@@ -519,13 +536,47 @@ func (o *Outbox) MarkDegraded(ctx context.Context, reason string) error {
 
 // MarkRepairRequired durably records an evidence contradiction — a
 // fork, a conflicting ack, or a contradictory obligation. Sticky:
-// cleared only by an explicit verified operator repair.
+// cleared only by an explicit verified operator repair. The reason and
+// the monotonic repair generation are written in one transaction, so
+// every assertion is observable even when the reason string repeats.
 func (o *Outbox) MarkRepairRequired(ctx context.Context, reason string) error {
-	if err := o.setMeta(ctx, metaRepairReason, reason); err != nil {
+	tx, err := o.db.BeginTx(ctx, nil)
+	if err != nil {
 		return fmt.Errorf("custody repair marker: %w", err)
 	}
-	o.recordEvent(ctx, "repair_required", reason)
-	return nil
+	defer tx.Rollback()
+	var curRaw string
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COALESCE((SELECT value FROM outbox_meta WHERE key = $1), '')`,
+		metaRepairGeneration).Scan(&curRaw); err != nil {
+		return fmt.Errorf("custody repair generation: %w", err)
+	}
+	var cur int64
+	if curRaw != "" {
+		if cur, err = strconv.ParseInt(curRaw, 10, 64); err != nil {
+			return fmt.Errorf("custody outbox: corrupt repair_generation %q", curRaw)
+		}
+	}
+	next := strconv.FormatInt(cur+1, 10)
+	if err := setMetaTx(ctx, tx, metaRepairGeneration, next); err != nil {
+		return fmt.Errorf("custody repair generation: %w", err)
+	}
+	if err := setMetaTx(ctx, tx, metaRepairReason, reason); err != nil {
+		return fmt.Errorf("custody repair marker: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO custody_events (event, detail, created_at) VALUES ($1, $2, $3)`,
+		"repair_required", fmt.Sprintf("generation=%s reason=%s", next, reason),
+		time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		return fmt.Errorf("custody repair event: %w", err)
+	}
+	return tx.Commit()
+}
+
+func setMetaTx(ctx context.Context, tx *sql.Tx, key, value string) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO outbox_meta (key, value) VALUES ($1, $2)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
+	return err
 }
 
 // RepairDegraded discharges a degraded marker after a verified repair:
@@ -578,11 +629,12 @@ func (o *Outbox) ClearRepairRequired(ctx context.Context, evidence string) error
 var ErrStaleRepairVerification = errors.New("custody repair: verification is stale — the repair marker changed after the scan")
 
 // ClearRepairRequiredIfUnchanged is the transactionally safe repair
-// clear: it compares the marker to the exact reason the verified scan
-// observed and refuses if anything changed, so a stale verification can
-// never discharge a newly required repair. The event row is written in
-// the same transaction as the state change.
-func (o *Outbox) ClearRepairRequiredIfUnchanged(ctx context.Context, expectedReason, evidence string) error {
+// clear: it compares the marker reason and the monotonic repair
+// generation the verified scan observed and refuses if either changed,
+// so a same-reason contradiction or an ABA cycle cannot be discharged
+// by stale work. The event row is written in the same transaction as
+// the state change.
+func (o *Outbox) ClearRepairRequiredIfUnchanged(ctx context.Context, expectedReason string, expectedGeneration int64, evidence string) error {
 	if expectedReason == "" {
 		return fmt.Errorf("custody repair clear: expected marker reason is empty")
 	}
@@ -591,7 +643,7 @@ func (o *Outbox) ClearRepairRequiredIfUnchanged(ctx context.Context, expectedRea
 		return err
 	}
 	defer tx.Rollback()
-	var degraded, repair string
+	var degraded, repair, genRaw string
 	if err := tx.QueryRowContext(ctx,
 		`SELECT COALESCE((SELECT value FROM outbox_meta WHERE key = $1), '')`,
 		metaDegradedReason).Scan(&degraded); err != nil {
@@ -602,14 +654,26 @@ func (o *Outbox) ClearRepairRequiredIfUnchanged(ctx context.Context, expectedRea
 		metaRepairReason).Scan(&repair); err != nil {
 		return err
 	}
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COALESCE((SELECT value FROM outbox_meta WHERE key = $1), '')`,
+		metaRepairGeneration).Scan(&genRaw); err != nil {
+		return err
+	}
+	var gen int64
+	if genRaw != "" {
+		if gen, err = strconv.ParseInt(genRaw, 10, 64); err != nil {
+			return fmt.Errorf("custody outbox: corrupt repair_generation %q", genRaw)
+		}
+	}
 	if degraded != "" {
 		return fmt.Errorf("custody still degraded (%s) — discharge it before clearing repair", degraded)
 	}
 	if repair == "" {
 		return nil
 	}
-	if repair != expectedReason {
-		return fmt.Errorf("%w: marker is now %q, scan verified %q", ErrStaleRepairVerification, repair, expectedReason)
+	if repair != expectedReason || gen != expectedGeneration {
+		return fmt.Errorf("%w: marker is now reason=%q generation=%d, scan verified reason=%q generation=%d",
+			ErrStaleRepairVerification, repair, gen, expectedReason, expectedGeneration)
 	}
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE outbox_meta SET value = '' WHERE key = $1`, metaRepairReason); err != nil {

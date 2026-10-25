@@ -25,10 +25,12 @@ signed operator grant from the repair authority (see
 3. Record the current posture:
    - `custodyctl status -outbox custody-outbox.db -json`
    - `custodyctl preflight -outbox custody-outbox.db -json` (exit 3 = migration pending)
-4. If a witness is configured, obtain and verify its signed head. `migrate` does
-   this automatically when `-witness-socket`/`-witness-tls` is supplied and
-   refuses if the checkpoint cannot be verified. Do not run offline migration
-   against a deployment whose witness may hold a newer checkpoint.
+4. A live witness is mandatory. `migrate` fetches and verifies the witness's
+   signed head over `-witness-socket` or `-witness-tls`; it refuses to run
+   without one. Offline suffix rewriting is **not authorized** in this release:
+   a local outbox that lost an acknowledgement cannot prove the custodian does
+   not already hold the suffix. The verified checkpoint's sequence, hash, and
+   witness identity are bound into the signed migration proof and journal.
 
 ## 2. Classify the backlog (read-only)
 
@@ -79,18 +81,23 @@ per-row preflight. It consumes no nonce and mutates nothing. Review every
 ## 5. Apply
 
 Remove `-dry-run` and use a fresh grant (the dry-run grant was not consumed, but
-using a fresh one keeps the audit trail unambiguous):
+using a fresh one keeps the audit trail unambiguous). The witness transport is
+mandatory:
 
 ```sh
-custodyctl migrate ... -json
+custodyctl migrate ... -witness-socket /run/crabbox/witness.sock -json
 ```
+
+If the witness is unreachable or its checkpoint does not verify, migration
+refuses before examining any row.
 
 Per-row behavior:
 
-- **Unacknowledged, fully unacknowledged suffix, no checkpoint coverage**: the
-  target receives canonical receipt bytes and every successor's
+- **Unacknowledged suffix, verified checkpoint below the target**: the target
+  receives canonical receipt bytes and every successor's
   `previous_checkpoint_hash` and signature are rewritten in one transaction.
-  A signed `custody-migration-proof-v1` before/after record lands in the journal.
+  A signed `custody-migration-proof-v1` before/after record lands in the
+  journal, binding the checkpoint sequence, hash, and witness fingerprint.
 - **Acknowledged row**: bytes stay byte-identical; the journal records
   `legacy-witnessed` with the authoritative terminal receipt digest. Coverage is
   later granted only if the recorded acknowledgement verifies under the pinned

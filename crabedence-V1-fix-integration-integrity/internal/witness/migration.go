@@ -91,6 +91,9 @@ type MigrationJournalEntry struct {
 	ResultEnvelopeHash    string `json:"result_envelope_hash"`
 	TerminalReceiptDigest string `json:"terminal_receipt_digest"`
 	TerminalSeq           int64  `json:"terminal_seq"`
+	CheckpointSeq         int64  `json:"checkpoint_seq"`
+	CheckpointHash        string `json:"checkpoint_hash"`
+	CheckpointWitnessFP   string `json:"checkpoint_witness_fp"`
 	AuthorizationJSON     string `json:"authorization_json"`
 	AuthorizationDigest   string `json:"authorization_digest"`
 	AuthorizedBy          string `json:"authorized_by"`
@@ -114,6 +117,9 @@ const legacyJournalDDL = `CREATE TABLE IF NOT EXISTS custody_migration_journal (
 	result_envelope_hash TEXT NOT NULL DEFAULT '',
 	terminal_receipt_digest TEXT NOT NULL DEFAULT '',
 	terminal_seq INTEGER NOT NULL DEFAULT 0,
+	checkpoint_seq INTEGER NOT NULL DEFAULT 0,
+	checkpoint_hash TEXT NOT NULL DEFAULT '',
+	checkpoint_witness_fp TEXT NOT NULL DEFAULT '',
 	authorization_json TEXT NOT NULL DEFAULT '',
 	authorization_digest TEXT NOT NULL DEFAULT '',
 	authorized_by TEXT NOT NULL DEFAULT '',
@@ -141,6 +147,9 @@ var journalUpgradeColumns = []struct{ name, decl string }{
 	{"result_envelope_hash", "TEXT NOT NULL DEFAULT ''"},
 	{"terminal_receipt_digest", "TEXT NOT NULL DEFAULT ''"},
 	{"terminal_seq", "INTEGER NOT NULL DEFAULT 0"},
+	{"checkpoint_seq", "INTEGER NOT NULL DEFAULT 0"},
+	{"checkpoint_hash", "TEXT NOT NULL DEFAULT ''"},
+	{"checkpoint_witness_fp", "TEXT NOT NULL DEFAULT ''"},
 	{"authorization_json", "TEXT NOT NULL DEFAULT ''"},
 	{"authorization_digest", "TEXT NOT NULL DEFAULT ''"},
 	{"authorized_by", "TEXT NOT NULL DEFAULT ''"},
@@ -238,6 +247,9 @@ type journalRecord struct {
 	ResultEnvelopeHash    string
 	TerminalReceiptDigest string
 	TerminalSeq           int64
+	CheckpointSeq         int64
+	CheckpointHash        string
+	CheckpointWitnessFP   string
 	AuthorizationJSON     string
 	AuthorizationDigest   string
 	AuthorizedBy          string
@@ -259,13 +271,15 @@ func (o *Outbox) journal(ctx context.Context, q execQueryer, rec journalRecord) 
 			row_seq, execution_id, action, detail, created_at,
 			original_envelope_hash, result_envelope_hash,
 			terminal_receipt_digest, terminal_seq,
+			checkpoint_seq, checkpoint_hash, checkpoint_witness_fp,
 			authorization_json, authorization_digest, authorized_by, nonce,
 			before_digest, after_digest, proof_json, proof_signature)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
 		rec.RowSeq, rec.ExecutionID, rec.Action, rec.Detail,
 		time.Now().UTC().Format(time.RFC3339Nano),
 		rec.OriginalEnvelopeHash, rec.ResultEnvelopeHash,
 		rec.TerminalReceiptDigest, rec.TerminalSeq,
+		rec.CheckpointSeq, rec.CheckpointHash, rec.CheckpointWitnessFP,
 		rec.AuthorizationJSON, rec.AuthorizationDigest, rec.AuthorizedBy, rec.Nonce,
 		rec.BeforeDigest, rec.AfterDigest, rec.ProofJSON, rec.ProofSignature)
 	if err != nil {
@@ -286,6 +300,7 @@ func (o *Outbox) MigrationJournalPage(ctx context.Context, afterSeq int64, limit
 	q := `SELECT seq, row_seq, execution_id, action, detail, created_at,
 		        original_envelope_hash, result_envelope_hash,
 		        terminal_receipt_digest, terminal_seq,
+		        checkpoint_seq, checkpoint_hash, checkpoint_witness_fp,
 		        authorization_json, authorization_digest, authorized_by, nonce,
 		        before_digest, after_digest, proof_json, proof_signature
 		 FROM custody_migration_journal WHERE seq > $1 ORDER BY seq`
@@ -305,6 +320,7 @@ func (o *Outbox) MigrationJournalPage(ctx context.Context, afterSeq int64, limit
 		if err := rows.Scan(&e.Seq, &e.RowSeq, &e.ExecutionID, &e.Action, &e.Detail, &e.CreatedAt,
 			&e.OriginalEnvelopeHash, &e.ResultEnvelopeHash,
 			&e.TerminalReceiptDigest, &e.TerminalSeq,
+			&e.CheckpointSeq, &e.CheckpointHash, &e.CheckpointWitnessFP,
 			&e.AuthorizationJSON, &e.AuthorizationDigest, &e.AuthorizedBy, &e.Nonce,
 			&e.BeforeDigest, &e.AfterDigest, &e.ProofJSON, &e.ProofSignature); err != nil {
 			return nil, err
@@ -340,6 +356,7 @@ func latestJournalEntry(ctx context.Context, q interface {
 		`SELECT seq, row_seq, execution_id, action, detail, created_at,
 		        original_envelope_hash, result_envelope_hash,
 		        terminal_receipt_digest, terminal_seq,
+		        checkpoint_seq, checkpoint_hash, checkpoint_witness_fp,
 		        authorization_json, authorization_digest, authorized_by, nonce,
 		        before_digest, after_digest, proof_json, proof_signature
 		 FROM custody_migration_journal WHERE execution_id = $1
@@ -355,6 +372,7 @@ func latestJournalEntry(ctx context.Context, q interface {
 	if err := rows.Scan(&e.Seq, &e.RowSeq, &e.ExecutionID, &e.Action, &e.Detail, &e.CreatedAt,
 		&e.OriginalEnvelopeHash, &e.ResultEnvelopeHash,
 		&e.TerminalReceiptDigest, &e.TerminalSeq,
+		&e.CheckpointSeq, &e.CheckpointHash, &e.CheckpointWitnessFP,
 		&e.AuthorizationJSON, &e.AuthorizationDigest, &e.AuthorizedBy, &e.Nonce,
 		&e.BeforeDigest, &e.AfterDigest, &e.ProofJSON, &e.ProofSignature); err != nil {
 		return MigrationJournalEntry{}, false, err
@@ -676,6 +694,17 @@ type MigrationRow struct {
 	ContentLen   int    `json:"content_len"`
 }
 
+// CheckpointRef is the verified witness checkpoint a migration is
+// allowed to proceed under. It is fetched live over the authenticated
+// witness transport, verified under the pinned custodian set, and bound
+// into the signed migration proof and journal. A zero value means no
+// checkpoint was verified — callers must treat that as a refusal.
+type CheckpointRef struct {
+	Seq       int64  `json:"seq"`
+	Hash      string `json:"hash"`
+	WitnessFP string `json:"witness_fp"`
+}
+
 // MigrationPreflight is the read-only safety verdict for rewriting a
 // legacy row and its suffix.
 type MigrationPreflight struct {
@@ -706,13 +735,14 @@ func (a MigrationAuthorization) verify(deploymentID, operation string, now time.
 // acknowledgements, and an externally observed checkpoint. It never
 // mutates. A blocked preflight is a refusal: the chain is quarantined
 // pending an explicitly authorized witness-coordinated recovery.
-func (o *Outbox) MigrationPreflight(ctx context.Context, rowSeq, checkpointSeq int64, checkpointHash string) (MigrationPreflight, error) {
-	return migrationPreflight(ctx, o.db, rowSeq, checkpointSeq, checkpointHash)
+func (o *Outbox) MigrationPreflight(ctx context.Context, rowSeq int64, checkpoint CheckpointRef) (MigrationPreflight, error) {
+	return migrationPreflight(ctx, o.db, rowSeq, checkpoint)
 }
 
 func migrationPreflight(ctx context.Context, q interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-}, rowSeq, checkpointSeq int64, checkpointHash string) (MigrationPreflight, error) {
+}, rowSeq int64, checkpoint CheckpointRef) (MigrationPreflight, error) {
+	checkpointSeq, checkpointHash := checkpoint.Seq, checkpoint.Hash
 	var pf MigrationPreflight
 	pf.TargetSeq = rowSeq
 	var envJSON string
@@ -797,6 +827,7 @@ func migrationPreflight(ctx context.Context, q interface {
 type migrationProof struct {
 	Schema       string              `json:"schema"`
 	TargetSeq    int64               `json:"target_seq"`
+	Checkpoint   CheckpointRef       `json:"checkpoint"`
 	Rows         []migrationProofRow `json:"rows"`
 	BeforeDigest string              `json:"before_digest"`
 	AfterDigest  string              `json:"after_digest"`
@@ -834,9 +865,16 @@ type migrationCandidate struct {
 // and every successor's linkage and signature, records signed
 // before/after evidence, and commits. Any witness or checkpoint in the
 // suffix refuses the whole operation.
-func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int64, receiptDigest string, native []byte, checkpointSeq int64, checkpointHash string, auth MigrationAuthorization) (MigrationResult, error) {
+func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int64, receiptDigest string, native []byte, checkpoint CheckpointRef, auth MigrationAuthorization) (MigrationResult, error) {
 	var res MigrationResult
 	res.TargetSeq = rowSeq
+	// WitnessFP is the proof that a live checkpoint was verified: an
+	// initial witness head is seq 0 with an empty hash, but it still
+	// carries the custodian key identity. A zero-value CheckpointRef is
+	// an offline attempt and is refused.
+	if checkpoint.WitnessFP == "" {
+		return res, fmt.Errorf("%w: migration requires a live, verified witness checkpoint — offline suffix rewriting is not authorized", ErrEvidenceContradiction)
+	}
 	if len(native) == 0 {
 		return res, fmt.Errorf("%w: migration requires a non-empty canonical payload", ErrEvidenceContradiction)
 	}
@@ -906,7 +944,7 @@ func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int
 		return res, fmt.Errorf("%w: seq %d already holds content and is not the recorded migration of this receipt", ErrEvidenceContradiction, rowSeq)
 	}
 
-	pf, err := migrationPreflight(ctx, tx, rowSeq, checkpointSeq, checkpointHash)
+	pf, err := migrationPreflight(ctx, tx, rowSeq, checkpoint)
 	if err != nil {
 		return res, err
 	}
@@ -952,6 +990,7 @@ func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int
 	proof := migrationProof{
 		Schema:       "custody-migration-proof-v1",
 		TargetSeq:    rowSeq,
+		Checkpoint:   checkpoint,
 		BeforeDigest: before,
 		Rows:         make([]migrationProofRow, 0, len(cands)),
 	}
@@ -1021,6 +1060,9 @@ func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int
 		OriginalEnvelopeHash:  pf.EnvelopeHash,
 		ResultEnvelopeHash:    cands[0].envelopeHash,
 		TerminalReceiptDigest: receiptDigest,
+		CheckpointSeq:         checkpoint.Seq,
+		CheckpointHash:        checkpoint.Hash,
+		CheckpointWitnessFP:   checkpoint.WitnessFP,
 		AuthorizationJSON:     string(authJSON),
 		AuthorizationDigest:   digest,
 		AuthorizedBy:          auth.Grant.Subject,
@@ -1118,8 +1160,8 @@ func VerifyMigrationProof(entry MigrationJournalEntry, deploymentID string, trus
 // CompensateLegacyRow is the single-row compatibility entry point. It
 // is only safe when the row has no successors; MigrateLegacySuffix is
 // the general path and the one custodyctl uses.
-func (o *Outbox) CompensateLegacyRow(ctx context.Context, p Producer, rowSeq int64, receiptDigest string, native []byte, auth MigrationAuthorization) (MigrationResult, error) {
-	return o.MigrateLegacySuffix(ctx, p, rowSeq, receiptDigest, native, 0, "", auth)
+func (o *Outbox) CompensateLegacyRow(ctx context.Context, p Producer, rowSeq int64, receiptDigest string, native []byte, checkpoint CheckpointRef, auth MigrationAuthorization) (MigrationResult, error) {
+	return o.MigrateLegacySuffix(ctx, p, rowSeq, receiptDigest, native, checkpoint, auth)
 }
 
 // JournalLegacyWitnessed records the operator-approved classification

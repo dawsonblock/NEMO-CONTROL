@@ -202,3 +202,93 @@ func TestRepairGrantDeploymentScopeRejected(t *testing.T) {
 		t.Fatalf("cross-deployment grant = %v, want ErrOperatorAuthorization", err)
 	}
 }
+
+// TestRepairNewContradictionWithSameReasonRejectsCAS: a concurrent
+// contradiction that repeats the same reason string must still be
+// detected. The monotonic generation, not the reason text, is the CAS
+// fence.
+func TestRepairNewContradictionWithSameReasonRejectsCAS(t *testing.T) {
+	h := newHarness(t, true)
+	defer h.cancel()
+	h.sender.SetFullRescanScanner(func(context.Context) error { return nil })
+	if err := h.outbox.MarkRepairRequired(context.Background(), "fork-A"); err != nil {
+		t.Fatal(err)
+	}
+	authority, trust := testRepairAuthority(t, h.dep)
+	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationRepair)
+	h.sender.repairHook = func(stage string) error {
+		if stage == "after_scan" {
+			return h.outbox.MarkRepairRequired(context.Background(), "fork-A")
+		}
+		return nil
+	}
+	err := h.sender.OperatorRepair(context.Background(), auth, "same-reason repair")
+	if !errors.Is(err, ErrStaleRepairVerification) {
+		t.Fatalf("same-reason contradiction repair = %v, want ErrStaleRepairVerification", err)
+	}
+	st, err := h.outbox.CustodyStatus(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.RepairReason != "fork-A" {
+		t.Fatalf("marker = %q, want the same-reason contradiction preserved", st.RepairReason)
+	}
+}
+
+// TestRepairMarkerABACycleRejectsOldGeneration: clearing and reopening
+// the same reason must advance the generation, so an old repair
+// verification cannot clear the reopened marker.
+func TestRepairMarkerABACycleRejectsOldGeneration(t *testing.T) {
+	h := newHarness(t, true)
+	defer h.cancel()
+	ctx := context.Background()
+	if err := h.outbox.MarkRepairRequired(ctx, "fork-A"); err != nil {
+		t.Fatal(err)
+	}
+	st, err := h.outbox.CustodyStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gen1 := st.RepairGeneration
+	if err := h.outbox.ClearRepairRequiredIfUnchanged(ctx, "fork-A", gen1, "first repair"); err != nil {
+		t.Fatalf("first clear: %v", err)
+	}
+	if err := h.outbox.MarkRepairRequired(ctx, "fork-A"); err != nil {
+		t.Fatal(err)
+	}
+	st2, err := h.outbox.CustodyStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st2.RepairGeneration <= gen1 {
+		t.Fatalf("generation did not advance across an ABA cycle: %d -> %d", gen1, st2.RepairGeneration)
+	}
+	if err := h.outbox.ClearRepairRequiredIfUnchanged(ctx, "fork-A", gen1, "stale repair"); !errors.Is(err, ErrStaleRepairVerification) {
+		t.Fatalf("old generation clear = %v, want ErrStaleRepairVerification", err)
+	}
+	if err := h.outbox.ClearRepairRequiredIfUnchanged(ctx, "fork-A", st2.RepairGeneration, "current repair"); err != nil {
+		t.Fatalf("current generation clear: %v", err)
+	}
+}
+
+// TestRepairGenerationIncrementsOnSameReason: every assertion is
+// observable even when the reason string is unchanged.
+func TestRepairGenerationIncrementsOnSameReason(t *testing.T) {
+	h := newHarness(t, true)
+	defer h.cancel()
+	ctx := context.Background()
+	if err := h.outbox.MarkRepairRequired(ctx, "fork-A"); err != nil {
+		t.Fatal(err)
+	}
+	first, _ := h.outbox.CustodyStatus(ctx)
+	if err := h.outbox.MarkRepairRequired(ctx, "fork-A"); err != nil {
+		t.Fatal(err)
+	}
+	second, _ := h.outbox.CustodyStatus(ctx)
+	if second.RepairGeneration != first.RepairGeneration+1 {
+		t.Fatalf("generation = %d, want %d", second.RepairGeneration, first.RepairGeneration+1)
+	}
+	if second.RepairReason != "fork-A" {
+		t.Fatalf("reason = %q", second.RepairReason)
+	}
+}

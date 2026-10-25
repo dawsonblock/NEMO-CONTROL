@@ -6,6 +6,7 @@ package sandboxexecutor
 // best-effort behavior.
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -230,5 +231,109 @@ func TestCleanupVerifiedRemovalLeavesNoIntent(t *testing.T) {
 	}
 	if len(pending) != 0 {
 		t.Fatalf("verified removal left an intent: %+v", pending)
+	}
+}
+
+func TestCleanupIntentRequiresDurableStateDirectory(t *testing.T) {
+	key, _ := testAuthority(t)
+	bin, stateDir := fakeMSB(t, nil)
+	backend := testBackend(t, bin, filepath.Join(t.TempDir(), "artifacts"))
+	job := testContract(t, key, func(c *JobContractV2) { c.JobID = "intent-nodir"; c.Nonce = "n-intent-nodir" })
+	disp, err := backend.Dispatch(testContext(t), job, nil)
+	if err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	backend.StateDir = ""
+	res, err := backend.Cleanup(testContext(t), cleanupReqFor(job, disp))
+	if err != nil {
+		t.Fatalf("cleanup must classify, not error: %v", err)
+	}
+	if res.Outcome != CleanupIdentityUnverifiable {
+		t.Fatalf("missing state directory classified %s, want %s: %s", res.Outcome, CleanupIdentityUnverifiable, res.Detail)
+	}
+	if destructiveCount(t, stateDir) != 0 {
+		t.Fatal("destruction issued without a durable cleanup intent")
+	}
+	survive(t, stateDir, disp.Handle)
+}
+
+func TestCleanupIntentSyncFailureFailsClosed(t *testing.T) {
+	for _, stage := range []string{"after_file_sync", "after_dir_sync"} {
+		t.Run(stage, func(t *testing.T) {
+			key, _ := testAuthority(t)
+			bin, stateDir := fakeMSB(t, nil)
+			backend := testBackend(t, bin, filepath.Join(t.TempDir(), "artifacts"))
+			job := testContract(t, key, func(c *JobContractV2) { c.JobID = "intent-sync-" + stage; c.Nonce = "n-intent-sync-" + stage })
+			disp, err := backend.Dispatch(testContext(t), job, nil)
+			if err != nil {
+				t.Fatalf("dispatch: %v", err)
+			}
+			backend.cleanupIntentSyncHook = func(got string) error {
+				if got == stage {
+					return errors.New("injected intent sync failure")
+				}
+				return nil
+			}
+			res, err := backend.Cleanup(testContext(t), cleanupReqFor(job, disp))
+			if err != nil {
+				t.Fatalf("cleanup must classify, not error: %v", err)
+			}
+			if res.Outcome != CleanupIdentityUnverifiable {
+				t.Fatalf("sync failure classified %s, want %s: %s", res.Outcome, CleanupIdentityUnverifiable, res.Detail)
+			}
+			if destructiveCount(t, stateDir) != 0 {
+				t.Fatal("destruction issued without a durable cleanup intent")
+			}
+			survive(t, stateDir, disp.Handle)
+		})
+	}
+}
+
+func TestCleanupIntentClearFailureSurfaced(t *testing.T) {
+	key, _ := testAuthority(t)
+	bin, _ := fakeMSB(t, nil)
+	backend := testBackend(t, bin, filepath.Join(t.TempDir(), "artifacts"))
+	job := testContract(t, key, func(c *JobContractV2) { c.JobID = "intent-clear"; c.Nonce = "n-intent-clear" })
+	disp, err := backend.Dispatch(testContext(t), job, nil)
+	if err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	intentDir := filepath.Join(backend.StateDir, "cleanup-intents")
+	t.Cleanup(func() { _ = os.Chmod(intentDir, 0o700) })
+	backend.cleanupIntentSyncHook = func(stage string) error {
+		if stage == "before_intent_clear" {
+			return os.Chmod(intentDir, 0o500)
+		}
+		return nil
+	}
+	res, err := backend.Cleanup(testContext(t), cleanupReqFor(job, disp))
+	if err != nil {
+		t.Fatalf("cleanup must classify, not error: %v", err)
+	}
+	if !res.Outcome.ProvesAbsent() {
+		t.Fatalf("removal outcome = %s: %s", res.Outcome, res.Detail)
+	}
+	if !strings.Contains(res.Detail, "clear failed") {
+		t.Fatalf("clear failure was not surfaced: %q", res.Detail)
+	}
+	if err := os.Chmod(intentDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	pending, err := backend.PendingCleanupObligations(testContext(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("unresolved intent = %+v, want one", pending)
+	}
+	if err := backend.clearCleanupIntent(disp.Handle); err != nil {
+		t.Fatal(err)
+	}
+	pending, err = backend.PendingCleanupObligations(testContext(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pending) != 0 {
+		t.Fatalf("cleared intent still listed: %+v", pending)
 	}
 }

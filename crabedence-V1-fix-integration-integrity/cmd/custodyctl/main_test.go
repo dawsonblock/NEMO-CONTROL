@@ -283,17 +283,11 @@ func TestMigrateDryRunDoesNotMutate(t *testing.T) {
 		"-signer-key", signerPath, "-trust-roots", trustPath,
 		"-repair-trust-roots", repairTrustPath, "-operator-token", grantPath,
 		"-actor", "alice@example.com", "-dry-run", "-json")
-	// Dry-run reports the quarantine it would perform (exit 3 = pending
-	// forensic action) without mutating anything.
-	if code != 3 {
-		t.Fatalf("migrate dry-run exit = %d, want 3\nstdout=%s\nstderr=%s", code, stdout, stderr)
-	}
-	var out migrateOutput
-	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
-		t.Fatalf("migrate JSON: %v\n%s", err, stdout)
-	}
-	if !out.DryRun {
-		t.Fatal("migrate output does not mark dry-run")
+	// Dry-run still requires a verified witness checkpoint: without one
+	// the preflight cannot prove the custodian does not already hold the
+	// suffix. It refuses before examining or mutating any row.
+	if code != 1 || !strings.Contains(stderr, "offline suffix rewriting is not authorized") {
+		t.Fatalf("migrate dry-run exit=%d stderr=%s stdout=%s", code, stderr, stdout)
 	}
 	// The legacy row is still empty and no journal entry was written.
 	o, err := witness.OpenOutbox(outboxPath)
@@ -374,5 +368,65 @@ func TestRepairAuthorityRequired(t *testing.T) {
 		"-actor", "alice@example.com", "-reason", "test")
 	if code != 1 || !strings.Contains(stderr, "requires -witness-socket or -witness-tls") {
 		t.Fatalf("repair without witness exit=%d stderr=%s", code, stderr)
+	}
+}
+
+// TestMigrationWithoutWitnessCheckpointFailsClosed: offline suffix
+// rewriting is refused before any row is examined. A local outbox that
+// lost an acknowledgement cannot prove the custodian does not already
+// hold the suffix, so migration requires a live verified checkpoint.
+func TestMigrationWithoutWitnessCheckpointFailsClosed(t *testing.T) {
+	bin := buildCLI(t)
+	dir := t.TempDir()
+	outboxPath := filepath.Join(dir, "outbox.db")
+	seedLegacyOutbox(t, outboxPath, 1)
+	storePath := filepath.Join(dir, "effects.db")
+	db, err := idempotency.OpenSQLiteDB(storePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	evidenceSigner, _ := evidence.GenerateSigner()
+	authority, _ := evidence.GenerateSigner()
+	signerPath := filepath.Join(dir, "evidence.pem")
+	pem, _ := evidenceSigner.MarshalPEM()
+	writeOwnerFile(t, signerPath, pem)
+	trustPath := filepath.Join(dir, "custodian-trust.json")
+	writeTrustFile(t, trustPath, custody.RoleCustodian, "dep-cli", authority)
+	repairTrustPath := filepath.Join(dir, "repair-trust.json")
+	writeTrustFile(t, repairTrustPath, custody.RoleRepairAuthority, "dep-cli", authority)
+	now := time.Now().UTC()
+	grant := &witness.OperatorGrant{
+		Subject: "alice@example.com", DeploymentID: "dep-cli",
+		Operations: []string{witness.OperationMigrate},
+		NotBefore:  now.Add(-time.Minute).Format(time.RFC3339),
+		ExpiresAt:  now.Add(10 * time.Minute).Format(time.RFC3339),
+		Nonce:      strings.Repeat("c", 32),
+	}
+	if err := witness.SignOperatorGrant(authority, grant); err != nil {
+		t.Fatal(err)
+	}
+	grantRaw, _ := json.Marshal(grant)
+	grantPath := filepath.Join(dir, "grant.json")
+	writeOwnerFile(t, grantPath, grantRaw)
+
+	_, stderr, code := runCLI(t, bin, "migrate",
+		"-outbox", outboxPath, "-effect-store", storePath, "-deployment", "dep-cli",
+		"-signer-key", signerPath, "-trust-roots", trustPath,
+		"-repair-trust-roots", repairTrustPath, "-operator-token", grantPath,
+		"-actor", "alice@example.com")
+	if code != 1 || !strings.Contains(stderr, "offline suffix rewriting is not authorized") {
+		t.Fatalf("offline migrate exit=%d stderr=%s", code, stderr)
+	}
+	// The legacy row is untouched.
+	o, err := witness.OpenOutbox(outboxPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer o.Close()
+	legacy, err := o.LegacyRows(t.Context())
+	if err != nil || len(legacy) != 1 {
+		t.Fatalf("offline migrate mutated the outbox: %+v, %v", legacy, err)
 	}
 }

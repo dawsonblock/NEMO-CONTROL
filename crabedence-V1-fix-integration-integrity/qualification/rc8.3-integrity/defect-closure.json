@@ -193,6 +193,56 @@
       "fix": "OpenOutbox chmods the database and its WAL/SHM siblings to 0600; read-only inspection still refuses accessible files",
       "tests": ["TestOutboxFileModeOwnerOnly", "TestReadOnlyCommandsRefuseMissingOutbox"],
       "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-20",
+      "pr": "PR-02",
+      "severity": "critical",
+      "title": "Offline migration could rewrite a suffix the witness may already hold",
+      "root_cause": "runMigrate defaulted checkpointSeq to zero when no witness transport was configured and still proceeded",
+      "fix": "migrate requires a live witness checkpoint; the checkpoint sequence, hash, and witness fingerprint are verified under the pinned custodian set, bound into the signed migration proof, and recorded in the journal. A zero-value checkpoint is refused.",
+      "tests": ["TestMigrationWithoutWitnessCheckpointFailsClosed", "TestLostLocalAckWithRemoteCheckpointRefusesRewrite", "TestMigrationRequiresVerifiedCheckpoint"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-21",
+      "pr": "PR-03",
+      "severity": "critical",
+      "title": "Repair marker ABA: a same-reason contradiction during repair could be cleared",
+      "root_cause": "ClearRepairRequiredIfUnchanged compared only the reason string; MarkRepairRequired did not advance a monotonic revision",
+      "fix": "Every contradiction assertion advances repair_generation transactionally with the reason. Repair captures the generation before scanning and the CAS clears only when both reason and generation are unchanged.",
+      "tests": ["TestRepairNewContradictionWithSameReasonRejectsCAS", "TestRepairMarkerABACycleRejectsOldGeneration", "TestRepairGenerationIncrementsOnSameReason"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-22",
+      "pr": "PR-05",
+      "severity": "high",
+      "title": "Cleanup intent was not demonstrably power-loss durable and could be skipped with no state directory",
+      "root_cause": "recordCleanupIntent used WriteFile+Rename without file/parent fsync, returned nil for an empty StateDir, and finishCleanup ignored clear failures",
+      "fix": "A durable state directory is mandatory; the intent is written with O_EXCL, fsynced, atomically renamed, and the parent directory is fsynced. Clear failures are surfaced in the result and leave the intent visible to PendingCleanupObligations.",
+      "tests": ["TestCleanupIntentRequiresDurableStateDirectory", "TestCleanupIntentSyncFailureFailsClosed", "TestCleanupIntentClearFailureSurfaced"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-23",
+      "pr": "PR-07",
+      "severity": "high",
+      "title": "Release evidence bundle was not self-contained or portable",
+      "root_cause": "Attestation/SHA256SUMS used absolute source-host paths; the full-race log shipped in one package was truncated and did not match its recorded hash",
+      "fix": "Release paths are relative to the bundle; the attestation is signed over canonical JSON with a pinned Ed25519 root; a bundle verifier checks every attached log hash and rejects a truncated full-race log; the full-race log is copied into the bundle.",
+      "tests": ["verify-evidence-bundle.py", "verify-release-attestation.py", "cleanroom-verify.sh"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-24",
+      "pr": "PR-06",
+      "severity": "high",
+      "title": "The exact 20m full-tree race gate cannot pass: internal/cli alone exceeds 20m under -race",
+      "root_cause": "The internal/cli package has grown beyond the per-package budget; isolated profiling exceeded 20m before completion, and full-tree parallelism adds starvation",
+      "fix": "Per operator direction, the requalification gate raises the per-package budget to 30m and limits package parallelism (GOFLAGS=-p=4). The original 20m FAIL is retained in evidence; this is a budget/parallelism change, not a security waiver.",
+      "tests": ["full-tree race with -timeout=30m and GOFLAGS=-p=4"],
+      "status": "QUALIFIED-WITH-BUDGET-CHANGE"
     }
   ],
   "open_items": [

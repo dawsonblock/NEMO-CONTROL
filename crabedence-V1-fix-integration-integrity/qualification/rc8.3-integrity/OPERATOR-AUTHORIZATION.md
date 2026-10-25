@@ -88,7 +88,7 @@ or the issuer is not pinned.
 
 | Operation | Grant operation | Additional requirements |
 |---|---|---|
-| `custodyctl migrate` | `custody-migrate` | effect store, signer key, custodian trust, repair trust; verified witness checkpoint when a witness transport is configured |
+| `custodyctl migrate` | `custody-migrate` | effect store, signer key, custodian trust, repair trust, and a **live verified witness checkpoint** over `-witness-socket`/`-witness-tls`; offline migration is refused |
 | `custodyctl rescan` | `custody-rescan` | effect store, signer key, custodian trust, repair trust |
 | `custodyctl repair` | `custody-repair` | all of the above, a non-empty `-reason`, an installed full-history scanner, and a live witness transport |
 | read-only (`status`, `inspect`, `preflight`) | none | owner-level access to the outbox file |

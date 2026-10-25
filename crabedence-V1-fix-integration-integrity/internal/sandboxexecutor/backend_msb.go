@@ -245,6 +245,10 @@ type MSBBackend struct {
 	// cleanupHook is a test-only fault-injection seam between the
 	// pre-removal inspection and the delete. Nil in production.
 	cleanupHook func(stage string) error
+	// cleanupIntentSyncHook is a test-only fault-injection seam around
+	// the durable cleanup intent's file and directory syncs. Nil in
+	// production.
+	cleanupIntentSyncHook func(stage string) error
 }
 
 // catalogIdentity is the verified on-disk identity of the dedicated
@@ -1766,7 +1770,18 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 // the unresolved obligation instead of losing it.
 func (b *MSBBackend) finishCleanup(req CleanupRequest, res CleanupResult, err error) (CleanupResult, error) {
 	if err == nil && res.Outcome.ResolvesObligation() {
-		_ = b.clearCleanupIntent(req.Handle)
+		if b.cleanupIntentSyncHook != nil {
+			if herr := b.cleanupIntentSyncHook("before_intent_clear"); herr != nil {
+				res.Detail = strings.TrimSpace(res.Detail + " ; cleanup intent clear skipped: " + herr.Error())
+				return res, nil
+			}
+		}
+		if cerr := b.clearCleanupIntent(req.Handle); cerr != nil {
+			// The outcome still resolves the removal, but the intent
+			// could not be discharged. Surface it and leave the intent
+			// in place so PendingCleanupObligations shows the residual.
+			res.Detail = strings.TrimSpace(res.Detail + " ; cleanup intent clear failed: " + cerr.Error())
+		}
 	}
 	return res, err
 }
@@ -1789,7 +1804,7 @@ func (b *MSBBackend) cleanupIntentPath(handle string) string {
 // the sandbox.
 func (b *MSBBackend) recordCleanupIntent(req CleanupRequest) error {
 	if b.StateDir == "" {
-		return nil
+		return fmt.Errorf("cleanup intent requires a durable state directory — a destructive removal without crash-recovery state is not issued")
 	}
 	dir := b.cleanupIntentDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -1809,21 +1824,76 @@ func (b *MSBBackend) recordCleanupIntent(req CleanupRequest) error {
 	}
 	path := b.cleanupIntentPath(req.Handle)
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	if _, err := f.Write(raw); err != nil {
+		f.Close()
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		_ = os.Remove(tmp)
+		return fmt.Errorf("cleanup intent file sync: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	if b.cleanupIntentSyncHook != nil {
+		if err := b.cleanupIntentSyncHook("after_file_sync"); err != nil {
+			_ = os.Remove(tmp)
+			return err
+		}
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	// The rename itself must be durable before the destructive command
+	// is issued: sync the containing directory.
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	if err := d.Sync(); err != nil {
+		d.Close()
+		return fmt.Errorf("cleanup intent directory sync: %w", err)
+	}
+	if err := d.Close(); err != nil {
+		return err
+	}
+	if b.cleanupIntentSyncHook != nil {
+		if err := b.cleanupIntentSyncHook("after_dir_sync"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (b *MSBBackend) clearCleanupIntent(handle string) error {
 	if b.StateDir == "" {
-		return nil
+		return fmt.Errorf("cleanup intent requires a durable state directory")
 	}
+	dir := b.cleanupIntentDir()
 	err := os.Remove(b.cleanupIntentPath(handle))
 	if os.IsNotExist(err) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	if err := d.Sync(); err != nil {
+		d.Close()
+		return fmt.Errorf("cleanup intent clear directory sync: %w", err)
+	}
+	return d.Close()
 }
 
 // PendingCleanupObligations lists durable cleanup intents that have not
