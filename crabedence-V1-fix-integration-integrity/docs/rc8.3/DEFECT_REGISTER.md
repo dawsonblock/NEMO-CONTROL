@@ -35,3 +35,9 @@ the stricter register in
   checks, catalog dev/inode re-verification, a second pre-delete inspection,
   and durable cleanup intents. Shared-runtime high assurance remains
   UNSUPPORTED; the inspect-then-delete residual is documented.
+- **RC83-IC-18/19 (full-suite findings).** The exact full-tree race run exposed
+  a real sync-heartbeat data race (`internal/cli/ssh.go`) and an outbox file
+  mode gap: SQLite created the database/WAL/SHM at 0644, so the new read-only
+  inspection refused valid outboxes. Both are fixed (serialized writer; 0600
+  at open) and covered by `TestSyncLocalActionsWorkspaceIsolatesNonForwardableOrigin`
+  under `-race` and `TestOutboxFileModeOwnerOnly`.

@@ -173,6 +173,26 @@
       "fix": "Durable cleanup intent is written before rm and cleared only on an obligation-resolving outcome; PendingCleanupObligations exposes unresolved intents",
       "tests": ["TestCleanupIntentSurvivesUncertainOutcome", "TestCleanupVerifiedRemovalLeavesNoIntent"],
       "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-18",
+      "pr": "PR-06",
+      "severity": "high",
+      "title": "Sync heartbeat raced the exec stderr copier on the same bytes.Buffer",
+      "root_cause": "startSyncHeartbeat wrote to the same io.Writer that exec.Cmd copied child stderr into, and stop only closed a channel without waiting for the goroutine",
+      "fix": "lockedWriter serializes both writers; stop waits for the heartbeat goroutine before returning",
+      "tests": ["TestSyncLocalActionsWorkspaceIsolatesNonForwardableOrigin (race)"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-19",
+      "pr": "PR-04",
+      "severity": "medium",
+      "title": "Outbox database and WAL/SHM siblings were created with the process umask (0644)",
+      "root_cause": "SQLite creates its files with the process umask; the new read-only inspection correctly refused group/other-readable evidence but valid outboxes were not tightened at open",
+      "fix": "OpenOutbox chmods the database and its WAL/SHM siblings to 0600; read-only inspection still refuses accessible files",
+      "tests": ["TestOutboxFileModeOwnerOnly", "TestReadOnlyCommandsRefuseMissingOutbox"],
+      "status": "CLOSED"
     }
   ],
   "open_items": [
