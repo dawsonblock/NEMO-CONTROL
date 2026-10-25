@@ -1,0 +1,13 @@
+--- FAIL: TestBaselineLegacyJournalSwallowsDBError (0.02s)
+    baseline_defects_test.go:20: LegacyJournalAction swallowed a database failure
+--- FAIL: TestBaselineCompensationBreaksSuccessorLink (0.02s)
+    baseline_defects_test.go:40: successor still links to the pre-compensation hash "5efbf58a0565250ed226f574ce759b19758cde0102eb76e4ee93641da9012c8e", not the rebuilt "1350e8b2e20f8aeb9427e19874418f8c8dfc1da3f0581eac737b61b09afb1658"
+--- FAIL: TestBaselineRepairWithoutFullScannerSucceeds (0.02s)
+    baseline_defects_test.go:52: repair without a full-history scanner was admitted
+FAIL
+FAIL	github.com/openclaw/crabbox/internal/witness	0.405s
+--- FAIL: TestBaselineUnverifiableJournalAdvancesHWM (0.01s)
+    baseline_defects_test.go:65: baseline accepted unverifiable-legacy as coverage
+FAIL
+FAIL	github.com/openclaw/crabbox/internal/execution	0.616s
+FAIL

@@ -1,0 +1,91 @@
+{
+  "schema": "rc83-integrity-baseline-v1",
+  "recorded_at": "2026-10-25T21:30:00Z",
+  "mission_input": {
+    "archive_name": "NEMO-CONTROL-codex-rc8.3-custody-sandbox-qualification.zip",
+    "expected_sha256": "45bf14380d862dd8d1c97e45db2de56e3bb373aa48201dd573cc8c55c1d83e60",
+    "present_in_workspace": false,
+    "note": "No file in the workspace matches the mission archive name or the expected SHA-256. The RC8.3 candidate actually present is recorded below; all findings are bound to that artifact and its source commit."
+  },
+  "actual_rc83_artifact": {
+    "archive_name": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip",
+    "sha256": "1611b161eea2db6da84aa21ae9f4dce8962d458d47dbdec32db4cc2a8cf9d5c7",
+    "size_bytes": 19089912,
+    "attestation": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip.attestation.json",
+    "attested_source_commit": "0db72fd29b43efaf15f3a69098d631a34145d5fb",
+    "attested_source_inventory_sha256": "367faa16783914b11887cccdaed1810e553d8d5fc81c949690b224bff76b43f5",
+    "attested_qualification": "BLOCKED / DEVELOPMENT ONLY — exclusive-runtime profile only; shared-runtime high assurance unsupported; pending independent-witness and linux-amd64-kvm lanes"
+  },
+  "source_identity": {
+    "repository_root": "/Users/dawsonblock/NEMO-CONTROL",
+    "authoritative_tree": "crabedence-V1-fix-integration-integrity",
+    "baseline_head": "54ad8776dcf0f6037a625e66a3b282df15aed650",
+    "working_branch_at_start": "codex/rc8.3-custody-sandbox-qualification",
+    "worktree_clean_at_start": true,
+    "archive_source_commit_diff": "0db72fd..54ad877 changes only release artifacts (zip, attestation, manifests, evidence index, toolchain lock); all reviewed security source files are byte-identical to the archive",
+    "key_file_identity": {
+      "cmd/custodyctl/main.go": "64a701676989",
+      "internal/witness/migration.go": "109ddd0d0962",
+      "internal/witness/outbox.go": "c09a05313cca",
+      "internal/witness/sender.go": "3c0218135235",
+      "internal/execution/custody_reconcile.go": "fdf3f63b9074",
+      "internal/sandboxexecutor/backend_msb.go": "5605065b158d",
+      "internal/idempotency/evidence_verify.go": "c8b01cc4ec11"
+    }
+  },
+  "safe_extraction": {
+    "extracted_to": "/tmp/rc83-extract",
+    "entry_count": 4971,
+    "path_traversal_entries": 0,
+    "absolute_path_entries": 0,
+    "symlink_count": 12,
+    "escaping_symlinks": 0,
+    "permissions_preserved": true,
+    "reviewed_files_match_worktree": true
+  },
+  "toolchain": {
+    "go": "go1.26.5",
+    "go_selection": "GOTOOLCHAIN=go1.26.5",
+    "go_mod": "go 1.26 / toolchain go1.26.5",
+    "installed_default_go": "go1.27.2",
+    "note": "Qualification commands pin GOTOOLCHAIN=go1.26.5; the host default is newer and is not used for evidence runs."
+  },
+  "host": {
+    "os": "Darwin 25.2.0",
+    "arch": "arm64",
+    "kernel": "xnu-12377.61.12~1/RELEASE_ARM64_T6020"
+  },
+  "baseline_defect_reproduction": {
+    "command": "GOTOOLCHAIN=go1.26.5 go test -count=1 -run 'TestBaseline' ./internal/witness ./internal/execution",
+    "worktree": "/tmp/rc83-baseline (detached HEAD 54ad877, unmodified)",
+    "exit_code": 1,
+    "log": "qualification/rc8.3-integrity/logs/baseline-defect-reproduction.log",
+    "log_sha256": "c410ed66e5267e9214da2c19092123db697ad8f88b535a35fa17f8c8a990b862",
+    "failures": [
+      "TestBaselineLegacyJournalSwallowsDBError: LegacyJournalAction returned nil on a closed database",
+      "TestBaselineCompensationBreaksSuccessorLink: successor still linked the pre-compensation hash after CompensateLegacyRow",
+      "TestBaselineRepairWithoutFullScannerSucceeds: OperatorRepair cleared REPAIR_REQUIRED with no full-history scanner and a caller-supplied actor name",
+      "TestBaselineUnverifiableJournalAdvancesHWM: an unverifiable-legacy journal entry was accepted as coverage and the high-water mark advanced"
+    ]
+  },
+  "reviewed_controls": [
+    "internal/execution/custody_reconcile.go",
+    "internal/witness/migration.go",
+    "internal/witness/outbox.go",
+    "internal/witness/sender.go",
+    "cmd/custodyctl/main.go",
+    "internal/sandboxexecutor/backend_msb.go",
+    "internal/idempotency/evidence_verify.go",
+    "internal/custody/envelope.go",
+    "internal/custody/trust.go",
+    "internal/idempotency/evidence_verify.go"
+  ],
+  "preserved_invariants": [
+    "NEMO reasoning architecture and package boundaries",
+    "Crabedence authority kernel and fail-closed admission",
+    "idempotency and terminal-receipt digest binding",
+    "UNKNOWN execution-state semantics",
+    "evidence signatures and witness verification",
+    "custody-envelope-v1 domain-separated signatures and sequence linkage"
+  ]
+}
