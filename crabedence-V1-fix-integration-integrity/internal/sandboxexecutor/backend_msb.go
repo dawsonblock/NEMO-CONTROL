@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -233,6 +234,40 @@ type MSBBackend struct {
 	// tests can exercise wedged-runtime classification in bounded time.
 	stepTimeoutOverride time.Duration
 	postVerifyOverride  time.Duration
+
+	// catalogMu guards the verified catalog identity. The identity is
+	// captured by DeploymentPosture (or the first cleanup) and
+	// re-checked immediately before destruction, so a catalog swapped
+	// under the same path is detected rather than trusted.
+	catalogMu    sync.Mutex
+	catalog      *catalogIdentity
+	resolvedHome string
+	// cleanupHook is a test-only fault-injection seam between the
+	// pre-removal inspection and the delete. Nil in production.
+	cleanupHook func(stage string) error
+}
+
+// catalogIdentity is the verified on-disk identity of the dedicated
+// MSB_HOME catalog. A same-UID co-tenant can rename or replace the
+// directory; dev/inode equality is what distinguishes the catalog the
+// posture proved from a substitute at the same path.
+type catalogIdentity struct {
+	Path   string
+	Device uint64
+	Inode  uint64
+	UID    uint32
+	Mode   os.FileMode
+}
+
+// CleanupIntent is a durable record that a destructive cleanup was
+// about to be issued. It survives a crash so an unresolved obligation
+// is visible to the operator instead of vanishing with the process.
+type CleanupIntent struct {
+	Handle        string `json:"handle"`
+	DispatchNonce string `json:"dispatch_nonce"`
+	JobID         string `json:"job_id"`
+	RecordedAt    string `json:"recorded_at"`
+	Detail        string `json:"detail"`
 }
 
 // imageBaseline is the pinned image's own execution defaults — the
@@ -554,11 +589,13 @@ func dispatchNonce() (string, error) {
 // floods a utility call is refused, never accumulated.
 func (b *MSBBackend) runOnce(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, b.Bin, args...)
-	if b.MSBHome != "" {
+	if home := b.catalogHome(); home != "" {
 		// The dedicated catalog home is pinned per call, not
 		// inherited: no ambient MSB_HOME can redirect the runtime
-		// outside the deployment's verified catalog.
-		cmd.Env = append(os.Environ(), "MSB_HOME="+b.MSBHome)
+		// outside the deployment's verified catalog. Once posture
+		// verification has resolved the path, the canonical path is
+		// used so an ancestor symlink cannot redirect the runtime.
+		cmd.Env = append(os.Environ(), "MSB_HOME="+home)
 	}
 	cmd.Stdin = nil
 	out := newBoundedBuffer(maxCLIOutputBytes)
@@ -569,6 +606,17 @@ func (b *MSBBackend) runOnce(ctx context.Context, args ...string) ([]byte, error
 			strings.Join(args, " "), maxCLIOutputBytes)
 	}
 	return []byte(out.String()), err
+}
+
+// catalogHome returns the verified canonical catalog path when posture
+// verification has run, else the configured path.
+func (b *MSBBackend) catalogHome() string {
+	b.catalogMu.Lock()
+	defer b.catalogMu.Unlock()
+	if b.resolvedHome != "" {
+		return b.resolvedHome
+	}
+	return b.MSBHome
 }
 
 // pinnedImage renders the contract's image as the immutable
@@ -1621,6 +1669,55 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 			req.Handle, ierr)
 	}
 
+	// Step 1b — re-prove the runtime namespace and the occupant
+	// immediately before deletion. The catalog identity catches a
+	// same-UID rename/replacement of MSB_HOME; the second inspection
+	// catches a substitution that landed after step 1. Neither closes
+	// the inspect-then-delete race — msb has no atomic
+	// identity-conditioned delete — so both narrow the window and a
+	// residual is documented rather than denied.
+	if err := b.verifyCatalogUnchanged(); err != nil {
+		return refuse(CleanupIdentityUnverifiable,
+			"%v — no destructive command issued; the cleanup obligation stays pending", err)
+	}
+	if b.cleanupHook != nil {
+		if err := b.cleanupHook("after_preinspect"); err != nil {
+			return refuse(CleanupIdentityUnverifiable, "cleanup fault injection after pre-inspection: %v", err)
+		}
+	}
+	rectx, recancel := context.WithTimeout(ctx, b.cleanupStepTimeout())
+	reDoc, reErr := b.inspectRaw(rectx, req.Handle)
+	recancel()
+	switch {
+	case reErr == nil:
+		cfg, _ := reDoc["config"].(map[string]any)
+		labels, _ := cfg["labels"].(map[string]any)
+		if jsonString(labels, "crabedence.dispatch") != req.DispatchNonce ||
+			(req.JobID != "" && jsonString(labels, "crabedence.job") != req.JobID) {
+			return refuse(CleanupIdentityMismatch,
+				"sandbox %s changed identity between pre-verification and deletion — a substituted occupant is never destroyed", req.Handle)
+		}
+	case msbNotFound(reErr):
+		return refuse(CleanupAlreadyAbsentVerified,
+			"sandbox %s disappeared after pre-verification — the authorized instance is gone", req.Handle)
+	default:
+		return refuse(CleanupIdentityUnverifiable,
+			"cannot re-classify the occupant of %s immediately before deletion (%v) — no destructive command issued", req.Handle, reErr)
+	}
+	if b.cleanupHook != nil {
+		if err := b.cleanupHook("before_delete"); err != nil {
+			return refuse(CleanupIdentityUnverifiable, "cleanup fault injection before delete: %v", err)
+		}
+	}
+	if err := b.verifyCatalogUnchanged(); err != nil {
+		return refuse(CleanupIdentityUnverifiable,
+			"%v — no destructive command issued; the cleanup obligation stays pending", err)
+	}
+	if err := b.recordCleanupIntent(req); err != nil {
+		return refuse(CleanupIdentityUnverifiable,
+			"cleanup intent could not be recorded durably (%v) — a crash-unrecoverable delete is not issued", err)
+	}
+
 	// Step 2 — identity-bound removal. The handle is the deletion
 	// condition: it embeds this dispatch's nonce, so the name the
 	// runtime resolves can only name this dispatch's instance — a
@@ -1644,20 +1741,125 @@ func (b *MSBBackend) Cleanup(ctx context.Context, req CleanupRequest) (CleanupRe
 			// A real removal failure — possibly after partial effect.
 			vctx, vcancel := b.postCleanupCtx(ctx)
 			defer vcancel()
-			return b.postCleanupVerify(vctx, req, notes+"the identity-conditioned removal failed: "+errText(rerr, out))
+			res, verr := b.postCleanupVerify(vctx, req, notes+"the identity-conditioned removal failed: "+errText(rerr, out))
+			return b.finishCleanup(req, res, verr)
 		}
 	case rctx.Err() != nil:
 		// The deadline expired with the removal in flight — the
 		// command may or may not have taken effect.
 		vctx, vcancel := b.postCleanupCtx(ctx)
 		defer vcancel()
-		return b.postCleanupVerify(vctx, req, notes+"the removal deadline expired after the command was issued — outcome uncertain")
+		res, verr := b.postCleanupVerify(vctx, req, notes+"the removal deadline expired after the command was issued — outcome uncertain")
+		return b.finishCleanup(req, res, verr)
 	}
 
 	// Step 3 — verify the resulting state independently.
 	vctx, vcancel := b.postCleanupCtx(ctx)
 	defer vcancel()
-	return b.postCleanupVerify(vctx, req, notes)
+	res, verr := b.postCleanupVerify(vctx, req, notes)
+	return b.finishCleanup(req, res, verr)
+}
+
+// finishCleanup clears the durable cleanup intent only when the
+// outcome discharges the obligation. An uncertain or unverifiable
+// outcome leaves the intent in place: a crash or restart can then see
+// the unresolved obligation instead of losing it.
+func (b *MSBBackend) finishCleanup(req CleanupRequest, res CleanupResult, err error) (CleanupResult, error) {
+	if err == nil && res.Outcome.ResolvesObligation() {
+		_ = b.clearCleanupIntent(req.Handle)
+	}
+	return res, err
+}
+
+// cleanupIntentDir is the durable crash-recovery journal for
+// destructive cleanup. It lives beside the artifacts under the
+// owner-only StateDir.
+func (b *MSBBackend) cleanupIntentDir() string {
+	return filepath.Join(b.StateDir, "cleanup-intents")
+}
+
+func (b *MSBBackend) cleanupIntentPath(handle string) string {
+	sum := sha256.Sum256([]byte(handle))
+	return filepath.Join(b.cleanupIntentDir(), hex.EncodeToString(sum[:])+".json")
+}
+
+// recordCleanupIntent durably records that a delete is about to be
+// issued. A crash after this point leaves an unresolved obligation
+// visible to PendingCleanupObligations rather than silently forgetting
+// the sandbox.
+func (b *MSBBackend) recordCleanupIntent(req CleanupRequest) error {
+	if b.StateDir == "" {
+		return nil
+	}
+	dir := b.cleanupIntentDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	if st, err := os.Stat(dir); err == nil && st.Mode().Perm() != 0o700 {
+		return fmt.Errorf("cleanup intent directory %s mode %04o is not owner-only", dir, st.Mode().Perm())
+	}
+	intent := CleanupIntent{
+		Handle: req.Handle, DispatchNonce: req.DispatchNonce, JobID: req.JobID,
+		RecordedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		Detail:     "identity-verified removal issued; outcome not yet verified",
+	}
+	raw, err := json.Marshal(intent)
+	if err != nil {
+		return err
+	}
+	path := b.cleanupIntentPath(req.Handle)
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+func (b *MSBBackend) clearCleanupIntent(handle string) error {
+	if b.StateDir == "" {
+		return nil
+	}
+	err := os.Remove(b.cleanupIntentPath(handle))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
+}
+
+// PendingCleanupObligations lists durable cleanup intents that have not
+// been discharged by a verified outcome — the crash-recovery surface
+// operators reconcile after a restart.
+func (b *MSBBackend) PendingCleanupObligations(ctx context.Context) ([]CleanupIntent, error) {
+	if b.StateDir == "" {
+		return nil, nil
+	}
+	entries, err := os.ReadDir(b.cleanupIntentDir())
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []CleanupIntent
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		raw, err := os.ReadFile(filepath.Join(b.cleanupIntentDir(), e.Name()))
+		if err != nil {
+			return nil, err
+		}
+		var intent CleanupIntent
+		if err := json.Unmarshal(raw, &intent); err != nil {
+			return nil, fmt.Errorf("cleanup intent %s: %w", e.Name(), err)
+		}
+		out = append(out, intent)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].RecordedAt < out[j].RecordedAt })
+	return out, nil
 }
 
 // requireCleanupPosture enforces the deployment's runtime-ownership
@@ -1697,20 +1899,165 @@ func (b *MSBBackend) DeploymentPosture() (string, error) {
 	if b.MSBHome == "" {
 		return "", fmt.Errorf("high-assurance cleanup requires a dedicated MSB_HOME catalog — the shared default catalog gives every co-tenant resolve-and-delete reach on this deployment's names")
 	}
-	info, err := os.Stat(b.MSBHome)
+	// The configured path itself must not be a symlink: a symlink can be
+	// repointed between verification and deletion.
+	linkInfo, err := os.Lstat(b.MSBHome)
 	if err != nil {
 		return "", fmt.Errorf("dedicated catalog %s not usable: %v", b.MSBHome, err)
 	}
+	if linkInfo.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("dedicated catalog %s is a symlink — a repointable path cannot prove exclusive runtime ownership", b.MSBHome)
+	}
+	resolved, err := filepath.EvalSymlinks(b.MSBHome)
+	if err != nil {
+		return "", fmt.Errorf("dedicated catalog %s cannot be resolved: %v", b.MSBHome, err)
+	}
+	if err := verifyCatalogAncestors(b.MSBHome); err != nil {
+		return "", err
+	}
+	info, err := os.Lstat(resolved)
+	if err != nil {
+		return "", fmt.Errorf("dedicated catalog %s not usable: %v", resolved, err)
+	}
 	if !info.IsDir() {
-		return "", fmt.Errorf("dedicated catalog %s is not a directory", b.MSBHome)
+		return "", fmt.Errorf("dedicated catalog %s is not a directory", resolved)
 	}
 	if perm := info.Mode().Perm(); perm&0o077 != 0 {
-		return "", fmt.Errorf("dedicated catalog %s mode %o grants group/other access — a co-tenant with catalog access can substitute and destroy this deployment's instances", b.MSBHome, perm)
+		return "", fmt.Errorf("dedicated catalog %s mode %o grants group/other access — a co-tenant with catalog access can substitute and destroy this deployment's instances", resolved, perm)
 	}
 	if st, ok := info.Sys().(*syscall.Stat_t); ok && int(st.Uid) != os.Geteuid() {
-		return "", fmt.Errorf("dedicated catalog %s is owned by uid %d, not this daemon's uid %d", b.MSBHome, st.Uid, os.Geteuid())
+		return "", fmt.Errorf("dedicated catalog %s is owned by uid %d, not this daemon's uid %d", resolved, st.Uid, os.Geteuid())
 	}
-	return fmt.Sprintf("exclusive runtime posture: namespace=%s catalog=%s (owner-only, uid %d)", b.Namespace, b.MSBHome, os.Geteuid()), nil
+	id, err := catalogIdentityOf(resolved, info)
+	if err != nil {
+		return "", err
+	}
+	b.catalogMu.Lock()
+	prev := b.catalog
+	if prev != nil && (prev.Device != id.Device || prev.Inode != id.Inode) {
+		b.catalogMu.Unlock()
+		return "", fmt.Errorf("catalog %s was replaced since the last posture check (dev/inode %d/%d → %d/%d) — runtime namespace substitution", resolved, prev.Device, prev.Inode, id.Device, id.Inode)
+	}
+	b.catalog = id
+	b.resolvedHome = resolved
+	b.catalogMu.Unlock()
+	return fmt.Sprintf("exclusive runtime posture: namespace=%s catalog=%s (owner-only, uid %d, dev=%d ino=%d)", b.Namespace, resolved, os.Geteuid(), id.Device, id.Inode), nil
+}
+
+// verifyCatalogAncestors refuses an ancestor path that a co-tenant
+// could redirect or replace: a non-root symlink, a non-directory, a
+// group/other writable non-sticky directory, or a directory owned by
+// another non-root user. Root-owned platform symlinks such as macOS
+// /var are resolved and skipped: only root can repoint them, and the
+// runtime uses the canonical path once posture is verified.
+func verifyCatalogAncestors(path string) error {
+	parent := filepath.Dir(path)
+	for parent != "/" && parent != "." && parent != "" {
+		info, err := os.Lstat(parent)
+		if err != nil {
+			return fmt.Errorf("catalog ancestor %s not usable: %v", parent, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			st, _ := info.Sys().(*syscall.Stat_t)
+			if st == nil || st.Uid != 0 {
+				return fmt.Errorf("catalog ancestor %s is a non-root symlink — ancestor-path substitution is not an exclusive ownership posture", parent)
+			}
+			target, err := filepath.EvalSymlinks(parent)
+			if err != nil {
+				return fmt.Errorf("catalog ancestor %s cannot be resolved: %v", parent, err)
+			}
+			parent = filepath.Dir(target)
+			continue
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("catalog ancestor %s is not a directory", parent)
+		}
+		if perm := info.Mode().Perm(); perm&0o022 != 0 && info.Mode()&os.ModeSticky == 0 {
+			return fmt.Errorf("catalog ancestor %s is group/other writable (mode %o) — a co-tenant can substitute the catalog path", parent, perm)
+		}
+		if st, ok := info.Sys().(*syscall.Stat_t); ok && int(st.Uid) != os.Geteuid() && st.Uid != 0 {
+			return fmt.Errorf("catalog ancestor %s is owned by uid %d, not this daemon's uid %d or root", parent, st.Uid, os.Geteuid())
+		}
+		parent = filepath.Dir(parent)
+	}
+	return nil
+}
+
+func catalogIdentityOf(path string, info os.FileInfo) (*catalogIdentity, error) {
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return nil, fmt.Errorf("catalog %s identity is not readable on this platform", path)
+	}
+	return &catalogIdentity{
+		Path: path, Device: uint64(st.Dev), Inode: uint64(st.Ino),
+		UID: st.Uid, Mode: info.Mode(),
+	}, nil
+}
+
+// ensureCatalogIdentity captures the catalog identity for a
+// non-high-assurance deployment that still pins MSB_HOME. It is the
+// weaker posture — no exclusivity is claimed — but replacement is still
+// detectable.
+func (b *MSBBackend) ensureCatalogIdentity() error {
+	if b.MSBHome == "" {
+		return nil
+	}
+	b.catalogMu.Lock()
+	defer b.catalogMu.Unlock()
+	if b.catalog != nil {
+		return nil
+	}
+	resolved, err := filepath.EvalSymlinks(b.MSBHome)
+	if err != nil {
+		return fmt.Errorf("catalog %s cannot be resolved: %v", b.MSBHome, err)
+	}
+	info, err := os.Lstat(resolved)
+	if err != nil {
+		return fmt.Errorf("catalog %s not usable: %v", resolved, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return fmt.Errorf("catalog %s is not a real directory", resolved)
+	}
+	id, err := catalogIdentityOf(resolved, info)
+	if err != nil {
+		return err
+	}
+	b.catalog = id
+	b.resolvedHome = resolved
+	return nil
+}
+
+// verifyCatalogUnchanged re-checks the catalog's on-disk identity
+// immediately before destruction. A same-UID process can rename the
+// verified directory and put a substitute at the same path; dev/inode
+// equality detects that replacement. It cannot detect in-place
+// modification of a catalog the attacker can already write — that is
+// the documented same-UID residual.
+func (b *MSBBackend) verifyCatalogUnchanged() error {
+	b.catalogMu.Lock()
+	id := b.catalog
+	b.catalogMu.Unlock()
+	if id == nil {
+		return b.ensureCatalogIdentity()
+	}
+	info, err := os.Lstat(id.Path)
+	if err != nil {
+		return fmt.Errorf("catalog %s disappeared before deletion: %v", id.Path, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return fmt.Errorf("catalog %s is no longer a real directory", id.Path)
+	}
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return fmt.Errorf("catalog %s identity is not readable", id.Path)
+	}
+	if uint64(st.Dev) != id.Device || uint64(st.Ino) != id.Inode {
+		return fmt.Errorf("catalog %s was replaced (dev/inode %d/%d → %d/%d) — runtime namespace substitution", id.Path, id.Device, id.Inode, st.Dev, st.Ino)
+	}
+	if st.Uid != id.UID {
+		return fmt.Errorf("catalog %s owner changed (uid %d → %d)", id.Path, id.UID, st.Uid)
+	}
+	return nil
 }
 
 // cleanupStepTimeout bounds each external call inside Cleanup — the
