@@ -168,3 +168,110 @@ Statuses: OPEN / IN_PROGRESS / CLOSED / NOT_RUN / BLOCKED.
   the measured module shape and ranked extraction boundaries with
   characterization-test requirements; no refactor in the candidate,
   by design.
+
+## Post-closure review findings (rc8.2 candidate review)
+
+The following were raised by code review of the rc8.2 branch itself
+(commits `820d44b`..`089ab75` over `codex/rc8.1-security-closure`).
+
+## F-10 — Pre-rc8.2 outbox rows with empty payloads escalate to an unrecoverable REPAIR_REQUIRED
+
+- **Severity:** P1 upgrade-safety (latent if no rc8.1 custody
+  deployment exists; permanent wedge if one does)
+- **Evidence:** rc8.1 enqueued `receipt.EvidenceReceipt` for every
+  terminal execution — nil for non-CRITICAL (the F-02 evidence above)
+  — producing `custody_outbox` rows whose envelope carries
+  `content.bytes_b64=""`. Under rc8.2,
+  `internal/execution/custody_reconcile.go:34` treats such a row as a
+  present obligation; `internal/witness/outbox.go` `StoredPayload`
+  returns its empty content; the byte-identity coverage check at
+  `custody_reconcile.go:84` then marks `repair_reason`. The row is
+  self-poisoning: re-enqueue of the same `execution_id` with real
+  bytes is refused as a contradiction (`Enqueue` unique-row check),
+  the outbox has no delete/quarantine path, and
+  `Sender.OperatorRepair`/`CustodyObligationRescan` re-hit the same
+  rows and re-escalate. Net: an rc8.1 custody outbox upgrades into a
+  REPAIR_REQUIRED that no code path discharges; the only recovery is
+  deleting the outbox file — undocumented chain-continuity loss.
+- **Correction (required):** pick one and document/enforce it —
+  (a) a documented upgrade step requiring a fresh outbox for any
+  rc8.1 custody store that ever terminalized a non-CRITICAL record,
+  stated in `OPERATOR_DEPLOYMENT.md` with its custody-continuity
+  implication; or (b) a migration/quarantine path that retires
+  empty-content rows as a legacy class (distinct from fork
+  contradictions) and continues the chain.
+- **Tests:** upgrade fixture — an outbox containing rc8.1-shape
+  empty-content rows booted under the rc8.2 scanner must reach a
+  documented, recoverable state.
+- **Status:** OPEN.
+
+## F-11 — REPAIR_REQUIRED has no shipped invocation path
+
+- **Severity:** P1 operability
+- **Evidence:** `internal/witness/sender.go:319` `OperatorRepair` and
+  `internal/execution/custody_reconcile.go` `CustodyObligationRescan`
+  have no non-test callers — no CLI command, admin socket, or service
+  endpoint invokes them. `CustodyState` is read only by the admission
+  gate (`serve.go:971`). `docs/rc8.2/OPERATOR_DEPLOYMENT.md:44`
+  describes `Sender.OperatorRepair` as the clearing path, but in a
+  shipped deployment the only way to clear `repair_reason` is
+  hand-editing `outbox_meta` in sqlite — the un-audited mutation this
+  design exists to prevent. The forensic views (`Outbox.Pending`,
+  `Outbox.CustodyEvents`) are likewise unsurfaced.
+- **Correction (required):** wire an operator surface — a custody
+  status/repair command or a service admin endpoint — that runs a
+  verified pass and records the operator's evidence note through
+  `OperatorRepair`; surface `CustodyState`/`CustodyEvents` read-only.
+- **Tests:** a REPAIR_REQUIRED deployment reaches HEALTHY via the
+  shipped surface; a failed verified pass clears nothing.
+- **Status:** OPEN.
+
+## F-12 — Obligation rescan enumerates the entire terminal stream every drain pass
+
+- **Severity:** P2 scalability/correctness-under-load
+- **Evidence:** `custody_reconcile.go:35` calls
+  `store.TerminalEvidence(ctx)` — an unbounded
+  `WHERE state IN ('COMMITTED','FAILED','DENIED') ORDER BY
+  terminal_seq` (`internal/idempotency/evidence_verify.go:168,205`) —
+  at the head of every drain pass (default 2s). The high-water mark
+  bounds re-verification, not enumeration, so per-pass cost grows
+  monotonically with terminal history on both engines. Every
+  above-HWM row additionally costs a `store.Lookup` plus a
+  `StoredPayload` read.
+- **Correction:** bound the enumeration (`terminal_seq > ?`) — e.g.
+  a `TerminalEvidenceFrom(ctx, hwm)` variant — keeping the full
+  fromSeq=0 form for `CustodyObligationRescan`.
+- **Tests:** bounded scan still advances the HWM and still detects a
+  gap below the bound when forced via the operator rescan.
+- **Status:** OPEN.
+
+## F-13 — Minor review items
+
+- **Severity:** P3
+- **Evidence:**
+  - `internal/execution/control_gate.go:84` — `controlGateFlight.gen`
+    is written, never read; retirement is pointer identity
+    (`current == f`). The comment describes a generation guard that
+    does not exist.
+  - `internal/witness/sender.go:106` — `CustodyState` never consults
+    in-memory `lastErr`; a transiently failed durable `MarkDegraded`
+    write can leave custody reading HEALTHY inside the freshness
+    window.
+  - `serve.go:983` — stale-freshness DEGRADED with an empty `lastErr`
+    reports "custody backlog pending" (misattributed reason).
+  - `internal/witness/outbox.go:114` — empty-payload refusal reuses
+    `ErrEvidenceContradiction`; it is an obligation fault, not a
+    contradiction — a future caller escalating on `errors.Is` would
+    over-escalate.
+  - `internal/witness/sender.go:307` — the `RepairDegraded` evidence
+    string asserts "obligation rescan" even when no scanner is
+    installed.
+  - `dispatch.go:1098` / `reconcile/worker.go:484` —
+    `CustodyPayload` errors collapse to nil, losing the
+    canonicalization detail from logs.
+- **Correction:** drop or read `gen`; treat non-empty `lastErr` as
+  DEGRADED in `CustodyState`; give stale freshness its own reason;
+  use a distinct error (or plain error) for empty payloads; record
+  the actual scan condition in the repair note; propagate the payload
+  error into the degraded marker detail.
+- **Status:** OPEN.
