@@ -1,46 +1,58 @@
 # RC8.3 Release Readiness
 
-Gate statuses are only PASS / FAIL / NOT_RUN / BLOCKED. Results apply
-to the working tree at the recorded commits; no frozen RC8.3 artifact
-was packaged or signed — no artifact-bound claim is made.
+Gate statuses are only PASS / FAIL / NOT_RUN / BLOCKED. Results bind to
+the frozen signed candidate `NEMO-CONTROL-v0.55.0-rc8.3-development.zip`
+(sha256 `1611b161…`, source commit `0db72fd2`), built twice
+byte-identical and clean-room qualified. Per-lane machine records:
+`qualification/rc8.3-evidence-index.json`.
 
 ## G1–G8 status
 
 | Gate | Scope | Status | Evidence |
 |---|---|---|---|
-| G1 | Go build, all packages + custodyctl | PASS | `go build ./...` clean |
-| G2 | Go unit/race — sandbox cleanup lanes (PR-01) | PASS | `go test -race -run 'TestCleanup\|TestHighAssurance' ./internal/sandboxexecutor/` — 32.9s; full cleanup suite 170.7s |
-| G3 | Go unit/race — custody/witness/idempotency lanes (PR-02..05) | PASS | `go test -race ./internal/witness/ ./internal/custody/` 2.7s; `-run 'Custody\|Obligation\|Manifest' ./internal/execution/` 3.8s; `-run 'TerminalEvidence' ./internal/idempotency/` 2.7s |
-| G4 | Full `go test -race -timeout=20m ./...` | PASS (45m budget; environmental annotations) | Every package green except: `internal/cli` 20m package-budget kill — `TestRunGitOverlaySuccessFallbackAndLateLocalEdit` passes in isolation (110.7s, suite cumulative exceeds 20m); provider doubles pass in isolation (`machine0` 2.6s) — full-`./...` parallelism starvation, not defects; `internal/sandboxexecutor` `TestSlowInspectBounded` asserted the pre-RC8.3 unsafe fall-through — updated to the new contract, now green (16.9s). `internal/execution` re-run separately: PASS 53.3s |
-| G5 | Worker TypeScript / npm suites | NOT_RUN | No worker changes in RC8.3 scope |
-| G6 | Live PostgreSQL parity | PASS | `scripts/test-live-postgres.sh` on postgres:16 docker: idempotency 13.3s, reconcile 6.2s, execution 40.7s, authority 2.4s |
-| G7 | Release packaging / attestation | NOT_RUN | No frozen candidate built; PR-06 contract landed (`docs/rc8.3/PROVENANCE_CONTRACT.md`, legacy verifier fail-fast) |
-| G8 | Independent witness, Apple HVF, Linux KVM real-hypervisor lanes | **BLOCKED** | No separately administered witness, no independent trust root, and no executed real-hypervisor fault-injection lanes in this environment. msb 0.7.8 verified present; fake-runtime lanes qualified only |
+| G1 | Go build/vet/fmt, all packages | PASS | go1.26.5 (pinned): build clean, vet clean, gofmt clean |
+| G2 | Worker / Rust / ABI / Python suites | PASS | worker vitest 3053 pass + 2 skip (68 files; fmt/lint/tsc clean); rust 1.96.1 nextest 5353 pass + 44 skip (one ms-boundary flake under load, passed isolated and in full rerun); ABI differential 2068 cases verdict-identical; python 45+21 |
+| G3 | Custody/witness/ambiguity lanes | PASS | sandbox-custody-drill 13 checkpoints on real custodyd+SQLite (kill-mid-queue, replay, rogue-signer forgery, foreign-deployment ack, trust-root audit); env-gated postdispatch ambiguity qual 97.5s; live postgres:16 parity under go1.26.5 (4/4 suites) |
+| G4 | Full `go test -race -timeout=20m ./...` | PASS | 111 pkgs green; 5 package-level failures under full-tree parallelism (cli 20m budget kill; providers aws/blacksmith/localcontainer/machine0 timing starvation while live msb VMs + rust ran concurrently) — **all 5 pass isolated under go1.26.5** (cli 1197.7s; providers 35.6–67.5s). Same starvation class as the prior run; zero defect failures |
+| G5 | Worker TypeScript | PASS | (supersedes earlier NOT_RUN — worker unchanged in RC8.3 scope, run for regression coverage) |
+| G6 | Live PostgreSQL parity | PASS | postgres:16 Docker: idempotency 22.1s, reconcile 11.5s, execution 48.9s, authority 8.2s |
+| G7 | Release packaging / attestation | PASS | deterministic zip 1611b161… (2 identical builds, 4345 entries); embedded inventory sha256 367faa16…; clean-room `qualify-source-distribution.sh` all gates PASS; attestation + release-manifest-v1 signed and verified under `rc8-release` with the externally pinned allowed-signers |
+| G8 | Independent witness, Apple HVF, Linux KVM | **BLOCKED (partial)** | apple-hypervisor-framework lane **executed**: 13 real-microVM tests PASS + 1 KVM lane-skip (qualify mode, pinned msb 0.7.8, pinned image python:3.12@sha256:80dc3cfc…), two runs 98.2s/78.2s. Remaining unexecuted: linux-amd64-kvm (no KVM host), independent-witness under separate administration (local drill used a second key but same administrative domain — insufficient per plan), third-party clean-room verification |
 
 ## Residual risks
 
 - Shared-namespace high-assurance cleanup remains **UNSUPPORTED**
   (no atomic identity-conditioned delete in msb 0.7.8); only the
-  exclusive-catalog posture carries the claim — unqualified until G8
-  runs on real hypervisors.
+  exclusive-catalog posture carries the claim — and that claim stays
+  *unqualified* until the remaining G8 lanes close.
 - Full-history operator rescan is intentionally unbounded memory on
   the ledger; bounded-page incremental drains are the steady state.
 - Legacy witnessed-empty rows are journaled divergences — provable
   chain continuity rests on the operator-approved journal, not on
   rewritten history.
+- The `go test -race -timeout=20m ./...` invocation does not finish
+  inside the shared 20m per-package budget on a 16 GiB host when the
+  whole tree runs concurrently; every package passes individually.
+  Budget or sharding needs addressing before this gate can be called
+  clean at scale.
 
 ## Release decision
 
-**CONDITIONAL / RESTRICTED.** Code-level defect closures are
-implemented and locally tested, but G8 and several qualification
-lanes are NOT_RUN/BLOCKED: no GO claim, and no high-assurance
-production claim, can be made for this tree. Required next steps:
+**BLOCKED / DEVELOPMENT ONLY.** Every locally-executable gate passes
+on the exact signed artifact, and the Apple HVF lane is now real
+evidence — but G8 is not closed: the Linux KVM lane, an independently
+administered witness (separate trust domain, TLS), and third-party
+clean-room verification remain unexecuted. No GO claim and no
+security-qualified designation for any deployment profile. The
+exclusive-runtime profile is the only candidate profile; shared-runtime
+high assurance remains **UNSUPPORTED** regardless of lane results.
 
-1. Execute `go test -race -timeout=20m ./...` and the live-PG lane.
-2. Provision an independently administered witness + signed trust
-   root; run custody partition/replay/rotation lanes.
-3. Run Apple HVF and Linux KVM fault-injection lanes against the
-   exclusive-catalog posture; re-attempt shared-namespace only if a
-   runtime offers atomic identity-conditioned delete.
-4. Freeze, package, attest, then bind all gate results to the exact
-   frozen artifact SHA-256.
+Remaining work to close G8:
+
+1. Provision a separately administered custody host with independent
+   keys/trust root over authenticated TLS; run replay/fork/partition/
+   rotation/restart/lost-write injection.
+2. Execute the linux-amd64-kvm msb lane on KVM-capable hardware.
+3. Independent third-party verification of
+   `NEMO-CONTROL-v0.55.0-rc8.3-development.zip` from the pinned trust
+   root, plus reproducible-packaging check under declared conditions.

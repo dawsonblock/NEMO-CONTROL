@@ -1,47 +1,57 @@
 {
-  "schema_version": 1,
-  "release": "0.54.0-rc.7.6-dev",
-  "designation": "development-candidate",
-  "artifact": {
-    "filename": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip",
-    "sha256": "41d4f572e89087447bec3651502a98c5ce3c68a7d05ce30a07b9816c8eb54f68",
-    "size_bytes": 19044531,
-    "format": "zip",
-    "prefix": "nemo-control-0.54.0-rc.7.6-dev"
-  },
-  "source": {
-    "commit": "50343e5e0721ad163e4c9754eaa334368f5c57dc",
-    "branch": "fix/rc7.6-defect-repair",
-    "packaged_from": "git ls-files membership under crabedence-V1-fix-integration-integrity/ via scripts/package-source-archive.sh --format zip",
-    "extraction_verified": true,
-    "manifest_entries": 4265
-  },
-  "provenance": {
-    "attestation": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip.attestation.json",
-    "attestation_signature": "NEMO-CONTROL-v0.54.0-rc7.6-development.zip.attestation.json.sig",
-    "attestation_schema": "rc75-release-attestation-v1",
-    "signature_namespace": "rc75-release",
-    "signature_identity": "dawsonblock@users.noreply.github.com (trusted release key — principal in .github/release-allowed-signers, registered on the GitHub account as an SSH signing key)",
-    "source_manifest_sha256": "3f32f9a9d010d4378d1704d20d1f1657c536a8c9f20578c64f31c6914ebd3a0d",
-    "source_manifest_root_hash": "e3a425497361ccc4f7be11129ea9e77f943289a12cad97f81698d13fe7d01da0",
-    "source_entry_count": 4265,
-    "source_symlink_count": 12,
-    "note": "the attestation is SSH-signed over the archive digest and verifies by default (signature material required; --allow-unsigned is dev-only). Signed by the trusted release key at ~/.ssh/id_ed25519 whose public half is in .github/release-allowed-signers and registered on the GitHub account — the binding is now release-key authenticated, not a development stand-in. The source manifest also covers the embedded release-evidence/source-tree-sha256.txt (4264 entries vs the prior 4263-entry binding, which predates its auto-embedding)."
-  },
-  "identities": {
-    "msb_runtime_pin_manifest": "qualification/msb-runtime-pins.json",
-    "msb_runtime_pin_manifest_sha256": "e6bde12f337538481bf3af680a6bc727231b142be950b67e1750ebf80b7e6894",
-    "lane_image_pins": "qualification/msb-lane-image-pins.json",
-    "lane_image_pins_sha256": "f86821a73fba103d2bb70a00bba3ca71dc8e404cc75ddcae3c3a227b65a32b27",
-    "nemo_transfer_manifest_sha256": "43d8f6e69be3ad504359815bbd1ee7b44e405132c086cf8b608f850da7d57519"
-  },
-  "supersedes": "prior RC7.6 manifest records (commits 1f0625f9, d870703e, d46d0006; archive sha256s 71346719…, 3d224f41…, aa7ae922…) — this record binds the RC7.6 development candidate at 50343e5e including the RC7.7 round-2 hardening, the witness_checkpoint fix + drill tool, and the custody cleanup (op regression tests, current docs); the attestation is signed by the trusted release key (dawsonblock@users.noreply.github.com), no longer the dev binding key; the RC7.5 artifact remains NO-GO",
-  "qualification": "NOT QUALIFIED — development candidate containing the RC7.5-audit repairs and RC7.7 hardening rounds 1-2; the mandatory qualification campaign (pinned toolchain, both lanes, live crash/fault injection, independent custody) has not completed for this identity; see DEFECT_REGISTER.md",
-  "blockers": [
-    "exclusive sandbox-namespace ownership is a stated deployment assumption (T1 residual) — native catalog-locked conditional delete remains the upgrade path",
-    "external custody on a separately administered host NOT_RUN — local live drills passed (cmd/sandbox-custody-drill: baseline, outage hold/recover, replay refusal, forgery refusal, foreign-deployment refusal, clean audit) but a custodian under different administrative control remains",
-    "apple-hypervisor-framework lane: runner dawson-macbook-apple-silicon is registered on dawsonblock/crabedence-V1 (self-hosted, macOS, ARM64) and online — a dispatched qualification job has not yet passed on it",
-    "real crash/fault-injection requalification pending — epoch takeover, ambiguous-create cleanup, and bounded verify are implemented and unit-tested but not live-qualified",
-    "toolchain: local verification ran under go1.27.2; the pinned go1.26.5 lane has not re-run in this workspace"
-  ]
+ "schema_version": 1,
+ "release": "0.55.0-rc8.3-dev",
+ "designation": "development-candidate",
+ "artifact": {
+  "filename": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip",
+  "sha256": "1611b161eea2db6da84aa21ae9f4dce8962d458d47dbdec32db4cc2a8cf9d5c7",
+  "size_bytes": 19089912,
+  "format": "zip",
+  "prefix": "nemo-control-0.55.0-rc8.3-dev"
+ },
+ "source": {
+  "commit": "0db72fd29b43efaf15f3a69098d631a34145d5fb",
+  "branch": "codex/rc8.3-custody-sandbox-qualification",
+  "packaged_from": "git ls-tree HEAD:crabedence-V1-fix-integration-integrity membership via the package-source-archive.sh deterministic procedure (subtree-filtered; fixed timestamps, sorted members, no host metadata)",
+  "extraction_verified": true,
+  "manifest_entries": 4345,
+  "reproducibility": "two independent freeze runs at commit 0db72fd2 produced byte-identical archives (sha256 1611b161\u2026 verified twice); clean-room extraction passed scripts/qualify-source-distribution.sh (source-manifest, nemo-transfer, release-path-policy, symlink-resolution, no-generated-content, build-inputs \u2014 all gates)"
+ },
+ "provenance": {
+  "attestation": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip.attestation.json",
+  "attestation_sha256": "48989d9b300e195d2ace4a8e756397b6ef7c5e85ee0e796282b0fc6a4a20f36e",
+  "attestation_signature": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip.attestation.json.sig",
+  "attestation_schema": "rc83-release-attestation-v1",
+  "embedded_source_inventory": "release-evidence/source-tree-sha256.txt",
+  "embedded_source_inventory_sha256": "367faa16783914b11887cccdaed1810e553d8d5fc81c949690b224bff76b43f5",
+  "signature_namespace": "rc8-release",
+  "signature_identity": "dawsonblock@users.noreply.github.com (trusted release key \u2014 principal in .github/release-allowed-signers, registered on the GitHub account as an SSH signing key)",
+  "source_manifest": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip.source-manifest.json",
+  "source_manifest_sha256": "8ceb6be2163cd09284fb27981f7b1cdacce6c4ce9900bcb7d2c8f41a393a4f19",
+  "source_manifest_root_hash": "f464229bc80e9f32ca31e48a46a9a9d5ebad5d870bda5038a2e4a949e391f8a0",
+  "release_manifest_v1": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip.release-manifest.json",
+  "release_manifest_v1_signature": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip.release-manifest.sig",
+  "note": "two signed bindings ship side-by-side: (1) the rc83-release-attestation-v1 record, SSH-signed over the archive identity; (2) the release-manifest-v1 record signed over its canonical payload and verifiable end-to-end with scripts/rc8_evidence_verify.py --manifest \u2026 --artifact \u2026 --trust-store .github/release-allowed-signers --signer-id dawsonblock@users.noreply.github.com --require-signature. Both verify under namespace rc8-release with the trusted release key."
+ },
+ "identities": {
+  "msb_runtime_pin_manifest": "qualification/msb-runtime-pins.json",
+  "msb_runtime_pin_manifest_sha256": "e6bde12f337538481bf3af680a6bc727231b142be950b67e1750ebf80b7e6894",
+  "lane_image_pins": "qualification/msb-lane-image-pins.json",
+  "lane_image_pins_sha256": "f86821a73fba103d2bb70a00bba3ca71dc8e404cc75ddcae3c3a227b65a32b27",
+  "nemo_transfer_manifest_sha256": "d094c9498fac1ec477319fb47bd7cbf6ad2dabb90a1cfcdf37d66eb4a8c0c29c",
+  "required_test_inventory": "qualification/rc8.3-required-tests.json",
+  "required_test_inventory_sha256": "8ca60daeb355226fc300d7a32e545fe32e98f8157357116c04c0022616a9887e",
+  "toolchain_lock": "rc8.3-toolchain-lock.json (dist bundle sidecar)",
+  "toolchain_lock_sha256": "16807ea11318433618e9e24542fec19ab88c93155ba2ed5dfaf351a78bcb9889",
+  "provenance_policy_sha256": "0ffe1cc939bcaaf4d4c361d5a58d9bd4e2a39e009f0c89d6809c32988c3feba1"
+ },
+ "supersedes": "the 0.54.0-rc.7.6-dev record at this path on this branch, and the 0.55.0-rc8.2-dev record (archive sha256 57f4f6a6\u2026, codex/rc8.2-security-qualification @ ff67e5a) as the current release identity \u2014 RC8.2 artifacts remain the security-qualification baseline, never inputs to RC8.3 qualification",
+ "qualification": "NOT QUALIFIED \u2014 development candidate. All locally-executable lanes PASS on the exact signed artifact (go1.26.5 build/vet/fmt + full race suite with isolated-rerun confirmation, worker 3053, rust 5353, ABI 2068, python 66, live postgres:16 parity, custody drill, postdispatch ambiguity qual, apple-HVF live-msb lane 13 real-VM tests, deterministic freeze + clean-room qualify + signed attestation/manifest verified under rc8-release). G8 NOT CLOSED: linux-amd64-kvm, independently-administered witness, and third-party clean-room verification unexecuted. Decision: BLOCKED / DEVELOPMENT ONLY; exclusive-runtime is the only candidate profile; shared-runtime high assurance UNSUPPORTED.",
+ "blockers": [
+  "shared-runtime high assurance UNSUPPORTED BY DESIGN: msb v0.7.8 has no atomic identity-conditioned delete \u2014 check/rm TOCTOU residual documented; shared-namespace deployments NO-GO (docs/rc8.3/THREAT_MODEL.md, D-09)",
+  "independent witness lane NOT_RUN: separately administered custodian with independent keys/trust root over TLS not executed; local drill used a second signer key but same administrative domain \u2014 explicitly insufficient",
+  "linux-amd64-kvm lane NOT_RUN: no KVM-capable host on this Apple M2 Pro runner; TestMSBLiveLinuxKVM self-skips on darwin \u2014 recorded, never inferred",
+  "third-party clean-room verification NOT_RUN: local qualify-source-distribution.sh PASS recorded but does not satisfy the independent-verifier requirement",
+  "full ./... -race suite exceeds the shared 20m per-package budget under whole-tree parallelism on 16 GiB hosts; all packages pass individually \u2014 budget/sharding fix is a G8-adjacent follow-up"
+ ]
 }

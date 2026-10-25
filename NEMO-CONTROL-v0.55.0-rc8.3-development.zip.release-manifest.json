@@ -1,0 +1,12 @@
+{
+  "schema": "release-manifest-v1",
+  "source_commit": "0db72fd29b43efaf15f3a69098d631a34145d5fb",
+  "artifact_path": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip",
+  "artifact_sha256": "1611b161eea2db6da84aa21ae9f4dce8962d458d47dbdec32db4cc2a8cf9d5c7",
+  "test_inventory_sha256": "8ca60daeb355226fc300d7a32e545fe32e98f8157357116c04c0022616a9887e",
+  "source_tree_digest": "367faa16783914b11887cccdaed1810e553d8d5fc81c949690b224bff76b43f5",
+  "toolchain_lock_digest": "16807ea11318433618e9e24542fec19ab88c93155ba2ed5dfaf351a78bcb9889",
+  "created_at": "2026-10-25T08:40:00Z",
+  "qualification": "BLOCKED / DEVELOPMENT ONLY \u2014 exclusive-runtime profile only; shared-runtime high assurance unsupported; pending independent-witness and linux-amd64-kvm lanes",
+  "signature_file": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip.release-manifest.sig"
+}

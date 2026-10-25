@@ -1,0 +1,14 @@
+{
+  "schema": "rc8.3-toolchain-lock-v1",
+  "go": "go1.26.5",
+  "go_resolution": "toolchain directive in crabedence-V1-fix-integration-integrity/go.mod; explicit binary ~/go/bin/go1.26.5 used for lane execution",
+  "rust": "1.96.1",
+  "rust_resolution": "rust-toolchain.toml in runtimes/nemo-relay; resolved via rustup toolchain 1.96.1-aarch64-apple-darwin",
+  "node": "v24.16.0",
+  "python": "3.12.0",
+  "pytest": "8.4.2",
+  "msb": "0.7.8",
+  "msb_image": "python:3.12@sha256:80dc3cfc45ae547207a41dad6f0e8bf86fbf11fe53e1b3e3a075893ba132c01d",
+  "docker": "29.9.2",
+  "postgres": "postgres:16 (Docker, live lane)"
+}

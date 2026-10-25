@@ -1,0 +1,21 @@
+{
+  "schema": "rc83-release-attestation-v1",
+  "version": "0.55.0-rc8.3-dev",
+  "archive_name": "NEMO-CONTROL-v0.55.0-rc8.3-development.zip",
+  "archive_sha256": "1611b161eea2db6da84aa21ae9f4dce8962d458d47dbdec32db4cc2a8cf9d5c7",
+  "archive_size": 19089912,
+  "source_commit": "0db72fd29b43efaf15f3a69098d631a34145d5fb",
+  "embedded_source_inventory": "release-evidence/source-tree-sha256.txt",
+  "embedded_source_inventory_sha256": "367faa16783914b11887cccdaed1810e553d8d5fc81c949690b224bff76b43f5",
+  "source_entry_count": 4345,
+  "source_manifest_sha256": "8ceb6be2163cd09284fb27981f7b1cdacce6c4ce9900bcb7d2c8f41a393a4f19",
+  "source_manifest_root_hash": "f464229bc80e9f32ca31e48a46a9a9d5ebad5d870bda5038a2e4a949e391f8a0",
+  "toolchains": {
+    "go": "go1.26.5",
+    "rust": "1.96.1",
+    "node": "v24.16.0",
+    "python": "3.12.0",
+    "msb": "0.7.8"
+  },
+  "created_at": "2026-10-25T08:25:00Z"
+}
