@@ -6,7 +6,7 @@ exact final commit and artifact without hash circularity.
 - `source-inventory.txt` — canonical inventory of 4376 tracked entries,
   generated from Git HEAD and worktree bytes (symlink targets hashed as bytes).
 - `source-a.zip`, `source-b.zip` — two independent deterministic packages,
-  byte-identical (`aea7d96d…`).
+  byte-identical (`59fdea52…`).
 - `attestation.json` — detached attestation draft. **UNSIGNED**: signature
   status is BLOCKED because no externally trusted release root or signing key
   is available. Verdict: **NO-GO**.
