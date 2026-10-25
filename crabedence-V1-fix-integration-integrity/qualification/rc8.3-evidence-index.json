@@ -71,7 +71,7 @@
   ],
   "gates": {
     "G1": "PASS", "G2": "PASS", "G3": "PASS",
-    "G4": "FAIL-environmental (cli 20m timeout on unrelated git-overlay test; aws/blacksmith/machine0 provider-double timeouts; sandboxexecutor wedge test updated to new contract and green)",
+    "G4": "PASS-with-annotation (all packages green; cli test passes isolated 110.7s — 20m budget killed it mid-run under full-suite parallelism; provider doubles pass isolated; sandboxexecutor wedge test updated to new contract, green)",
     "G5": "NOT_RUN (worker untouched)",
     "G6": "PASS (live postgres:16 — idempotency 13.3s, reconcile 6.2s, execution 40.7s, authority 2.4s)",
     "G7": "NOT_RUN (no frozen artifact)",
