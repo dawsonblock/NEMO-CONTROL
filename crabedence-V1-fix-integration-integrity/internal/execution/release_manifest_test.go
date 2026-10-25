@@ -23,7 +23,7 @@ import (
 func manifestFixture() *ReleaseManifest {
 	return &ReleaseManifest{
 		Schema:          ReleaseManifestSchema,
-		Version:         "0.55.0-rc8.2-dev",
+		Version:         "0.55.0-rc8.3-dev",
 		SourceCommit:    strings.Repeat("a", 40),
 		ArtifactSHA256:  strings.Repeat("b", 64),
 		ArtifactKind:    ArtifactKindBinary,

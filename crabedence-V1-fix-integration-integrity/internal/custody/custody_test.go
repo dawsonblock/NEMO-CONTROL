@@ -38,7 +38,7 @@ func testTrust(t *testing.T, key *evidence.Signer, role string) *TrustSet {
 func testEnvelope(t *testing.T, family string, signer *evidence.Signer, payload []byte) *Envelope {
 	t.Helper()
 	env := New(family, testDep,
-		ReleaseIdentity{Version: "0.55.0-rc8.2-dev", SourceCommit: strings.Repeat("a", 40)},
+		ReleaseIdentity{Version: "0.55.0-rc8.3-dev", SourceCommit: strings.Repeat("a", 40)},
 		"",
 		Subject{EffectID: "exec-1", ExecutionID: "exec-1"},
 		Sequence{Domain: family, Epoch: 0, Index: 1},
@@ -102,7 +102,7 @@ func TestEnvelopeVerifyPipeline(t *testing.T) {
 	bad.ReleaseIdentity.Version = "0.55.0-other"
 	if err := Verify(bad, VerifyOptions{
 		DeploymentID: testDep, Trust: trust,
-		ReleaseIdentity: &ReleaseIdentity{Version: "0.55.0-rc8.2-dev"},
+		ReleaseIdentity: &ReleaseIdentity{Version: "0.55.0-rc8.3-dev"},
 	}); !errors.Is(err, ErrRelease) {
 		t.Fatalf("release binding: %v", err)
 	}

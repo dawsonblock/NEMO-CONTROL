@@ -210,7 +210,7 @@ func TestCustodyEndToEndProviderTerminalVsVerified(t *testing.T) {
 
 	p := artifactProvider()
 	store := openExecutorSQLiteStore(t, idempotency.DefaultLeaseConfig)
-	hooks, err := wireCustodyBoundary(ctx, &ServiceConfig{Witness: wc}, store, kernel, "0.55.0-rc8.2-dev")
+	hooks, err := wireCustodyBoundary(ctx, &ServiceConfig{Witness: wc}, store, kernel, "0.55.0-rc8.3-dev")
 	if err != nil {
 		t.Fatal(err)
 	}

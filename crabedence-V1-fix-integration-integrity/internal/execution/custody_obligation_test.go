@@ -58,7 +58,7 @@ func obligationProducer(t *testing.T, dep string, signer *evidence.Signer) witne
 	return witness.Producer{
 		DeploymentID: dep,
 		Release: custody.ReleaseIdentity{
-			Version:      "0.55.0-rc8.2-dev",
+			Version:      "0.55.0-rc8.3-dev",
 			SourceCommit: strings.Repeat("a", 40),
 		},
 		Signer: signer,

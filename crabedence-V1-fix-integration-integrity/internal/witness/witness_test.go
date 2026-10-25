@@ -81,7 +81,7 @@ func newHarness(t *testing.T, serve bool) *harness {
 	}
 	h.prod = Producer{
 		DeploymentID: h.dep,
-		Release:      custody.ReleaseIdentity{Version: "0.55.0-rc8.2-dev", SourceCommit: strings.Repeat("a", 40)},
+		Release:      custody.ReleaseIdentity{Version: "0.55.0-rc8.3-dev", SourceCommit: strings.Repeat("a", 40)},
 		Signer:       h.kernel,
 	}
 	h.client = NewClient(h.socket)
@@ -128,7 +128,7 @@ func (h *harness) drain() bool {
 func (h *harness) craft(exec string, index, epoch int64, prev, family string, signer *evidence.Signer, deployment string, payload []byte) *custody.Envelope {
 	h.t.Helper()
 	env := custody.New(family, deployment,
-		custody.ReleaseIdentity{Version: "0.55.0-rc8.2-dev"}, "",
+		custody.ReleaseIdentity{Version: "0.55.0-rc8.3-dev"}, "",
 		custody.Subject{EffectID: exec, ExecutionID: exec},
 		custody.Sequence{Domain: family, Epoch: epoch, Index: index, PreviousCheckpointHash: prev},
 		custody.EncodingWitnessFrame, payload)

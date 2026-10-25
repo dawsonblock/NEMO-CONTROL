@@ -1,0 +1,17 @@
+{
+  "schema": "rc83-baseline-v1",
+  "branch": "codex/rc8.3-custody-sandbox-qualification",
+  "baseline_source_commit": "32654cedd2699d27e23314ec3a91309ff71229ad",
+  "baseline_branch": "codex/rc8.2-security-qualification",
+  "baseline_zip_sha256": "57f4f6a6555edbc89a0c32a89240b1d6ed3fb25a1af6340e349413b2ef543fcc",
+  "baseline_inventory_entries": 4329,
+  "baseline_tree_root_digest": "fe654970404897ad0dc9ee68ec231a6a820feb392ffe908c71b52475bd6ffdca",
+  "version": "0.55.0-rc8.3-dev",
+  "toolchains": {
+    "go_local": "go1.27.2",
+    "go_pinned_gate": "go1.26.5",
+    "node": "v24.16.0",
+    "msb": "0.7.8"
+  },
+  "upstream_gate_claims": "rc8.2 signed release reports G1-G7 PASS, G8 BLOCKED; treated as upstream claims, re-run under PR-07"
+}
