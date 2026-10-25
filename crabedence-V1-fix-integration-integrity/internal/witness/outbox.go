@@ -105,6 +105,29 @@ func OpenOutbox(path string) (*Outbox, error) {
 	return &Outbox{db: db}, nil
 }
 
+// OpenOutboxReadOnly opens an existing custody outbox for forensic
+// inspection without creating, migrating, or writing anything. A
+// missing or group/other-accessible file is refused: a read-only
+// operator command must never manufacture the evidence it inspects.
+func OpenOutboxReadOnly(path string) (*Outbox, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, fmt.Errorf("custody outbox %s: %w", path, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("custody outbox %s is not a regular file", path)
+	}
+	if perm := info.Mode().Perm(); perm&0o077 != 0 {
+		return nil, fmt.Errorf("custody outbox %s mode %04o grants group/other access", path, perm)
+	}
+	dsn := fmt.Sprintf("file:%s?mode=ro&_pragma=busy_timeout(5000)", path)
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
+	return &Outbox{db: db}, nil
+}
+
 // Close releases the outbox.
 func (o *Outbox) Close() error { return o.db.Close() }
 

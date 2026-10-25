@@ -167,9 +167,9 @@ type preflightOutput struct {
 func runReadOnly(op string, args []string) {
 	f := parseReadFlags(op, args)
 	ctx := context.Background()
-	outbox, err := witness.OpenOutbox(f.outbox)
+	outbox, err := witness.OpenOutboxReadOnly(f.outbox)
 	if err != nil {
-		fatalf("outbox: %v", err)
+		fatalf("outbox (read-only): %v", err)
 	}
 	defer outbox.Close()
 

@@ -176,6 +176,18 @@ func writeTrustFile(t *testing.T, path, role, deployment string, signer *evidenc
 	writeOwnerFile(t, path, raw)
 }
 
+func TestReadOnlyCommandsRefuseMissingOutbox(t *testing.T) {
+	bin := buildCLI(t)
+	path := filepath.Join(t.TempDir(), "missing.db")
+	_, stderr, code := runCLI(t, bin, "status", "-outbox", path)
+	if code != 1 || !strings.Contains(stderr, "read-only") {
+		t.Fatalf("status on missing outbox exit=%d stderr=%s", code, stderr)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("a read-only command created the outbox it was inspecting")
+	}
+}
+
 func TestPreflightSubcommandFlagsAndJSON(t *testing.T) {
 	bin := buildCLI(t)
 	path := filepath.Join(t.TempDir(), "outbox.db")
