@@ -208,12 +208,12 @@ func TestCustodyEndToEndProviderTerminalVsVerified(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	hooks, err := wireCustodyBoundary(ctx, wc, kernel, "0.55.0-rc8.1-dev")
+	p := artifactProvider()
+	store := openExecutorSQLiteStore(t, idempotency.DefaultLeaseConfig)
+	hooks, err := wireCustodyBoundary(ctx, &ServiceConfig{Witness: wc}, store, kernel, "0.55.0-rc8.2-dev")
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := artifactProvider()
-	store := openExecutorSQLiteStore(t, idempotency.DefaultLeaseConfig)
 	store.SetTrustedEvidenceSigners(kernel.Fingerprint())
 	exec := NewDispatchExecutor(fullProofsProvider(p), store)
 	exec.SetEvidenceSigner(kernel)
@@ -226,6 +226,19 @@ func TestCustodyEndToEndProviderTerminalVsVerified(t *testing.T) {
 	}
 	defer outbox.Close()
 
+	// A fresh sender is UNVERIFIED_STARTUP — CRITICAL admission waits
+	// on a completed verified drain, never on the absence of observed
+	// failure.
+	for {
+		hooks.wake()
+		if err := hooks.gate(); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("custody never reached verified readiness")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 	resp := exec.ExecuteWithIdempotency(context.Background(),
 		crashRequest("alice@example.com", "custody-e2e-1"), criticalDesc())
 	if resp.Status != StatusSucceeded {

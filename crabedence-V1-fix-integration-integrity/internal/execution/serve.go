@@ -365,7 +365,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 			executor.SetControlGate(controlGateProbe(controlGate, 5*time.Second))
 		}
 		if cfg.Witness.Enabled() {
-			enqueue, err := wireCustodyBoundary(ctx, cfg.Witness, signer, opts.Release)
+			enqueue, err := wireCustodyBoundary(ctx, cfg, store, signer, opts.Release)
 			if err != nil {
 				return fmt.Errorf("evidence custody: %w", err)
 			}
@@ -904,7 +904,8 @@ type custodyHooks struct {
 // admission gate that refuses CRITICAL work while custody is degraded.
 // The witness is independently administered — its keys resolve only
 // from the configured trust set, never from anything it sends.
-func wireCustodyBoundary(ctx context.Context, wc WitnessConfig, signer *evidence.Signer, release string) (*custodyHooks, error) {
+func wireCustodyBoundary(ctx context.Context, cfg *ServiceConfig, store idempotency.EffectStore, signer *evidence.Signer, release string) (*custodyHooks, error) {
+	wc := cfg.Witness
 	trust, err := custody.LoadTrustSet(wc.TrustRootsPath)
 	if err != nil {
 		return nil, fmt.Errorf("custodian trust set: %w", err)
@@ -924,19 +925,42 @@ func wireCustodyBoundary(ctx context.Context, wc WitnessConfig, signer *evidence
 	} else {
 		client = witness.NewClient(wc.Socket)
 	}
+	// The release identity the envelopes carry: a verified manifest
+	// binds commit, artifact digest, version, and registry digest; an
+	// unverified deployment carries the build version alone — never a
+	// fabricated identity.
+	releaseID := custody.ReleaseIdentity{Version: release}
+	if cfg.Release != nil {
+		releaseID.SourceCommit = cfg.Release.SourceCommit
+		releaseID.ArtifactSHA256 = cfg.Release.ArtifactSHA256
+		releaseID.RegistryDigest = cfg.Release.RegistryDigest
+	}
 	producer := witness.Producer{
 		DeploymentID: wc.Deployment,
-		Release:      custody.ReleaseIdentity{Version: release},
+		Release:      releaseID,
 		PolicyDigest: wc.PolicyDigest,
 		Signer:       signer,
 	}
 	sender := witness.NewSender(client, outbox, wc.Deployment, trust, nil)
+	sender.SetFreshnessBound(wc.ReadinessTTL)
+	// The obligation replay scanner: every drain pass first restores
+	// custody obligations the authoritative terminalization store has
+	// but the outbox lost (crash between commit and enqueue), bounded
+	// by the durable high-water mark, before any witness contact.
+	sender.SetObligationScanner(func(ctx context.Context) error {
+		hwm, err := outbox.ObligationHighWater(ctx)
+		if err != nil {
+			return fmt.Errorf("custody obligation high-water: %w", err)
+		}
+		return reconcileCustodyObligations(ctx, store, outbox, producer, hwm)
+	})
 	sink := func(executionID, receiptDigest string, payload []byte) {
 		if _, err := outbox.Enqueue(ctx, producer, executionID, receiptDigest, payload); err != nil {
 			// An enqueue failure never rewinds committed terminal
-			// state — it degrades custody health so the next mandated
+			// state — it degrades custody durably so the next mandated
 			// admission fails closed instead of accumulating silent
-			// evidence loss.
+			// evidence loss, and it survives restarts and unrelated
+			// successful drains (F-02).
 			sender.MarkDegraded(fmt.Sprintf("custody enqueue %s: %v", executionID, err))
 			fmt.Fprintf(os.Stderr, "custody enqueue %s failed: %v\n", executionID, err)
 			return
@@ -944,21 +968,29 @@ func wireCustodyBoundary(ctx context.Context, wc WitnessConfig, signer *evidence
 		sender.Wake()
 	}
 	gate := func() error {
-		if !sender.CustodyHealthy(ctx) {
-			reason := sender.LastError()
-			if reason == "" {
+		state := sender.CustodyState(context.Background())
+		if state == "HEALTHY" {
+			return nil
+		}
+		reason := sender.LastError()
+		if reason == "" {
+			switch state {
+			case "UNVERIFIED_STARTUP":
+				reason = "witness readiness not yet verified this boot"
+			case "REPAIR_REQUIRED":
+				reason = "evidence contradiction escalated — operator repair required"
+			default:
 				reason = "custody backlog pending — witness has not acknowledged queued receipts"
 			}
-			return fmt.Errorf("evidence custody degraded: %s", reason)
 		}
-		return nil
+		return fmt.Errorf("evidence custody %s: %s", state, reason)
 	}
 	go func() {
 		sender.Run(ctx, wc.DrainInterval)
 		outbox.Close()
 	}()
-	fmt.Fprintf(os.Stderr, "Evidence custody: outbox %s → witness %s (deployment %s)\n",
-		wc.OutboxPath, orElseStr(wc.Socket, wc.TLSAddr), wc.Deployment)
+	fmt.Fprintf(os.Stderr, "Evidence custody: outbox %s → witness %s (deployment %s, assurance %s)\n",
+		wc.OutboxPath, orElseStr(wc.Socket, wc.TLSAddr), wc.Deployment, cfg.AssuranceProfile)
 	return &custodyHooks{sink: sink, gate: gate, wake: sender.Wake}, nil
 }
 

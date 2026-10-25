@@ -25,7 +25,7 @@ else
 fi
 
 EXPECTED_PARENT="13566f1adf4fd3e3bd94981fe99670dc9de15793"
-EXPECTED_VERSION="0.55.0-rc8.1-dev"
+EXPECTED_VERSION="0.55.0-rc8.2-dev"
 
 failures=0
 check() {

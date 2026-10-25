@@ -81,6 +81,9 @@ type ReleaseIdentity struct {
 	SourceCommit   string `json:"source_commit,omitempty"`
 	Version        string `json:"version,omitempty"`
 	ArtifactSHA256 string `json:"artifact_sha256,omitempty"`
+	// RegistryDigest binds the record to the capability registry the
+	// release shipped — the policy surface the execution ran under.
+	RegistryDigest string `json:"registry_digest,omitempty"`
 }
 
 // Subject names what the wrapped record attests. Receipt-family records
@@ -292,6 +295,9 @@ func Verify(e *Envelope, o VerifyOptions) error {
 		}
 		if rel.ArtifactSHA256 != "" && e.ReleaseIdentity.ArtifactSHA256 != rel.ArtifactSHA256 {
 			return fmt.Errorf("%w: artifact_sha256 %q != pinned %q", ErrRelease, e.ReleaseIdentity.ArtifactSHA256, rel.ArtifactSHA256)
+		}
+		if rel.RegistryDigest != "" && e.ReleaseIdentity.RegistryDigest != rel.RegistryDigest {
+			return fmt.Errorf("%w: registry_digest %q != pinned %q", ErrRelease, e.ReleaseIdentity.RegistryDigest, rel.RegistryDigest)
 		}
 	}
 	if o.PolicyDigest != "" && e.PolicyDigest != o.PolicyDigest {

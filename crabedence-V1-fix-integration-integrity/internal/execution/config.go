@@ -72,6 +72,19 @@ type ServiceConfig struct {
 	// admission while the custody path is degraded is refused.
 	Witness WitnessConfig
 
+	// AssuranceProfile is the resolved deployment assurance class —
+	// development, reduced, or high-assurance (F-05). Production mode
+	// may never run below reduced; high-assurance additionally requires
+	// the verified release manifest and a separate-host witness.
+	AssuranceProfile string
+
+	// Release is the verified signed release manifest when
+	// CRABEDENCE_RELEASE_MANIFEST is configured (F-04). nil means no
+	// verified release identity was provisioned — the custody
+	// envelopes then carry the build version alone and the
+	// high-assurance profile refuses startup.
+	Release *ReleaseManifest
+
 	// CheckpointPath, when set, is where the service writes its
 	// periodically emitted signed evidence checkpoint — the latest
 	// emission (replaced atomically) beside a retained append-only
@@ -99,6 +112,30 @@ type ServiceConfig struct {
 	// enforced.
 	production bool
 }
+
+// Deployment assurance profiles (F-05). The profile is a declared,
+// startup-verified posture — never inferred from a bare production
+// flag, and never silently downgraded at runtime.
+const (
+	// AssuranceDevelopment is test/development operation: custody may
+	// be absent or local, and no release attestation exists.
+	AssuranceDevelopment = "development"
+	// AssuranceReduced is production operation without independent
+	// verified custody prerequisites — same-host custody is permitted,
+	// but the deployment may not claim independently custodied
+	// CRITICAL evidence.
+	AssuranceReduced = "reduced"
+	// AssuranceHighAssurance is independently custodied production:
+	// a verified signed release manifest binding this exact binary,
+	// a separate-host witness, and full operator controls. Every
+	// prerequisite is verified at startup — a missing piece fails
+	// closed.
+	AssuranceHighAssurance = "high-assurance"
+)
+
+// DefaultWitnessReadinessTTL bounds how long a verified
+// witness-readiness mark remains a valid CRITICAL-admission input.
+const DefaultWitnessReadinessTTL = 5 * time.Second
 
 // LoadServiceConfig resolves and validates the deployment configuration.
 // Development defaults are explicit here; production requirements are
@@ -290,7 +327,92 @@ func LoadServiceConfig(opts ServeOptions) (*ServiceConfig, error) {
 	}
 	cfg.Witness = witnessCfg
 
+	// The signed release manifest (F-04): CRABEDENCE_RELEASE_MANIFEST
+	// names the manifest document and CRABEDENCE_RELEASE_SIGNERS the
+	// pinned release-authority key set. Either without the other is a
+	// fault — an unverifiable manifest is not an identity, and signer
+	// pins with nothing to verify are a misdeployment. A manifest
+	// policy digest contradicting CRABEDENCE_POLICY_DIGEST is a
+	// contradiction, not an override: the envelope binds exactly one
+	// policy.
+	manifestPath := strings.TrimSpace(os.Getenv("CRABEDENCE_RELEASE_MANIFEST"))
+	signersPath := strings.TrimSpace(os.Getenv("CRABEDENCE_RELEASE_SIGNERS"))
+	if manifestPath != "" && signersPath == "" {
+		return nil, fmt.Errorf("CRABEDENCE_RELEASE_MANIFEST requires CRABEDENCE_RELEASE_SIGNERS — an unverifiable manifest is not a release identity")
+	}
+	if signersPath != "" && manifestPath == "" {
+		return nil, fmt.Errorf("CRABEDENCE_RELEASE_SIGNERS is set but CRABEDENCE_RELEASE_MANIFEST is not")
+	}
+	if manifestPath != "" {
+		signers, err := LoadReleaseSigners(signersPath)
+		if err != nil {
+			return nil, err
+		}
+		manifest, err := LoadReleaseManifest(manifestPath, signers)
+		if err != nil {
+			return nil, err
+		}
+		if cfg.Witness.PolicyDigest != "" && cfg.Witness.PolicyDigest != manifest.PolicyDigest {
+			return nil, fmt.Errorf("CRABEDENCE_POLICY_DIGEST %q contradicts the signed release manifest policy %q — the custody envelopes would bind an ambiguous policy", cfg.Witness.PolicyDigest, manifest.PolicyDigest)
+		}
+		cfg.Witness.PolicyDigest = manifest.PolicyDigest
+		cfg.Release = manifest
+	}
+
+	// The assurance profile is the deployment's declared custody
+	// posture (F-05). Explicit declaration only — "production" is not
+	// a profile value, and an unset variable resolves to the weakest
+	// profile the mode tolerates rather than a strong one.
+	profile, err := resolveAssuranceProfile(cfg)
+	if err != nil {
+		return nil, err
+	}
+	cfg.AssuranceProfile = profile
+
 	return cfg, nil
+}
+
+// resolveAssuranceProfile resolves and enforces the deployment
+// assurance class. High-assurance requires production mode plus every
+// independently verifiable prerequisite — separate-host custody, a
+// signed release manifest bound to a binary artifact, and the running
+// binary proving it IS that artifact. Anything less is refused at
+// startup, never downgraded to.
+func resolveAssuranceProfile(cfg *ServiceConfig) (string, error) {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv("CRABEDENCE_ASSURANCE_PROFILE")))
+	profile := raw
+	if profile == "" {
+		if cfg.production {
+			profile = AssuranceReduced
+		} else {
+			profile = AssuranceDevelopment
+		}
+	}
+	switch profile {
+	case AssuranceDevelopment, AssuranceReduced:
+		if cfg.production && profile == AssuranceDevelopment {
+			return "", fmt.Errorf("CRABEDENCE_ASSURANCE_PROFILE=development is refused under CRABBOX_MODE=production — production runs at least at %s", AssuranceReduced)
+		}
+	case AssuranceHighAssurance:
+		if !cfg.production {
+			return "", fmt.Errorf("CRABEDENCE_ASSURANCE_PROFILE=high-assurance requires CRABBOX_MODE=production")
+		}
+		if !cfg.Witness.Enabled() {
+			return "", fmt.Errorf("CRABEDENCE_ASSURANCE_PROFILE=high-assurance requires an evidence-custody witness (CRABEDENCE_WITNESS_TLS)")
+		}
+		if cfg.Witness.TLSAddr == "" {
+			return "", fmt.Errorf("CRABEDENCE_ASSURANCE_PROFILE=high-assurance requires separate-host custody (CRABEDENCE_WITNESS_TLS + CRABEDENCE_WITNESS_TLS_KEY); a same-host socket witness tops out at %s", AssuranceReduced)
+		}
+		if cfg.Release == nil {
+			return "", fmt.Errorf("CRABEDENCE_ASSURANCE_PROFILE=high-assurance requires a verified signed release manifest (CRABEDENCE_RELEASE_MANIFEST + CRABEDENCE_RELEASE_SIGNERS)")
+		}
+		if err := cfg.Release.VerifyDeployment(); err != nil {
+			return "", fmt.Errorf("CRABEDENCE_ASSURANCE_PROFILE=high-assurance deployment attestation failed: %w", err)
+		}
+	default:
+		return "", fmt.Errorf("unknown CRABEDENCE_ASSURANCE_PROFILE %q (want %s, %s, or %s)", raw, AssuranceDevelopment, AssuranceReduced, AssuranceHighAssurance)
+	}
+	return profile, nil
 }
 
 // ControlLedgerConfig is the resolved operator release-control
@@ -339,6 +461,11 @@ type WitnessConfig struct {
 	PolicyDigest string
 	// DrainInterval bounds outbox retry cadence (default 2s).
 	DrainInterval time.Duration
+	// ReadinessTTL bounds how long a verified witness-readiness mark
+	// remains a valid CRITICAL-admission input (default
+	// DefaultWitnessReadinessTTL) — the freshness guarantee F-03
+	// requires.
+	ReadinessTTL time.Duration
 }
 
 // Enabled reports whether the custody boundary is configured.
@@ -374,6 +501,7 @@ func witnessConfigFromEnv(production bool, deployment string) (WitnessConfig, er
 		Deployment:     deployment,
 		PolicyDigest:   strings.TrimSpace(os.Getenv("CRABEDENCE_POLICY_DIGEST")),
 		DrainInterval:  2 * time.Second,
+		ReadinessTTL:   DefaultWitnessReadinessTTL,
 	}
 	if raw := strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_DRAIN_INTERVAL")); raw != "" {
 		d, err := time.ParseDuration(raw)
@@ -381,6 +509,13 @@ func witnessConfigFromEnv(production bool, deployment string) (WitnessConfig, er
 			return cfg, fmt.Errorf("CRABEDENCE_WITNESS_DRAIN_INTERVAL %q is not a positive Go duration", raw)
 		}
 		cfg.DrainInterval = d
+	}
+	if raw := strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_READINESS_TTL")); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d <= 0 {
+			return cfg, fmt.Errorf("CRABEDENCE_WITNESS_READINESS_TTL %q is not a positive Go duration (e.g. 5s)", raw)
+		}
+		cfg.ReadinessTTL = d
 	}
 	declared := cfg.Socket != "" || cfg.TLSAddr != "" || cfg.OutboxPath != "" ||
 		cfg.TrustRootsPath != "" || cfg.TLSKeyFP != ""
@@ -588,6 +723,7 @@ func (c *ServiceConfig) Report() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Service configuration:\n")
 	fmt.Fprintf(&b, "  mode:             %s\n", mode)
+	fmt.Fprintf(&b, "  assurance:        %s\n", c.AssuranceProfile)
 	fmt.Fprintf(&b, "  topology:         %s (declared replicas: %d)\n", c.Topology, c.Replicas)
 	fmt.Fprintf(&b, "  effect store:     %s\n", c.Backend)
 	fmt.Fprintf(&b, "  evidence key:     %s\n", c.EvidenceKeySource())
@@ -619,6 +755,22 @@ func (c *ServiceConfig) Report() string {
 	fmt.Fprintf(&b, "  provider ceiling: %s\n", c.ExecutorTimeouts.ProviderExecution)
 	fmt.Fprintf(&b, "  provider gate:    max %d concurrent; degraded after %d consecutive ambiguous outcomes; circuit opens after %d (cooldown %s)\n",
 		c.ProviderGate.MaxConcurrent, c.ProviderGate.DegradedAfter, c.ProviderGate.OpenAfter, c.ProviderGate.OpenCooldown)
+	witness := "disabled"
+	if c.Witness.Enabled() {
+		transport := fmt.Sprintf("socket %s (same-host)", c.Witness.Socket)
+		if c.Witness.TLSAddr != "" {
+			transport = fmt.Sprintf("tls %s (separate-host)", c.Witness.TLSAddr)
+		}
+		witness = fmt.Sprintf("%s, outbox %s, readiness ttl %s", transport, c.Witness.OutboxPath, c.Witness.ReadinessTTL)
+	}
+	fmt.Fprintf(&b, "  witness custody:  %s\n", witness)
+	release := "unverified (build version only)"
+	if c.Release != nil {
+		release = fmt.Sprintf("signed manifest %s: commit %s, artifact %s (%s), policy %s, signer %s",
+			c.Release.Version, c.Release.SourceCommit, c.Release.ArtifactSHA256,
+			c.Release.ArtifactKind, c.Release.PolicyDigest, c.Release.SignerFingerprint)
+	}
+	fmt.Fprintf(&b, "  release identity: %s\n", release)
 	return b.String()
 }
 
