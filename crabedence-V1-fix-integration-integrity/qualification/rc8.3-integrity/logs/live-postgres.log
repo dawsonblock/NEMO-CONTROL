@@ -1,0 +1,8 @@
+==> Starting postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94 in Docker on 127.0.0.1:44172
+==> CRABBOX_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:44172/crabbox_test
+==> Running: go test -race -count=1 -timeout=20m -run TestLive ./internal/idempotency/ ./internal/reconcile/ ./internal/execution/ ./internal/authority/
+ok  	github.com/openclaw/crabbox/internal/idempotency	12.002s
+ok  	github.com/openclaw/crabbox/internal/reconcile	5.271s
+ok  	github.com/openclaw/crabbox/internal/execution	40.775s
+ok  	github.com/openclaw/crabbox/internal/authority	1.900s
+EXIT=0

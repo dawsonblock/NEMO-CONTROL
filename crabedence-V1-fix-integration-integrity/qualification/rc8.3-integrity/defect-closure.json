@@ -1,0 +1,208 @@
+{
+  "schema": "rc83-defect-closure-register-v1",
+  "release": "0.55.0-rc8.3-integrity-closure",
+  "baseline_source_commit": "0db72fd29b43efaf15f3a69098d631a34145d5fb",
+  "baseline_head": "54ad8776dcf0f6037a625e66a3b282df15aed650",
+  "defects": [
+    {
+      "id": "RC83-IC-01",
+      "pr": "PR-01",
+      "severity": "critical",
+      "title": "Any non-empty legacy journal action bypassed a missing canonical receipt",
+      "root_cause": "custody_reconcile.go accepted action != \"\" as coverage, including unverifiable-legacy and unknown dispositions",
+      "fix": "Typed LegacyDisposition state machine (COVERED_VERIFIED / UNRESOLVED / CONTRADICTION) with independent binding checks",
+      "tests": ["TestUnverifiableLegacyJournalCannotAdvanceHWM", "TestTerminalArrivesAfterQuarantine", "TestMalformedLegacyJournalFailsClosed"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-02",
+      "pr": "PR-01",
+      "severity": "high",
+      "title": "LegacyJournalAction swallowed every database error as 'no classification'",
+      "root_cause": "migration.go returned (\"\", nil) for any Scan error instead of distinguishing sql.ErrNoRows",
+      "fix": "sql.ErrNoRows is the only not-found result; all other errors propagate with context",
+      "tests": ["TestJournalDBErrorNotSwallowed"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-03",
+      "pr": "PR-01",
+      "severity": "critical",
+      "title": "Quarantined unverifiable-legacy rows were treated as covered and advanced the high-water mark",
+      "root_cause": "reconcile skipped every journaled row before verifying the disposition",
+      "fix": "UNRESOLVED/CONTRADICTION preserve REPAIR_REQUIRED and return before AdvanceObligationHWM",
+      "tests": ["TestUnverifiableLegacyJournalCannotAdvanceHWM", "TestTerminalArrivesAfterQuarantine"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-04",
+      "pr": "PR-01",
+      "severity": "critical",
+      "title": "Witnessed-legacy classification was coverage without a verified acknowledgement",
+      "root_cause": "coverage verification never re-verified the recorded ack against the custodian trust set",
+      "fix": "ResolveLegacyCoverage requires a custodian-signed ack binding the unchanged envelope, sequence, execution, deployment, and family",
+      "tests": ["TestLegacyWitnessedWithoutVerifiedAckIsNotCovered", "TestLegacyWitnessedWithVerifiedAckIsCovered"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-05",
+      "pr": "PR-02",
+      "severity": "critical",
+      "title": "Compensating a legacy row changed its envelope hash without updating successor links",
+      "root_cause": "CompensateLegacyRow updated one row's envelope_hash/envelope_json and re-signed only that row",
+      "fix": "MigrateLegacySuffix rewrites the target and every successor's previous_checkpoint_hash and signature in one transaction; VerifyChain proves the result",
+      "tests": ["TestLegacyTwoRowSuffixRehash", "TestLegacyThreeRowMixedPayloads"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-06",
+      "pr": "PR-02",
+      "severity": "critical",
+      "title": "Migration had no preflight for witnessed or checkpointed suffixes",
+      "root_cause": "No successor/ack/checkpoint examination before rewriting",
+      "fix": "MigrationPreflight refuses a witnessed target, any witnessed successor, a checkpoint covering the suffix, a missing checkpoint row, or a contradictory checkpoint head; refusal quarantines the chain",
+      "tests": ["TestLegacyMixedWitnessedSuffixRefusal", "TestMigrationRefusesCheckpointedSuffix"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-07",
+      "pr": "PR-02",
+      "severity": "high",
+      "title": "Migration was not crash-safe, fenced, or replayable, and preserved no before/after proof",
+      "root_cause": "No transaction-wide preflight, no migration hook coverage, no signed proof record",
+      "fix": "Single immediate transaction, in-transaction preflight, signed custody-migration-proof-v1 before/after evidence, idempotent replay, and fault-injection seams",
+      "tests": ["TestMigrationCrashBeforeCommit", "TestMigrationCrashAfterCommitBeforeAck", "TestConcurrentEnqueueFenced", "TestMigrationReplayIdempotent"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-08",
+      "pr": "PR-03",
+      "severity": "critical",
+      "title": "OperatorRepair succeeded with no full-history scanner installed",
+      "root_cause": "the scanner was invoked only when present (`if ok && fn != nil`) and absence was treated as success",
+      "fix": "OperatorRepair returns ErrRepairScannerUnavailable when no scanner is installed",
+      "tests": ["TestOperatorRepairWithoutFullScannerFailsClosed"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-09",
+      "pr": "PR-03",
+      "severity": "critical",
+      "title": "A caller-supplied actor name plus the ordinary evidence signer authorized repair",
+      "root_cause": "OperatorRepair took actor string and required only non-empty; custodyctl used -signer-key as authority",
+      "fix": "Detached OperatorGrant signed by a separately pinned repair-authority key; subject is signature-bound; deployment, role, operation, window, and nonce are verified",
+      "tests": ["TestUnauthorizedEvidenceSignerDeniedRepair", "TestCallerSuppliedActorSpoofRejected", "TestRepairGrantDeploymentScopeRejected"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-10",
+      "pr": "PR-03",
+      "severity": "critical",
+      "title": "Repair marker clear was not transactional and could erase a newer contradiction",
+      "root_cause": "ClearRepairRequired read status, then unconditionally set the marker empty",
+      "fix": "ClearRepairRequiredIfUnchanged compares the exact reason the scan observed inside the write transaction and returns ErrStaleRepairVerification on change",
+      "tests": ["TestConcurrentContradictionPreventsClear"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-11",
+      "pr": "PR-03",
+      "severity": "high",
+      "title": "No grant expiry, single-use nonce, or durable replay fence",
+      "root_cause": "authorization was a static key possession with no per-operation grant",
+      "fix": "RFC3339 not_before/expires_at, >=16-byte nonce consumed in operator_nonce_ledger, grant digest bound into journal and audit evidence",
+      "tests": ["TestExpiredOperatorApprovalRejected", "TestRepairGrantNonceReplayRejected"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-12",
+      "pr": "PR-04",
+      "severity": "high",
+      "title": "Documented subcommand-first custodyctl syntax failed",
+      "root_cause": "global flag.Parse stopped at the subcommand; trailing flags became positional arguments",
+      "fix": "Per-subcommand flag.FlagSet parsing; status/inspect/preflight/migrate/rescan/repair accept flags after the subcommand",
+      "tests": ["TestPreflightSubcommandFlagsAndJSON", "TestRepairAuthorityRequired"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-13",
+      "pr": "PR-04",
+      "severity": "medium",
+      "title": "Inspection materialized the entire outbox and journal",
+      "root_cause": "Pending() and MigrationJournal() were unbounded",
+      "fix": "PendingPage / LegacyRowsPage / MigrationJournalPage use SQL cursor pagination with bounded page sizes; text mode streams pages; JSON output is capped by -limit/-page-size",
+      "tests": ["TestInspectPaginationBounded"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-14",
+      "pr": "PR-05",
+      "severity": "high",
+      "title": "Sandbox catalog verification followed symlinks and ignored unsafe ancestors",
+      "root_cause": "DeploymentPosture used os.Stat and checked only the final directory",
+      "fix": "Lstat refuses a symlink catalog; ancestor walk refuses non-root symlinks, group/other-writable non-sticky directories, and foreign-owned directories; canonical path is used for the runtime",
+      "tests": ["TestHighAssuranceRejectsSymlinkCatalog", "TestHighAssuranceRejectsNonRootAncestorSymlink", "TestHighAssuranceRejectsGroupWritableAncestor"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-15",
+      "pr": "PR-05",
+      "severity": "high",
+      "title": "Same-UID catalog replacement was invisible",
+      "root_cause": "Posture re-check accepted whatever directory sat at the path",
+      "fix": "Catalog dev/inode/uid identity is captured and re-checked at posture time and immediately before deletion; replacement is IDENTITY_UNVERIFIABLE",
+      "tests": ["TestCleanupRejectsCatalogReplacementBeforePosture", "TestCleanupRejectsCatalogReplacementInsideWindow"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-16",
+      "pr": "PR-05",
+      "severity": "high",
+      "title": "Inspect-then-delete race had no second identity check",
+      "root_cause": "Cleanup classified the occupant once, then issued rm",
+      "fix": "A second bounded inspection plus catalog re-check runs immediately before delete; substitution is IDENTITY_MISMATCH and no rm is issued",
+      "tests": ["TestCleanupReinspectCatchesSubstitution"],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-17",
+      "pr": "PR-05",
+      "severity": "medium",
+      "title": "Cleanup had no crash-recovery record for an in-flight destructive step",
+      "root_cause": "The removal obligation existed only in caller memory",
+      "fix": "Durable cleanup intent is written before rm and cleared only on an obligation-resolving outcome; PendingCleanupObligations exposes unresolved intents",
+      "tests": ["TestCleanupIntentSurvivesUncertainOutcome", "TestCleanupVerifiedRemovalLeavesNoIntent"],
+      "status": "CLOSED"
+    }
+  ],
+  "open_items": [
+    {
+      "id": "RC83-IC-R1",
+      "title": "msb has no atomic identity-conditioned delete; inspect-then-delete TOCTOU is narrowed but not eliminated",
+      "status": "RESIDUAL",
+      "owner": "runtime dependency",
+      "mitigation": "second inspection + catalog dev/inode re-check + nonce-bound handle; documented in RESIDUAL-LIMITATIONS.md"
+    },
+    {
+      "id": "RC83-IC-R2",
+      "title": "A same-UID process that can write inside the verified catalog can modify runtime state in place",
+      "status": "RESIDUAL",
+      "owner": "deployment",
+      "mitigation": "dedicated owner-only catalog, no same-UID co-tenant; high-assurance claim is scoped to exclusive-runtime posture"
+    },
+    {
+      "id": "RC83-IC-R3",
+      "title": "Shared-runtime high-assurance cleanup is unsupported",
+      "status": "UNSUPPORTED",
+      "owner": "architecture",
+      "mitigation": "HighAssurance requires a non-empty namespace and a dedicated MSB_HOME; shared posture fails closed"
+    },
+    {
+      "id": "RC83-IC-R4",
+      "title": "Repair-authority key compromise grants full migration/repair authority until rotation",
+      "status": "RESIDUAL",
+      "owner": "operator",
+      "mitigation": "separate key class, short grant windows, single-use nonces, pinned trust set, rotation authorization"
+    }
+  ]
+}

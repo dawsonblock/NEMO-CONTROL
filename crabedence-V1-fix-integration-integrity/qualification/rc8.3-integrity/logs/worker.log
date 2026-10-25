@@ -1,0 +1,30 @@
+
+> @openclaw/crabbox-worker@0.55.0-rc8.3-dev format:check
+> oxfmt --check .
+
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 101ms on 164 files using 12 threads.
+
+> @openclaw/crabbox-worker@0.55.0-rc8.3-dev lint
+> oxlint --config .oxlintrc.json .
+
+
+> @openclaw/crabbox-worker@0.55.0-rc8.3-dev check
+> tsc --noEmit
+
+
+> @openclaw/crabbox-worker@0.55.0-rc8.3-dev test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/worker
+
+
+ Test Files  68 passed (68)
+      Tests  3053 passed | 2 skipped (3055)
+   Start at  16:04:49
+   Duration  7.79s (transform 10.86s, setup 0ms, import 16.91s, tests 16.96s, environment 4ms)
+
+EXIT=0

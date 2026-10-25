@@ -1,0 +1,18 @@
+
+> @crabedence/nemo@0.55.0-rc8.3-dev check
+> tsc --noEmit
+
+
+> @crabedence/nemo@0.55.0-rc8.3-dev test
+> vitest run
+
+
+ RUN  v4.1.11 /Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/nemo
+
+
+ Test Files  9 passed (9)
+      Tests  145 passed (145)
+   Start at  16:10:17
+   Duration  801ms (transform 515ms, setup 0ms, import 678ms, tests 1.18s, environment 1ms)
+
+EXIT=0
