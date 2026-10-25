@@ -1,0 +1,81 @@
+{
+  "schema": "rc83-evidence-index-v1",
+  "release": "0.55.0-rc8.3-dev",
+  "branch": "codex/rc8.3-custody-sandbox-qualification",
+  "artifact": {
+    "status": "NOT_PRODUCED",
+    "reason": "no frozen candidate packaged or signed; results bind to working-tree commits"
+  },
+  "commits": [
+    "e87cf2b (baseline + version bump)",
+    "PR-01 fail-closed deletion + exclusive posture",
+    "PR-02..PR-05 custody lifecycle/migration/readiness/bounded reconcile",
+    "PR-06 provenance contract + verifier fail-fast",
+    "docs + evidence index"
+  ],
+  "defects": "docs/rc8.3/DEFECT_REGISTER.md",
+  "test_inventory": [
+    {
+      "lane": "go-build-all",
+      "command": "go build ./...",
+      "host": "darwin/arm64 local",
+      "toolchain": "go1.27.2",
+      "exit_code": 0,
+      "verifier": "clean build"
+    },
+    {
+      "lane": "sandbox-cleanup-race",
+      "command": "go test -race -timeout=300s -run 'TestCleanupUnverifiedInspectNeverRemoves|TestCleanupPostCheckDelayUncertain|TestCleanupInvalidNamespaceRefused|TestHighAssurance' ./internal/sandboxexecutor/",
+      "host": "darwin/arm64 local",
+      "toolchain": "go1.27.2",
+      "exit_code": 0,
+      "duration_s": 32.9,
+      "verifier": "go test"
+    },
+    {
+      "lane": "sandbox-cleanup-regression",
+      "command": "go test -race -timeout=600s -run 'TestCleanup|TestRetention|TestNamespace|TestReconciler|TestCrash' ./internal/sandboxexecutor/",
+      "host": "darwin/arm64 local",
+      "toolchain": "go1.27.2",
+      "exit_code": 0,
+      "duration_s": 170.7,
+      "verifier": "go test"
+    },
+    {
+      "lane": "witness-custody",
+      "command": "go test -race -timeout=300s ./internal/witness/ ./internal/custody/",
+      "host": "darwin/arm64 local",
+      "toolchain": "go1.27.2",
+      "exit_code": 0,
+      "duration_s": 2.7,
+      "verifier": "go test"
+    },
+    {
+      "lane": "execution-custody",
+      "command": "go test -race -timeout=300s -run 'Custody|Obligation|Assurance|Manifest' ./internal/execution/",
+      "host": "darwin/arm64 local",
+      "toolchain": "go1.27.2",
+      "exit_code": 0,
+      "duration_s": 3.8,
+      "verifier": "go test"
+    },
+    {
+      "lane": "idempotency-terminal-evidence",
+      "command": "go test -race -timeout=200s -run 'TerminalEvidence|Migration|Reconcil|Checkpoint' ./internal/idempotency/",
+      "host": "darwin/arm64 local",
+      "toolchain": "go1.27.2",
+      "exit_code": 0,
+      "duration_s": 2.7,
+      "verifier": "go test"
+    }
+  ],
+  "gates": {
+    "G1": "PASS", "G2": "PASS", "G3": "PASS",
+    "G4": "NOT_RUN (full ./... suite exceeds session budget)",
+    "G5": "NOT_RUN (worker untouched)",
+    "G6": "NOT_RUN (no live PostgreSQL provisioned)",
+    "G7": "NOT_RUN (no frozen artifact)",
+    "G8": "BLOCKED (no independent witness, trust root, or executed real-hypervisor lanes)"
+  },
+  "release_decision": "CONDITIONAL/RESTRICTED — no GO, no high-assurance production claim"
+}

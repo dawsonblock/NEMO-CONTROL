@@ -272,7 +272,14 @@ def cmd_attest(args):
     with open(args.source_manifest) as f:
         manifest = json.load(f)
     if manifest.get("schema") != MANIFEST_SCHEMA:
-        die("source manifest schema mismatch")
+        schema = manifest.get("schema")
+        if isinstance(schema, str) and schema.startswith("rc8"):
+            die(f"unsupported RC8 manifest schema {schema!r}: RC8.x provenance is "
+                "verified by scripts/rc8_evidence_verify.py over the embedded "
+                "release-evidence/source-tree-sha256.txt inventory — see "
+                "docs/rc8.3/PROVENANCE_CONTRACT.md. Refusing rather than "
+                "reporting this as tampering.")
+        die(f"source manifest schema mismatch: expected {MANIFEST_SCHEMA!r}, got {schema!r}")
     att = {
         "schema": ATTEST_SCHEMA,
         "version": args.version,
