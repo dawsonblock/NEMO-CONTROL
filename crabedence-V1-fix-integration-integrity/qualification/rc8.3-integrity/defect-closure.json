@@ -1,8 +1,8 @@
 {
   "schema": "rc83-defect-closure-register-v1",
-  "release": "0.55.0-rc8.3-integrity-closure",
+  "release": "0.55.0-rc8.3-witness-fence",
   "baseline_source_commit": "0db72fd29b43efaf15f3a69098d631a34145d5fb",
-  "baseline_head": "54ad8776dcf0f6037a625e66a3b282df15aed650",
+  "baseline_head": "77956eabec121579316d7b75b6ba0487eabbf60a",
   "defects": [
     {
       "id": "RC83-IC-01",
@@ -430,6 +430,108 @@
         "R7 lane list matches qualification-matrix.json"
       ],
       "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-34",
+      "pr": "PR-01",
+      "severity": "critical",
+      "title": "A migration checkpoint was never verified at the library boundary",
+      "root_cause": "MigrateLegacySuffix accepted a CheckpointRef carrying only Seq/Hash/WitnessFP and tested WitnessFP for non-emptiness. custodyctl verified the checkpoint, but the library that performs the rewrite did not, so any caller \u2014 and any fingerprint string \u2014 authorized a durable evidence rewrite.",
+      "fix": "CheckpointRef now carries the custodian's signer epoch and signature, and Verify resolves it under the pinned custodian set. Migration authority moved from a bare checkpoint to a signed fence receipt that MigrateLegacySuffix verifies itself, requires to be OPEN, binds to this run's grant, and requires to freeze a head below the target.",
+      "tests": [
+        "TestMigrationRequiresVerifiedFenceSignature",
+        "TestMigrationRejectsClosedFence",
+        "TestMigrationRefusesZeroFence",
+        "TestMigrationRefusesFenceFromAnotherGrant"
+      ],
+      "evidence": "qualification/rc8.3-integrity/logs/pr00-baseline-repro.log",
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-35",
+      "pr": "PR-02",
+      "severity": "critical",
+      "title": "A checkpoint cannot prove that no submission is in flight, so a late submission forked custody",
+      "root_cause": "The witness accepted submissions purely against its own head. A submission already on the wire when the operator read the checkpoint landed while the rewrite was prepared, and the rewrite committed anyway; the witness then held the old bytes at a sequence the outbox had rewritten. Reproduced against the baseline as a permanent fork.",
+      "fix": "Migration epochs. The kernel asks the witness to freeze the deployment at the head it observed; the witness admits the fence only if that head is still its own and then refuses every submission until the epoch closes. The fence check, head read and insert share one immediate transaction, so a submission racing a fence-begin either commits before the freeze or is refused.",
+      "tests": [
+        "TestFenceRefusesInFlightSubmission",
+        "TestFenceRefusesStaleBase",
+        "TestFenceRefusesInFlightSubmission/after_close",
+        "TestMigrateEndToEndFencedEpoch"
+      ],
+      "evidence": "qualification/rc8.3-integrity/logs/pr00-baseline-repro.log",
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-36",
+      "pr": "PR-03",
+      "severity": "high",
+      "title": "The migration proof did not bind the journal row it described",
+      "root_cause": "migrationProof carried only TargetSeq, the checkpoint and before/after digests. Execution identity, terminal receipt digest, original/result envelope hashes, action and the rewritten rows were recorded in the journal but not covered by the signature, so a correctly signed proof could be attached to a different journal row.",
+      "fix": "The proof now binds action, row sequence, execution, terminal receipt digest, before/after envelope hashes and the frozen epoch, and verification re-derives both suffix digests from the proof's own rows. VerifyMigrationProofAgainstChain additionally re-proves a compensated entry against the evidence the outbox holds now.",
+      "tests": [
+        "TestMigrationProofRejectsJournalIdentityMismatch",
+        "TestMigrationProofRejectsAlteredRows",
+        "TestMigrationProofRejectsNonOpenEpoch",
+        "TestMigrationProofRejectsFenceFromAnotherEpoch",
+        "TestMigrationProofAgainstChainDetectsLaterRewrite"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-37",
+      "pr": "PR-04",
+      "severity": "high",
+      "title": "Kernel-relay proof trust was resolved from the custodian file",
+      "root_cause": "CustodyCoveragePolicy.ProofTrust was assigned the custodian trust set, and LoadTrustSet accepted a file pinning any mix of custodian, kernel-relay and repair-authority keys. One administrative document could hold all three authorities, and one key could be pinned as custodian and repair authority.",
+      "fix": "LoadTrustSetForRole refuses a file that pins any other role, CheckDisjointRoles refuses a key pinned under two authorities, the service requires CRABEDENCE_WITNESS_KERNEL_TRUST_ROOTS, and custodyctl takes three role-pinned files. The kernel set is the proof trust, never an alias for the custodian set.",
+      "tests": [
+        "TestLoadTrustSetForRoleRefusesMixedFile",
+        "TestCheckDisjointRolesRefusesSharedKey",
+        "TestRolesCannotCrossVerify",
+        "TestMigrateRoleSeparatedTrustRequired"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-38",
+      "pr": "PR-02",
+      "severity": "medium",
+      "title": "A fence abort could release an epoch after custody advanced",
+      "root_cause": "Abort was a state write with no comparison against the head the epoch froze, so an integrity fault inside a frozen window could be cleared by the recovery path that exists to handle crashes.",
+      "fix": "AbortFence compares the current head to the frozen base inside the transaction and returns a contradiction when custody moved. The epoch stays open for an operator.",
+      "tests": [
+        "TestFenceAbortRefusedAfterCustodyAdvanced"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-39",
+      "pr": "PR-02",
+      "severity": "medium",
+      "title": "A crashed migration left no durable local record of its epoch",
+      "root_cause": "The epoch existed only at the witness. A kernel that crashed between freezing the custodian and recording anything could only re-open under a new grant, which the witness refuses while an epoch is open \u2014 custody stayed frozen with no nameable recovery.",
+      "fix": "custody_fence_intent records the planned epoch before the witness is asked to freeze. A re-run with the same grant finds the intent, re-enters the same fence identity idempotently, and custodyctl ships 'fence status' and 'fence abort' for the two terminal paths.",
+      "tests": [
+        "TestFenceSurvivesWitnessRestart",
+        "TestMigrationCrashBeforeCommit",
+        "TestMigrationCrashAfterCommitBeforeAck"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-40",
+      "pr": "PR-06",
+      "severity": "medium",
+      "title": "The full-race gate was an operator-directed invocation, not a reproducible gate",
+      "root_cause": "G4a (exact 20m whole-tree) fails because internal/cli legitimately exceeds the shared per-package budget; G4b passed under GOFLAGS=-p=4 -timeout=45m, which records an operator decision rather than a measurement. Neither form is a gate.",
+      "fix": "scripts/qualify-race.sh is the canonical gate: every package runs in its own process with its own declared budget, in deterministic order, with per-package JSONL evidence and a summary. Parallelism is an explicit parameter rather than an environment accident.",
+      "tests": [
+        "scripts/qualify-race.sh on internal/witness internal/custody cmd/custodyctl internal/execution internal/idempotency: 5 packages, 0 failed"
+      ],
+      "evidence": "qualification/rc8.3-integrity/logs/race-fence-targeted/run.json",
+      "status": "CLOSED"
     }
   ],
   "open_items": [
@@ -467,6 +569,34 @@
       "status": "RESIDUAL",
       "owner": "release engineering",
       "mitigation": "rotated to a new root held outside the repository; signatures under key id 387d837e\u2026 must be rejected. Purging the old blob from history requires a destructive rewrite and an explicit operator decision."
+    },
+    {
+      "id": "RC83-IC-R5",
+      "title": "External trust-root authorization is unexecuted",
+      "status": "BLOCKED",
+      "owner": "release authority",
+      "mitigation": "The release root is pinned by SHA-256 and its private key is held outside the repository, but a self-pinned root is not third-party authorization. No external countersignature exists for this candidate; the release claim does not include one."
+    },
+    {
+      "id": "RC83-IC-R6",
+      "title": "No independently administered witness",
+      "status": "BLOCKED",
+      "owner": "custody operations",
+      "mitigation": "The fence lane runs against a second key in the same administrative domain, which the plan calls insufficient. Independent administration over authenticated TLS is unexecuted, so no third-party custody claim is made."
+    },
+    {
+      "id": "RC83-IC-R7",
+      "title": "Third-party clean-room verification is unexecuted",
+      "status": "BLOCKED",
+      "owner": "release engineering",
+      "mitigation": "Local clean-room reproduction passes on the exact artifact; an external party has not reproduced or attested it."
+    },
+    {
+      "id": "RC83-IC-R8",
+      "title": "Restricted deployment certification is unexecuted",
+      "status": "BLOCKED",
+      "owner": "security",
+      "mitigation": "The macOS arm64/HVF exclusive-runtime profile is locally evidenced. An external assessor has not certified a restricted deployment."
     }
   ]
 }

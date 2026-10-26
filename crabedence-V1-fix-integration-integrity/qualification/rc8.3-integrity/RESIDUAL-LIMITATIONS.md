@@ -120,3 +120,41 @@ Verification requires that fingerprint from outside the bundle; the copy
 inside the bundle is a distribution convenience only. This is a real
 cryptographic anchor for local qualification, not a third-party root: an
 external countersignature is still required before anyone else may rely on it.
+
+## R13. A migration epoch suspends custody for the whole deployment
+
+While an epoch is open the witness refuses every submission for that
+deployment, and the sender reports the fence rather than a fault. That is
+the mechanism, not a defect: it is what makes a rewrite unable to race an
+in-flight submission. The operational consequence is that an epoch left
+open by a crashed migration suspends custody until an operator resumes the
+migration or releases the epoch with `custodyctl fence abort`. Both paths
+require the grant that opened the epoch, so an unrelated operator cannot
+unfreeze a deployment.
+
+## R14. One epoch at a time, one grant per epoch
+
+The witness admits exactly one open epoch per deployment. A migration that
+must resume after a crash re-enters the same fence identity with the same
+grant; a fresh grant cannot open a second epoch while one is open, and
+cannot close one it did not open. This is deliberate: concurrent migrations
+of one deployment have no safe interleaving, and the epoch is the object
+that makes that statement enforceable rather than advisory.
+
+## R15. Fence coverage is per deployment, not per row
+
+The epoch freezes the deployment's custody head. It does not assert
+anything about rows the witness already holds above that head — those are
+refused by preflight (a frozen base at or above the target blocks the
+rewrite) rather than reconciled. A custodian that holds a suffix the local
+outbox no longer matches is still the R6 manual recovery case.
+
+## R16. External gates remain unexecuted
+
+G31 (external authorization of the release root), G32 (an independently
+administered witness in a separate trust domain over authenticated TLS),
+G33 (third-party clean-room attestation) and G34 (restricted-deployment
+certification by an external assessor) are not executed and are not
+claimed. The fence protocol is transport-agnostic — it runs unchanged over
+the unix socket and over mutually authenticated TLS — but transport
+capability is not independent administration.

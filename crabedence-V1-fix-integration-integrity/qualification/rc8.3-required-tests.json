@@ -1,7 +1,7 @@
 {
  "schema_version": 2,
- "suite": "rc8.3-integration",
- "description": "RC8.3 reviewer-maintained mandatory-test inventory. Carries the executed RC8.2 gate structure forward unchanged and adds gate g8-rc83-defect-closure: the regression tests that close defects D-01, D-02, D-04, D-05, D-07 and D-09 in docs/rc8.3/DEFECT_REGISTER.md (fail-closed sandbox cleanup, exclusive-runtime posture, legacy custody migration, generation-scoped readiness, bounded terminal-evidence enumeration). A gate qualifies only when every required test executed exactly once and passed for the candidate commit under the pinned toolchains; absent, skipped, duplicated, failed, NOT_RUN, or identity-mismatched evidence fails. Changes to this file require review and a signed note in the landing PR.",
+ "suite": "rc8.3-witness-fence",
+ "description": "RC8.3 reviewer-maintained mandatory-test inventory. Carries the executed RC8.2 gate structure forward unchanged and adds gate g8-rc83-defect-closure: the regression tests that close defects D-01, D-02, D-04, D-05, D-07 and D-09 in docs/rc8.3/DEFECT_REGISTER.md (fail-closed sandbox cleanup, exclusive-runtime posture, legacy custody migration, generation-scoped readiness, bounded terminal-evidence enumeration). A gate qualifies only when every required test executed exactly once and passed for the candidate commit under the pinned toolchains; absent, skipped, duplicated, failed, NOT_RUN, or identity-mismatched evidence fails. Changes to this file require review and a signed note in the landing PR. Adds gate g9-rc83-witness-fence: the regression tests that close RC83-IC-34..40 \u2014 verified fence receipts at the migration library boundary, witness-enforced migration epochs that refuse in-flight submissions, complete proof/journal/chain binding, and role-separated custodian/kernel-relay/repair trust roots. A gate qualifies only when every required test executed exactly once and passed for the candidate commit under the pinned toolchains.",
  "gates": {
   "g1-trust-repair": {
    "status": "executed",
@@ -410,6 +410,84 @@
      "TestHighAssuranceSharedCatalogDenied"
     ]
    }
+  },
+  "g9-rc83-witness-fence": {
+   "status": "executed",
+   "package": [
+    "internal/witness",
+    "internal/custody",
+    "cmd/custodyctl"
+   ],
+   "required_tests": [
+    "TestMigrationRequiresVerifiedFenceSignature",
+    "TestMigrationRejectsClosedFence",
+    "TestMigrationRefusesZeroFence",
+    "TestMigrationRefusesFenceFromAnotherGrant",
+    "TestFenceRequiresPinnedKernelRequest",
+    "TestFenceRefusesInFlightSubmission",
+    "TestFenceRefusesStaleBase",
+    "TestFenceSurvivesWitnessRestart",
+    "TestFenceAbortRefusedAfterCustodyAdvanced",
+    "TestMigrationCrashBeforeCommit",
+    "TestMigrationCrashAfterCommitBeforeAck",
+    "TestMigrationReplayIdempotent",
+    "TestMigrationRefusesCheckpointedSuffix",
+    "TestLostLocalAckWithRemoteCheckpointRefusesRewrite",
+    "TestMigrationProofBindsFence",
+    "TestMigrationProofRejectsAlteredRows",
+    "TestMigrationProofRejectsJournalIdentityMismatch",
+    "TestMigrationProofRejectsNonOpenEpoch",
+    "TestMigrationProofRejectsCustodianSignedProof",
+    "TestMigrationProofRejectsFenceFromAnotherEpoch",
+    "TestMigrationProofAgainstChainDetectsLaterRewrite",
+    "TestLoadTrustSetForRoleRefusesMixedFile",
+    "TestLoadTrustSetForRoleAcceptsSingleRole",
+    "TestCheckDisjointRolesRefusesSharedKey",
+    "TestRolesCannotCrossVerify",
+    "TestValidateRoleSeparationRefusesDualRoleKey",
+    "TestMigrateEndToEndFencedEpoch",
+    "TestMigrateRoleSeparatedTrustRequired"
+   ],
+   "requirements": {
+    "epoch-verified-where-the-rewrite-happens": [
+     "TestMigrationRequiresVerifiedFenceSignature",
+     "TestMigrationRejectsClosedFence",
+     "TestMigrationRefusesZeroFence",
+     "TestMigrationRefusesFenceFromAnotherGrant"
+    ],
+    "in-flight-submissions-cannot-land-inside-an-epoch": [
+     "TestFenceRefusesInFlightSubmission",
+     "TestFenceRefusesStaleBase",
+     "TestFenceRequiresPinnedKernelRequest"
+    ],
+    "epochs-are-durable-and-recoverable": [
+     "TestFenceSurvivesWitnessRestart",
+     "TestMigrationCrashBeforeCommit",
+     "TestMigrationCrashAfterCommitBeforeAck",
+     "TestMigrationReplayIdempotent"
+    ],
+    "abort-never-hides-an-integrity-fault": [
+     "TestFenceAbortRefusedAfterCustodyAdvanced"
+    ],
+    "proof-describes-the-rewrite-it-performed": [
+     "TestMigrationProofRejectsJournalIdentityMismatch",
+     "TestMigrationProofRejectsAlteredRows",
+     "TestMigrationProofRejectsNonOpenEpoch",
+     "TestMigrationProofRejectsFenceFromAnotherEpoch",
+     "TestMigrationProofAgainstChainDetectsLaterRewrite"
+    ],
+    "one-key-one-authority": [
+     "TestLoadTrustSetForRoleRefusesMixedFile",
+     "TestCheckDisjointRolesRefusesSharedKey",
+     "TestRolesCannotCrossVerify",
+     "TestValidateRoleSeparationRefusesDualRoleKey",
+     "TestMigrateRoleSeparatedTrustRequired"
+    ],
+    "operator-path-is-end-to-end-fenced": [
+     "TestMigrateEndToEndFencedEpoch"
+    ]
+   },
+   "notes": "RC83-IC-34..40. G30 (scripts/qualify-race.sh) is the canonical race gate; the whole-tree 20m invocation remains recorded as G4a evidence of a package-budget problem, not as the gate."
   }
  }
 }

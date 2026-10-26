@@ -1,18 +1,21 @@
 # RC8.3 Release Readiness
 
-> **Integrity-closure requalification supersedes the G4 claim below.** On
-> branch `codex/rc8.3-integrity-closure`, the exact 20m full-tree race
-> command remains **FAIL** (`internal/cli` exceeded the 20m package budget)
-> and is retained as G4a. The operator-directed requalified gate G4b
-> (`GOFLAGS=-p=4 go test -race -timeout=45m ./...`) passes with zero
-> failures (`internal/cli` 1311.6s, `internal/sandboxexecutor` 1115.0s).
-> The independent TLS witness lane, signed attestation with a pinned local
-> release root, tamper rejection, and local clean-room reproduction pass.
-> Decision: **GO, scoped to the macOS arm64/HVF exclusive-runtime profile**.
-> Linux/KVM is excluded by operator direction; shared-runtime high assurance
-> remains UNSUPPORTED; third-party trust requires an external
-> countersignature. See `qualification/rc8.3-integrity/FINAL-REPORT.md` and
-> `qualification/rc8.3-integrity/qualification-matrix.json`.
+> **Witness-fence requalification supersedes the integrity-closure
+> readiness claim.** On branch
+> `codex/rc8.3-witness-fence-proof-qualification`, migration authority
+> moved from a verified checkpoint to a signed, open witness epoch
+> (RC83-IC-34/35), the migration proof now binds the whole journal row
+> (IC-36), and the three custody authorities resolve from three
+> role-pinned trust files (IC-37). The locally executable gates for
+> those changes pass under `-race`; the external gates below remain
+> unexecuted and are not claimed.
+>
+> Decision: **NO-GO for every deployment profile.** The macOS
+> arm64/HVF exclusive-runtime profile is the only candidate profile and
+> its local evidence is intact, but external trust-root authorization
+> (G31), an independently administered witness (G32), third-party
+> clean-room attestation (G33) and restricted-deployment certification
+> (G34) are unexecuted. A scoped GO would require at least G31 and G32.
 >
 > **Release-root pin.** The attestation is signed under the release root whose
 > SHA-256 key id is
@@ -43,6 +46,23 @@ byte-identical and clean-room qualified. Per-lane machine records:
 | G7 | Release packaging / attestation | PASS | deterministic zip 1611b161… (2 identical builds, 4345 entries); embedded inventory sha256 367faa16…; clean-room `qualify-source-distribution.sh` all gates PASS; attestation + release-manifest-v1 signed and verified under `rc8-release` with the externally pinned allowed-signers |
 | G8 | Independent witness, Apple HVF, Linux KVM | **BLOCKED (partial)** | apple-hypervisor-framework lane **executed**: 13 real-microVM tests PASS + 1 KVM lane-skip (qualify mode, pinned msb 0.7.8, pinned image python:3.12@sha256:80dc3cfc…), two runs 98.2s/78.2s. Remaining unexecuted: linux-amd64-kvm (no KVM host), independent-witness under separate administration (local drill used a second key but same administrative domain — insufficient per plan), third-party clean-room verification |
 
+## Witness-fence gates (RC8.3 PR-01..PR-06)
+
+| Gate | Scope | Status | Evidence |
+|---|---|---|---|
+| G24 | Fence verification at the migration library boundary | PASS | unpinned key, closed epoch, zero fence and another grant's epoch each refused before mutation |
+| G25 | In-flight submission protection | PASS | a submission on the wire is refused once the epoch is open; stale fence base refused; abort over advanced custody escalated |
+| G26 | Epoch durability and crash recovery | PASS | witness restart leaves the epoch open; pre/post-commit crash and idempotent replay; durable local fence intent |
+| G27 | Proof/journal/chain binding | PASS | correctly signed proofs that differ in identity, digest, action, row hash, grant or epoch all refused |
+| G28 | Role-separated trust roots | PASS | mixed files refused, shared keys refused, cross-role resolution refused, CLI requires three files |
+| G29 | End-to-end fenced migration through the shipped binary | PASS | real witness, real outbox, real effect store; 2 rows compensated, epoch closed, chain intact, drain to HEALTHY, replay refused |
+| G30 | Formal per-package race gate | PASS | `scripts/qualify-race.sh`: 5 packages, 0 failed, per-package JSON evidence |
+
+The whole-tree `go test -race -timeout=20m ./...` invocation is retained
+as G4a evidence of a package-budget problem, not as the gate; G30
+replaces it with a reproducible per-package measurement.
+
+
 ## Residual risks
 
 - Shared-namespace high-assurance cleanup remains **UNSUPPORTED**
@@ -57,26 +77,42 @@ byte-identical and clean-room qualified. Per-lane machine records:
 - The `go test -race -timeout=20m ./...` invocation does not finish
   inside the shared 20m per-package budget on a 16 GiB host when the
   whole tree runs concurrently; every package passes individually.
-  Budget or sharding needs addressing before this gate can be called
-  clean at scale.
+  `scripts/qualify-race.sh` is the gate that measures this without
+  hiding it (G30); the whole-tree invocation stays recorded as G4a.
+- A migration epoch freezes custody for the whole deployment. While it
+  is open, submissions are refused and the sender reports the fence
+  rather than a fault. An operator who leaves an epoch open has
+  suspended custody — deliberately, and visibly, via `custodyctl fence
+  status`.
 
 ## Release decision
 
-**BLOCKED / DEVELOPMENT ONLY.** Every locally-executable gate passes
-on the exact signed artifact, and the Apple HVF lane is now real
-evidence — but G8 is not closed: the Linux KVM lane, an independently
-administered witness (separate trust domain, TLS), and third-party
-clean-room verification remain unexecuted. No GO claim and no
-security-qualified designation for any deployment profile. The
-exclusive-runtime profile is the only candidate profile; shared-runtime
-high assurance remains **UNSUPPORTED** regardless of lane results.
+**NO-GO for every deployment profile.** Every locally-executable gate
+passes on the candidate, including the witness-fence gates G24–G30, and
+the Apple HVF lane is real evidence — but the external gates are not
+closed: no external authorization of the trust root (G31), no
+independently administered witness (G32), no third-party clean-room
+attestation (G33), and no restricted-deployment certification (G34).
+The macOS arm64/HVF exclusive-runtime profile remains the only
+candidate profile; shared-runtime high assurance remains
+**UNSUPPORTED** regardless of lane results, and Linux/KVM remains
+outside the release claim.
 
-Remaining work to close G8:
+A scoped GO for the exclusive-runtime profile would require, at
+minimum, G31 (an external authority countersigning the release root)
+and G32 (a witness administered in a separate trust domain over
+authenticated TLS, with replay/fork/partition/rotation/restart/
+lost-write injection).
+
+Remaining work:
 
 1. Provision a separately administered custody host with independent
    keys/trust root over authenticated TLS; run replay/fork/partition/
-   rotation/restart/lost-write injection.
-2. Execute the linux-amd64-kvm msb lane on KVM-capable hardware.
-3. Independent third-party verification of
-   `NEMO-CONTROL-v0.55.0-rc8.3-development.zip` from the pinned trust
-   root, plus reproducible-packaging check under declared conditions.
+   rotation/restart/lost-write injection, including the new
+   fence-begin/fence-end handshake across the trust boundary.
+2. Obtain an external countersignature of the release root and of the
+   candidate artifact.
+3. Execute the linux-amd64-kvm msb lane on KVM-capable hardware.
+4. Independent third-party verification of the candidate archive from
+   the pinned trust root, plus reproducible-packaging check under
+   declared conditions.

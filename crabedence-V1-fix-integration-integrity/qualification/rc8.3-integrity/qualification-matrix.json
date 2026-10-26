@@ -1,6 +1,6 @@
 {
   "schema": "rc83-integrity-qualification-matrix-v1",
-  "release": "0.55.0-rc8.3-integrity-closure",
+  "release": "0.55.0-rc8.3-witness-fence",
   "source_commit": "HEAD at packaging time \u2014 the detached attestation binds the exact commit and artifact SHA-256",
   "toolchain": {
     "go": "go1.26.5",
@@ -238,6 +238,80 @@
         "TestCleanupIntentClearFailureSurfaced"
       ],
       "notes": "Closes audit findings IC-A (offline migration), IC-B (repair-marker ABA), and IC-C (cleanup intent durability). IC-D/IC-E are closed by the self-contained signed bundle and verifier; IC-F remains the documented non-atomic msb residual."
+    },
+    {
+      "id": "G24-fence-library-boundary",
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -run 'TestMigrationRequiresVerifiedFenceSignature|TestMigrationRejectsClosedFence|TestMigrationRefusesZeroFence|TestFenceRequiresPinnedKernelRequest|TestMigrationRefusesFenceFromAnotherGrant' ./internal/witness",
+      "exit_code": 0,
+      "notes": "A migration admits only a fence receipt that verifies under the pinned custodian set, is OPEN, is bound to this run's grant, and freezes a head below the target. An unpinned key, a closed epoch, a zero value, and another grant's epoch are each refused before any mutation."
+    },
+    {
+      "id": "G25-fence-inflight-submission",
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -run 'TestFenceRefusesInFlightSubmission|TestFenceRefusesStaleBase|TestFenceAbortRefusedAfterCustodyAdvanced' ./internal/witness",
+      "exit_code": 0,
+      "notes": "The defect the RC8.3 plan names: a submission already on the wire is refused once the epoch is open, a fence naming a head the witness no longer holds is refused, and an abort over advanced custody is escalated rather than released. Fence check, head read and insert share one immediate transaction."
+    },
+    {
+      "id": "G26-fence-crash-recovery",
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -run 'TestFenceSurvivesWitnessRestart|TestMigrationCrashBeforeCommit|TestMigrationCrashAfterCommitBeforeAck|TestMigrationReplayIdempotent' ./internal/witness",
+      "exit_code": 0,
+      "notes": "A witness restart leaves the epoch open; a pre-commit crash leaves no partial content and the retry runs inside the same frozen window; a post-commit crash replays idempotently. custodyctl records a durable fence intent before asking the witness to freeze, so a crash in the handshake resumes the same epoch."
+    },
+    {
+      "id": "G27-migration-proof-binding",
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -run 'TestMigrationProof' ./internal/witness",
+      "exit_code": 0,
+      "notes": "Correctly signed proofs that differ from the journal in execution, terminal digest, row sequence, action, result hash, authorization, or checkpoint are each refused; a custodian-signed proof does not satisfy the kernel-relay set; a proof whose rows no longer hash to its own digests is refused; a post-hoc rewrite of the row is a contradiction."
+    },
+    {
+      "id": "G28-role-separated-trust",
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 ./internal/custody ./cmd/custodyctl ./internal/execution",
+      "exit_code": 0,
+      "notes": "LoadTrustSetForRole refuses a mixed file; CheckDisjointRoles refuses one key under two authorities; a custodian key does not resolve as kernel-relay or repair authority; the service requires a separate kernel-relay trust file; custodyctl refuses a custodian file offered as the kernel set."
+    },
+    {
+      "id": "G29-end-to-end-fenced-migration",
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -run 'TestMigrateEndToEndFencedEpoch|TestMigrateRoleSeparatedTrustRequired' ./cmd/custodyctl",
+      "exit_code": 0,
+      "notes": "Shipped binary against a real witness service, real outbox and real effect store: two legacy rows compensated, epoch closed with the custodian's signed result digest, chain intact, rewritten rows drain to HEALTHY custody afterwards, and a second run under the same grant is refused as a replay."
+    },
+    {
+      "id": "G30-formal-race-gate",
+      "status": "PASS",
+      "command": "RACE_BUDGET=20m sh scripts/qualify-race.sh -o qualification/rc8.3-integrity/logs/race-fence-targeted ./internal/witness ./internal/custody ./cmd/custodyctl ./internal/execution ./internal/idempotency",
+      "exit_code": 0,
+      "log": "qualification/rc8.3-integrity/logs/race-fence-targeted/run.json",
+      "notes": "Formal correction of the G4a/G4b split: the gate is per-package and reproducible rather than an operator-directed whole-tree budget. 5 packages, 0 failed. The whole-tree invocation is retained as G4a evidence, not as the gate."
+    },
+    {
+      "id": "G31-external-trust-root-authorization",
+      "status": "BLOCKED",
+      "command": "requires an external release authority to countersign the release root",
+      "notes": "No external authority is available in this environment. The local release root is pinned by SHA-256 and its private key is held outside the repository, but a self-pinned root is not third-party authorization. Not claimed."
+    },
+    {
+      "id": "G32-independent-witness-administration",
+      "status": "BLOCKED",
+      "command": "requires a separately administered custody host with its own keys over authenticated TLS",
+      "notes": "The fence lane runs a second key under the same administrative domain, which the plan explicitly calls insufficient for G8. The fence protocol is transport-agnostic (unix socket or mTLS), but independent administration is unexecuted. Not claimed."
+    },
+    {
+      "id": "G33-external-cleanroom-attestation",
+      "status": "BLOCKED",
+      "command": "requires a third party to reproduce and attest the artifact",
+      "notes": "Local clean-room reproduction passes; third-party attestation is unexecuted. Not claimed."
+    },
+    {
+      "id": "G34-restricted-deployment-certification",
+      "status": "BLOCKED",
+      "command": "requires a deployment-profile certification by an external assessor",
+      "notes": "The macOS arm64/HVF exclusive-runtime profile is locally evidenced; certification of a restricted deployment by an external assessor is unexecuted. Not claimed."
     }
   ]
 }

@@ -1,6 +1,6 @@
 # RC8.3 Legacy Custody Migration Recovery Runbook
 
-Status: applies to `0.55.0-rc8.3-integrity-closure`.
+Status: applies to `0.55.0-rc8.3-witness-fence`.
 Audience: custody operator + deployment owner. Every mutating step needs a
 signed operator grant from the repair authority (see
 `OPERATOR-AUTHORIZATION.md`).
@@ -25,12 +25,19 @@ signed operator grant from the repair authority (see
 3. Record the current posture:
    - `custodyctl status -outbox custody-outbox.db -json`
    - `custodyctl preflight -outbox custody-outbox.db -json` (exit 3 = migration pending)
-4. A live witness is mandatory. `migrate` fetches and verifies the witness's
-   signed head over `-witness-socket` or `-witness-tls`; it refuses to run
-   without one. Offline suffix rewriting is **not authorized** in this release:
-   a local outbox that lost an acknowledgement cannot prove the custodian does
-   not already hold the suffix. The verified checkpoint's sequence, hash, and
-   witness identity are bound into the signed migration proof and journal.
+4. A live witness is mandatory, and so is a migration epoch. `migrate` fetches
+   and verifies the witness's signed head over `-witness-socket` or
+   `-witness-tls`, then asks the witness to **freeze the deployment at that
+   head**. Offline suffix rewriting is **not authorized** in this release: a
+   local outbox that lost an acknowledgement cannot prove the custodian does
+   not already hold the suffix, and a checkpoint cannot prove that no
+   submission is still in flight.
+5. Three role-pinned trust files are mandatory and must name three distinct
+   keys: `-custodian-trust-roots` (custodian keys only),
+   `-kernel-trust-roots` (kernel-relay keys only) and
+   `-repair-trust-roots` (repair-authority keys only). A file that pins more
+   than one role, or a key pinned under two roles, is refused before any row
+   is examined.
 
 ## 2. Classify the backlog (read-only)
 
@@ -66,7 +73,8 @@ custodyctl migrate \
   -effect-store /var/lib/crabbox/effects.db \
   -deployment dep-prod-a \
   -signer-key /etc/crabbox/evidence-signer.pem \
-  -trust-roots /etc/crabbox/custodian-trust.json \
+  -custodian-trust-roots /etc/crabbox/custodian-trust.json \
+  -kernel-trust-roots /etc/crabbox/kernel-trust.json \
   -repair-trust-roots /etc/crabbox/repair-trust.json \
   -operator-token /run/grants/migrate.json \
   -actor alice@example.com \
@@ -88,16 +96,24 @@ mandatory:
 custodyctl migrate ... -witness-socket /run/crabbox/witness.sock -json
 ```
 
-If the witness is unreachable or its checkpoint does not verify, migration
-refuses before examining any row.
+If the witness is unreachable, its checkpoint does not verify, or the epoch
+cannot be opened, migration refuses before examining any row.
+
+`migrate` opens one epoch for the whole run and closes it after the last row.
+While the epoch is open the witness refuses every submission for the
+deployment — that is the point of the fence, not a fault. The sender reports
+`custody is fenced for a migration epoch` and resumes on the next pass after
+the close.
 
 Per-row behavior:
 
-- **Unacknowledged suffix, verified checkpoint below the target**: the target
+- **Unacknowledged suffix, frozen epoch below the target**: the target
   receives canonical receipt bytes and every successor's
   `previous_checkpoint_hash` and signature are rewritten in one transaction.
   A signed `custody-migration-proof-v1` before/after record lands in the
-  journal, binding the checkpoint sequence, hash, and witness fingerprint.
+  journal, binding the action, execution, terminal receipt digest,
+  before/after envelope hashes, every rewritten row and the signed epoch
+  (fence id, epoch number, base sequence/hash, grant digest).
 - **Acknowledged row**: bytes stay byte-identical; the journal records
   `legacy-witnessed` with the authoritative terminal receipt digest. Coverage is
   later granted only if the recorded acknowledgement verifies under the pinned
@@ -128,6 +144,8 @@ Acceptance:
 - The witness accepts the rebuilt chain (drain reaches HEALTHY).
 - `MigrationJournal` contains one `payload-compensated` entry per rewritten
   target with non-empty before/after digests and a verifiable proof.
+- `custodyctl fence status -outbox ... -json` reports the run's epoch as
+  `CLOSED` with the result digest the operator command printed.
 
 ## 7. Blocked / quarantined recovery
 
@@ -154,11 +172,18 @@ checkpoint contradiction:
 
 The migration transaction is atomic and the journal is committed with it.
 
-- **Crash before commit**: nothing changed. Re-run `migrate` with a new grant.
+- **Crash before the epoch opens**: nothing changed. Re-run `migrate`.
+- **Crash after the epoch opens**: custody stays fenced at the witness, and the
+  outbox holds a `custody_fence_intent` row for the epoch. Re-run `migrate`
+  **with the same grant file**: the nonce is already consumed by that grant,
+  which the tool accepts as a resume rather than a replay, and it re-enters the
+  same fence identity. If the migration will never complete, release the epoch
+  explicitly with `custodyctl fence abort` using the same grant.
+- **Crash before commit**: nothing changed in the outbox. Re-run `migrate` with
+  the same grant; the epoch is still open and the retry runs inside it.
 - **Crash after commit, before drain**: rows are rewritten and the journal entry
-  exists. Re-running `migrate` returns `already_done` for that target; the drain
-  completes on the next sender pass. If the grant nonce was consumed, issue a
-  new grant for the retry.
+  exists. Re-running `migrate` returns `already_done` for that target and closes
+  the epoch; the drain completes on the next sender pass.
 - **Crash during drain**: the outbox retains the rows; the witness accepts
   identical resubmissions. Restart the sender.
 
@@ -183,14 +208,36 @@ signed migration proofs, the pre/post `preflight` JSON, the witness checkpoint
 readback, and the `custody_events` audit log. Bind them to the release artifact
 SHA-256 in the qualification matrix.
 
+## 11. Migration epochs (witness fence)
+
+A checkpoint proves the custodian's state at one instant. It does not prove
+that no submission is still in flight, so a rewrite under a checkpoint can
+fork the two stores when a late submission lands.
+
+```sh
+custodyctl fence status -outbox /var/lib/crabbox/custody-outbox.db -json
+```
+
+| Epoch state | Meaning | Action |
+|---|---|---|
+| `OPEN` | custody frozen; a migration is in flight or crashed | resume `migrate` with the same grant, or `fence abort` |
+| `CLOSED` | the migration completed; the custodian recorded its result digest | nothing |
+| `ABORTED` | released without a result; custody resumed | nothing |
+
+`fence abort` requires the same grant that opened the epoch and is refused if
+custody advanced inside the window — that would mean a submission was admitted
+while the deployment was frozen, which is an integrity fault to escalate, not
+to release.
+
 ## 9. Post-review corrections
 
 - **Preflight works on a pre-upgrade journal.** The six-column RC8.3-dev
   journal is read with typed defaults; the additive upgrade still happens only
   on a writable open, so `status`/`inspect`/`preflight` remain read-only.
-- **Pin the kernel-relay key.** Compensated coverage verifies the signed
-  before/after proof under the trust-roots set. A trust file that pins only
-  custodians leaves every compensated row UNRESOLVED and REPAIR_REQUIRED open.
+- **Pin the kernel-relay key in its own file.** Compensated coverage verifies
+  the signed before/after proof under `-kernel-trust-roots`. A custodian file
+  offered as the kernel set is refused as a role-separation fault, and an empty
+  kernel set leaves every compensated row UNRESOLVED with REPAIR_REQUIRED open.
 - **A rotation-spanning suffix is refused.** If any row in the suffix was
   signed by a kernel-relay key other than the deployment's current one, the
   rewrite is refused by name; use the §7 witness-coordinated recovery path.

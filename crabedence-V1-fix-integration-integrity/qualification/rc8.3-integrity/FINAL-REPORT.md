@@ -1,5 +1,18 @@
 # RC8.3 Integrity Closure — Final Qualification Report
 
+> **Superseded decision (witness-fence branch).** This report records the
+> integrity-closure candidate `0.55.0-rc8.3-integrity-closure`. The
+> witness-fence branch `codex/rc8.3-witness-fence-proof-qualification`
+> closes RC83-IC-34..40 and **withdraws the scoped GO**: migration
+> authority is now a signed witness epoch rather than a checkpoint, the
+> proof binds the whole journal row, and the three custody authorities
+> resolve from three role-pinned trust files. The external gates (G31
+> trust-root authorization, G32 independently administered witness, G33
+> third-party clean-room, G34 restricted-deployment certification) are
+> unexecuted. Current decision: **NO-GO for every deployment profile**.
+> See `docs/rc8.3/RELEASE_READINESS.md` and
+> `qualification/rc8.3-integrity/qualification-matrix.json` (G24–G34).
+
 Release: `0.55.0-rc8.3-integrity-closure`
 Branch: `codex/rc8.3-integrity-closure`
 Baseline artifact: `NEMO-CONTROL-v0.55.0-rc8.3-development.zip`
@@ -7,9 +20,11 @@ Baseline artifact: `NEMO-CONTROL-v0.55.0-rc8.3-development.zip`
 
 ## Decision
 
-**GO — scoped.** The corrected source qualifies for the **macOS arm64 /
-Apple Silicon HVF, exclusive-runtime profile**. The following are explicitly
-out of scope and must not be inferred from this decision:
+**GO — scoped (withdrawn by the witness-fence branch; retained as the
+integrity-closure record).** The corrected source qualified for the
+**macOS arm64 / Apple Silicon HVF, exclusive-runtime profile** at the time
+of that branch. The following are explicitly out of scope and must not be
+inferred from this decision:
 
 - **Linux/KVM**: excluded by operator direction; not executed.
 - **Shared-runtime high-assurance cleanup**: **UNSUPPORTED** (no atomic

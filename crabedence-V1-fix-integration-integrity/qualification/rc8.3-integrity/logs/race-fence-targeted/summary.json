@@ -1,0 +1,65 @@
+{
+ "schema": "rc83-race-gate-v1",
+ "packages": 5,
+ "passed": 5,
+ "failed": 0,
+ "slowest": [
+  {
+   "package": "./internal/execution",
+   "elapsed_seconds": 57
+  },
+  {
+   "package": "./internal/idempotency",
+   "elapsed_seconds": 35
+  },
+  {
+   "package": "./cmd/custodyctl",
+   "elapsed_seconds": 22
+  },
+  {
+   "package": "./internal/witness",
+   "elapsed_seconds": 7
+  },
+  {
+   "package": "./internal/custody",
+   "elapsed_seconds": 2
+  }
+ ],
+ "results": [
+  {
+   "package": "./internal/witness",
+   "status": "PASS",
+   "exit_code": 0,
+   "elapsed_seconds": 7,
+   "log": "__internal_witness.log"
+  },
+  {
+   "package": "./internal/custody",
+   "status": "PASS",
+   "exit_code": 0,
+   "elapsed_seconds": 2,
+   "log": "__internal_custody.log"
+  },
+  {
+   "package": "./cmd/custodyctl",
+   "status": "PASS",
+   "exit_code": 0,
+   "elapsed_seconds": 22,
+   "log": "__cmd_custodyctl.log"
+  },
+  {
+   "package": "./internal/execution",
+   "status": "PASS",
+   "exit_code": 0,
+   "elapsed_seconds": 57,
+   "log": "__internal_execution.log"
+  },
+  {
+   "package": "./internal/idempotency",
+   "status": "PASS",
+   "exit_code": 0,
+   "elapsed_seconds": 35,
+   "log": "__internal_idempotency.log"
+  }
+ ]
+}

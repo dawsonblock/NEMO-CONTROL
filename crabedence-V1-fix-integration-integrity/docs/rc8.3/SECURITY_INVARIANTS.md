@@ -42,3 +42,31 @@
    UNVERIFIED_STARTUP, and migration-pending all deny CRITICAL
    admission; a passing unit test is not an independently qualified
    lane.
+10. **A checkpoint is a state, not a barrier.** A signed custody head
+    proves the witness's state at one instant and nothing about what is
+    in flight. A rewrite of durable evidence therefore requires a
+    signed, open migration epoch: the custodian freezes the deployment
+    at the head the operator observed — admitted only if that head is
+    still current, atomically — and refuses every submission until the
+    epoch closes. (INV-FENCE-01)
+11. **The epoch is verified where the rewrite happens.** The migration
+    library verifies the fence receipt itself under the pinned
+    custodian set, requires it to be OPEN and bound to the run's grant,
+    and binds it into the signed proof and journal. A caller's
+    verification is never accepted as the library's own.
+    (INV-FENCE-02)
+12. **An epoch is durable, not leased.** A witness restart leaves the
+    epoch open; a kernel crash leaves the custodian frozen; an abort is
+    refused if custody advanced inside the window. Recovery is an
+    explicit operator act, never an expiry. (INV-FENCE-03)
+13. **One key, one authority.** Custodian, kernel-relay and
+    repair-authority keys resolve from three separately pinned files,
+    each of which may name only its own role, and no key may be pinned
+    under two authorities. The authority that attests custody is never
+    the authority whose records it attests. (INV-TRUST-01)
+14. **A proof describes the rewrite it performed.** The signed
+    migration proof binds action, row, execution, terminal receipt,
+    before/after envelope hashes and the frozen epoch, and verification
+    re-derives both suffix digests from the proof's own rows. A proof
+    that verifies under the right key but describes a different rewrite
+    is not evidence. (INV-PROOF-01)

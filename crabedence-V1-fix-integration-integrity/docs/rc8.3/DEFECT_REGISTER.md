@@ -90,3 +90,51 @@ authorization/upgrade paths were still open. Closures are recorded in
   database failure as an authoritative not-found; a stale cleanup-intent temp
   file no longer wedges later cleanups; and the qualification documents now
   match `qualification-matrix.json` and the signed attestation.
+
+## Witness-fence addendum (RC83-IC-34..40)
+
+Branch `codex/rc8.3-witness-fence-proof-qualification`. The
+integrity-closure branch treated a verified checkpoint as authority to
+rewrite durable evidence. Both halves of that assumption were
+reproduced against the frozen baseline before any correction
+(`qualification/rc8.3-integrity/logs/pr00-baseline-repro.log`).
+
+- **RC83-IC-34 (critical).** `MigrateLegacySuffix` accepted a
+  `CheckpointRef` carrying a sequence, a hash and a fingerprint string,
+  and tested only that the fingerprint was non-empty. `custodyctl`
+  verified the checkpoint; the library that performs the rewrite did
+  not, so an unpinned key's fingerprint authorized a rewrite. The
+  library now verifies the custodian's signature itself, and authority
+  moved from a bare checkpoint to a signed fence receipt.
+- **RC83-IC-35 (critical).** A checkpoint proves the witness's state at
+  one instant, not that nothing is in flight. A submission already on
+  the wire landed at the witness between the checkpoint read and the
+  commit; the rewrite committed anyway and the two stores held
+  different records at the same sequence, permanently. Migration now
+  runs inside a witness-enforced epoch: the custodian freezes the
+  deployment at the head the operator observed — admitted only if that
+  head is still current, in the same immediate transaction as the fence
+  insert — and refuses every submission until the epoch closes.
+- **RC83-IC-36 (high).** The signed migration proof bound only the
+  target sequence and the before/after digests; execution identity,
+  terminal receipt digest, envelope hashes, action and the rewritten
+  rows were journal fields outside the signature. The proof now binds
+  all of them, verification re-derives the digests from the proof's own
+  rows, and `VerifyMigrationProofAgainstChain` re-proves a compensated
+  entry against the evidence the outbox holds now.
+- **RC83-IC-37 (high).** `CustodyCoveragePolicy.ProofTrust` was the
+  custodian trust set, and a trust file could pin custodian,
+  kernel-relay and repair-authority keys together. Each authority now
+  resolves from its own role-pinned file, a mixed file is refused, and
+  no key may be pinned under two authorities.
+- **RC83-IC-38/39 (medium).** A fence abort could release an epoch after
+  custody advanced; a crashed migration left no durable local record of
+  its epoch. Abort now compares the head to the frozen base and
+  escalates a contradiction, and `custody_fence_intent` records the
+  planned epoch before the witness is asked to freeze, so recovery
+  re-enters the same fence identity.
+- **RC83-IC-40 (medium).** The full-race gate was an operator-directed
+  invocation (`GOFLAGS=-p=4 -timeout=45m`) rather than a measurement.
+  `scripts/qualify-race.sh` is the canonical form: every package in its
+  own process with its own declared budget, deterministic order, and
+  per-package JSON evidence.
