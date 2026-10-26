@@ -745,6 +745,18 @@ func runFenceAbort(ctx context.Context, f mutateFlags, grant *witness.OperatorGr
 	if pending == nil {
 		fatalf("fence abort: no open migration epoch was opened by this grant")
 	}
+	// Releasing an epoch that already rewrote rows would resume
+	// submissions against a suffix the sender may still hold in its old
+	// form — the exact in-flight corruption the epoch exists to
+	// prevent. An epoch that committed anything is closed, never
+	// aborted.
+	committed, err := outbox.JournalSince(ctx, pending.OpenedAt)
+	if err != nil {
+		fatalf("fence abort: %v", err)
+	}
+	if committed > 0 {
+		fatalf("fence abort: epoch %s already committed %d migration(s) — finish the run to close it; aborting would resume submissions against a rewritten suffix", pending.FenceID, committed)
+	}
 	client, err := witnessClient(f, signer)
 	if err != nil {
 		fatalf("fence abort: %v", err)

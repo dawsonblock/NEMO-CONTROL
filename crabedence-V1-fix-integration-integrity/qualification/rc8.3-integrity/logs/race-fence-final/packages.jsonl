@@ -1,0 +1,5 @@
+{"package":"./internal/witness","status":"PASS","exit_code":0,"elapsed_seconds":9,"log":"__internal_witness.log"}
+{"package":"./internal/custody","status":"PASS","exit_code":0,"elapsed_seconds":2,"log":"__internal_custody.log"}
+{"package":"./cmd/custodyctl","status":"PASS","exit_code":0,"elapsed_seconds":19,"log":"__cmd_custodyctl.log"}
+{"package":"./internal/execution","status":"PASS","exit_code":0,"elapsed_seconds":59,"log":"__internal_execution.log"}
+{"package":"./internal/idempotency","status":"PASS","exit_code":0,"elapsed_seconds":36,"log":"__internal_idempotency.log"}

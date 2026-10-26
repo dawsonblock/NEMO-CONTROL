@@ -446,7 +446,8 @@
     "TestRolesCannotCrossVerify",
     "TestValidateRoleSeparationRefusesDualRoleKey",
     "TestMigrateEndToEndFencedEpoch",
-    "TestMigrateRoleSeparatedTrustRequired"
+    "TestMigrateRoleSeparatedTrustRequired",
+    "TestFenceAbortRefusesEpochWithCommittedMigration"
    ],
    "requirements": {
     "epoch-verified-where-the-rewrite-happens": [
@@ -467,7 +468,8 @@
      "TestMigrationReplayIdempotent"
     ],
     "abort-never-hides-an-integrity-fault": [
-     "TestFenceAbortRefusedAfterCustodyAdvanced"
+     "TestFenceAbortRefusedAfterCustodyAdvanced",
+     "TestFenceAbortRefusesEpochWithCommittedMigration"
     ],
     "proof-describes-the-rewrite-it-performed": [
      "TestMigrationProofRejectsJournalIdentityMismatch",

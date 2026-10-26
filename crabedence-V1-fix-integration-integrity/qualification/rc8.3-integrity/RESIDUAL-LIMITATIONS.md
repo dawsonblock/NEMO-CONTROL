@@ -158,3 +158,17 @@ certification by an external assessor) are not executed and are not
 claimed. The fence protocol is transport-agnostic — it runs unchanged over
 the unix socket and over mutually authenticated TLS — but transport
 capability is not independent administration.
+
+## R17. An epoch that committed a migration is closed, never aborted
+
+`fence abort` refuses when the outbox journal shows a migration
+committed inside the epoch. Releasing the fence then would let the
+sender resume with envelopes the migration has already replaced — the
+in-flight corruption the epoch exists to prevent. An epoch in that state
+is finished by re-running `migrate` with the same grant (which closes
+it), not by releasing it.
+
+The check is local: it reads the outbox journal, which is the same
+store the migration wrote. A second host that shares the witness but not
+the outbox is outside this check, and would have to be prevented
+operationally by scoping a deployment to one outbox.

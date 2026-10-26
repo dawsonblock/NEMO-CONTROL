@@ -1548,6 +1548,28 @@ func (o *Outbox) JournalUnverifiable(ctx context.Context, rowSeq int64, executio
 	return tx.Commit()
 }
 
+// JournalSince counts migration transitions recorded at or after the
+// given RFC3339 timestamp. It is the local check that keeps an epoch
+// from being aborted after it has already rewritten evidence: releasing
+// a fence over a rewritten suffix would let the sender resume with
+// envelopes the migration has replaced.
+func (o *Outbox) JournalSince(ctx context.Context, since string) (int64, error) {
+	at, err := time.Parse(time.RFC3339Nano, since)
+	if err != nil {
+		at, err = time.Parse(time.RFC3339, since)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("journal since: unparseable timestamp %q", since)
+	}
+	var n int64
+	if err := o.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM custody_migration_journal WHERE created_at >= $1`,
+		at.UTC().Format(time.RFC3339Nano)).Scan(&n); err != nil {
+		return 0, fmt.Errorf("journal since: %w", err)
+	}
+	return n, nil
+}
+
 // SortMigrationRows orders rows by sequence — exported for tooling that
 // renders preflight output deterministically.
 func SortMigrationRows(rows []MigrationRow) {

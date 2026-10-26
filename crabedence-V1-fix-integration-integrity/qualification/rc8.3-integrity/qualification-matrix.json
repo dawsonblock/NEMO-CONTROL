@@ -284,10 +284,11 @@
     {
       "id": "G30-formal-race-gate",
       "status": "PASS",
-      "command": "RACE_BUDGET=20m sh scripts/qualify-race.sh -o qualification/rc8.3-integrity/logs/race-fence-targeted ./internal/witness ./internal/custody ./cmd/custodyctl ./internal/execution ./internal/idempotency",
+      "command": "RACE_BUDGET=20m sh scripts/qualify-race.sh -o qualification/rc8.3-integrity/logs/race-fence-final ./internal/witness ./internal/custody ./cmd/custodyctl ./internal/execution ./internal/idempotency",
       "exit_code": 0,
-      "log": "qualification/rc8.3-integrity/logs/race-fence-targeted/run.json",
-      "notes": "Formal correction of the G4a/G4b split: the gate is per-package and reproducible rather than an operator-directed whole-tree budget. 5 packages, 0 failed. The whole-tree invocation is retained as G4a evidence, not as the gate."
+      "log": "qualification/rc8.3-integrity/logs/race-fence-final/run.json",
+      "notes": "Formal correction of the G4a/G4b split: the gate is per-package and reproducible rather than an operator-directed whole-tree budget. 5 packages, 0 failed, on the final commit. The whole-tree invocation is retained as G4a evidence, not as the gate.",
+      "log_sha256": "36e10eecb0babb61488c07e859135236d39c5f41fd01166817bb190773e09785"
     },
     {
       "id": "G31-external-trust-root-authorization",

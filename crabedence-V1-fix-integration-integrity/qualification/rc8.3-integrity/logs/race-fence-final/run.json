@@ -1,0 +1,12 @@
+{
+ "schema": "rc83-race-gate-run-v1",
+ "commit": "b322bfea96d317fbca13da44f1b0ea91c521ee8f",
+ "toolchain": "go1.26.5",
+ "per_package_budget": "20m",
+ "parallelism": 1,
+ "started_at": "2026-10-26T09:35:32Z",
+ "finished_at": "2026-10-26T09:37:37Z",
+ "packages": 5,
+ "failed": 0,
+ "result": "PASS"
+}

@@ -498,11 +498,12 @@
       "id": "RC83-IC-38",
       "pr": "PR-02",
       "severity": "medium",
-      "title": "A fence abort could release an epoch after custody advanced",
+      "title": "A fence abort could release an epoch after custody advanced or after a migration committed",
       "root_cause": "Abort was a state write with no comparison against the head the epoch froze, so an integrity fault inside a frozen window could be cleared by the recovery path that exists to handle crashes.",
-      "fix": "AbortFence compares the current head to the frozen base inside the transaction and returns a contradiction when custody moved. The epoch stays open for an operator.",
+      "fix": "AbortFence compares the current head to the frozen base inside the transaction and returns a contradiction when custody moved. custodyctl additionally refuses an abort when the outbox journal shows a migration committed inside the epoch: releasing the fence then would resume submissions against envelopes the migration already replaced.",
       "tests": [
-        "TestFenceAbortRefusedAfterCustodyAdvanced"
+        "TestFenceAbortRefusedAfterCustodyAdvanced",
+        "TestFenceAbortRefusesEpochWithCommittedMigration"
       ],
       "status": "CLOSED"
     },
