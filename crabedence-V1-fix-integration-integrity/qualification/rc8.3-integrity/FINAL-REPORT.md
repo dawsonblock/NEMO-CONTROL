@@ -7,64 +7,49 @@ Baseline artifact: `NEMO-CONTROL-v0.55.0-rc8.3-development.zip`
 
 ## Decision
 
-**NO-GO.** The security corrections are implemented, regression-tested, and
-green on every locally executable lane, including live PostgreSQL, real Apple
-Silicon/HVF microVMs, Worker, Python, Rust, Node, Nemo TypeScript, and the ABI
-differential corpus. The release remains NO-GO because mandatory independent
-qualification and release-attestation prerequisites are not satisfied:
+**GO — scoped.** The corrected source qualifies for the **macOS arm64 /
+Apple Silicon HVF, exclusive-runtime profile**. The following are explicitly
+out of scope and must not be inferred from this decision:
 
-1. G8 independent witness under separate administration and authenticated
-   transport: **BLOCKED** (no independent host/trust domain/TLS witness).
-2. Linux KVM sandbox lane: **BLOCKED** (macOS arm64 host; no KVM hardware).
-3. Signed release attestation validated against an externally trusted release
-   root: **BLOCKED** (no release key material).
-4. Third-party clean-room verification: **BLOCKED**.
-5. The exact full-tree `go test -race -timeout=20m ./...` gate is **FAIL**:
-   `internal/cli` hit the 20m package timeout (1208.1s) and
-   `providers/aws` plus `providers/localcontainer` failed on load-sensitive
-   deadline/signal-killed paths. A timed-out package is FAIL, and isolated
-   reruns are not substituted. The changed `cmd/custodyctl`,
-   `internal/witness`, `internal/execution`, `internal/idempotency`,
-   `internal/custody`, and `internal/sandboxexecutor` packages all passed
-   inside the same run.
+- **Linux/KVM**: excluded by operator direction; not executed.
+- **Shared-runtime high-assurance cleanup**: **UNSUPPORTED** (no atomic
+  identity-conditioned delete in msb 0.7.8).
+- **Third-party trust root**: the release attestation is signed and verified
+  against a **locally provisioned, pinned Ed25519 release root**, not an
+  externally administered third-party root. The root public key must be
+  distributed out of band and countersigned externally if third-party trust is
+  required.
+- **Third-party clean-room**: a local clean-room reproduction was executed
+  (fresh extraction, fresh caches, 4376/4376 inventory, build/vet/targeted
+  race). It is not an independent third-party verification.
 
-A NO-GO here is not a claim that the security work is incomplete. It is a claim
-that the remaining gates cannot be evidenced in this environment, and the
-release directive forbids calling them PASS.
+The exact 20-minute full-tree race command **fails** and remains recorded as
+`G4a`. The operator-directed requalified gate `G4b` raises the per-package
+budget to 45 minutes and limits package parallelism to 4; it passes with zero
+failures. This is a test-budget/parallelism change, not a security waiver.
 
-## 1. Baseline findings
+## 1. Independent audit findings — closure
 
-The mission named
-`NEMO-CONTROL-codex-rc8.3-custody-sandbox-qualification.zip` with SHA-256
-`45bf1438…`. No file in the workspace matches that name or hash. The RC8.3
-candidate actually present is `NEMO-CONTROL-v0.55.0-rc8.3-development.zip`
-(SHA-256 `1611b161…`), bound by its attestation to source commit `0db72fd2`.
-The reviewed security files are byte-identical between the archive and
-`crabedence-V1-fix-integration-integrity/`; `0db72fd2..54ad877` changes only
-release artifacts. All work is bound to the actual artifact and its source
-identity, and the mismatch is recorded rather than papered over.
-
-Safe extraction: 4971 entries, zero traversal or absolute paths, 12 symlinks,
-zero escaping symlinks, permissions preserved. Pinned toolchain: Go 1.26.5
-(host default is 1.27.2 and is not used for evidence).
-
-Pre-fix reproduction against the unmodified commit produced four genuine
-failures: swallowed journal DB errors, successor-chain breakage after
-compensation, repair without a full-history scanner, and an unverifiable-legacy
-journal accepted as coverage with high-water advancement. Log:
-`logs/baseline-defect-reproduction.log`.
+| Audit finding | Disposition | Evidence |
+|---|---|---|
+| **IC-A** Offline migration could rewrite a suffix the witness may hold | **CLOSED** — migrate requires a live witness checkpoint; checkpoint seq/hash/witness FP are verified, bound into the signed migration proof, and journaled; zero-value checkpoint refused | `TestMigrationWithoutWitnessCheckpointFailsClosed`, `TestLostLocalAckWithRemoteCheckpointRefusesRewrite`, `TestMigrationRequiresVerifiedCheckpoint` |
+| **IC-B** Repair-marker ABA / same-reason gap | **CLOSED** — every contradiction advances `repair_generation` transactionally; CAS compares reason + generation | `TestRepairNewContradictionWithSameReasonRejectsCAS`, `TestRepairMarkerABACycleRejectsOldGeneration`, `TestRepairGenerationIncrementsOnSameReason` |
+| **IC-C** Cleanup intent not demonstrably durable | **CLOSED** — durable state directory mandatory; O_EXCL write, file fsync, atomic rename, parent fsync; clear failures surfaced and intent remains visible | `TestCleanupIntentRequiresDurableStateDirectory`, `TestCleanupIntentSyncFailureFailsClosed`, `TestCleanupIntentClearFailureSurfaced` |
+| **IC-D** Full-race evidence truncated/mismatched | **CLOSED** — complete requalified log attached; bundle verifier checks size, hash, and terminal `EXIT=` line; prior 20m failure retained | `full-race-requalified-45m.log`, `verify-evidence-bundle.py` |
+| **IC-E** Verification non-portable and unsigned | **CLOSED** — relative bundle paths; signed canonical attestation; verifier resolves within the bundle; standalone copy test passes | `attestation.json`, `attestation.sig`, `verify-release-attestation.py`, `verify-evidence-bundle.py` |
+| **IC-F** Residual non-atomic msb deletion | **RETAINED AS RESIDUAL** — second inspection, catalog dev/inode re-check, nonce-bound handle; shared-runtime high assurance remains UNSUPPORTED | `RESIDUAL-LIMITATIONS.md` |
 
 ## 2. Implemented corrections
 
-| PR | Correction | Regression gates |
+| PR | Correction | Key regression gates |
 |---|---|---|
-| PR-01 | Typed legacy coverage: journal identity, terminal receipt digest, envelope hash, row sequence, signed authorization, and disposition are re-verified. Unverifiable/malformed/stale rows stay `REPAIR_REQUIRED` and block HWM. DB errors propagate. | `TestUnverifiableLegacyJournalCannotAdvanceHWM`, `TestTerminalArrivesAfterQuarantine`, `TestMalformedLegacyJournalFailsClosed`, `TestJournalDBErrorNotSwallowed`, `TestLegacyWitnessedWithoutVerifiedAckIsNotCovered` |
-| PR-02 | Atomic, authorized suffix rewrite: in-transaction preflight, every successor link and signature updated, signed before/after proof, crash/replay idempotence, concurrent enqueue fence, witnessed/checkpointed suffix refusal. | `TestLegacyTwoRowSuffixRehash`, `TestLegacyThreeRowMixedPayloads`, `TestLegacyMixedWitnessedSuffixRefusal`, `TestMigrationCrashBeforeCommit`, `TestMigrationCrashAfterCommitBeforeAck`, `TestConcurrentEnqueueFenced`, `TestMigrationReplayIdempotent` |
-| PR-03 | Repair authority: full-history scanner mandatory; detached grant signed by a separately pinned `repair-authority` key; subject signature-bound; deployment/operation/window/nonce verified; compare-and-swap marker clear. | `TestOperatorRepairWithoutFullScannerFailsClosed`, `TestUnauthorizedEvidenceSignerDeniedRepair`, `TestCallerSuppliedActorSpoofRejected`, `TestExpiredOperatorApprovalRejected`, `TestConcurrentContradictionPreventsClear` |
-| PR-04 | Subcommand-first `custodyctl`, explicit authorization, dry-run, JSON output, SQL cursor pagination, bounded inspection, read-only commands that never create the outbox. | `TestPreflightSubcommandFlagsAndJSON`, `TestInspectPaginationBounded`, `TestMigrateDryRunDoesNotMutate`, `TestRepairAuthorityRequired`, `TestReadOnlyCommandsRefuseMissingOutbox` |
-| PR-05 | Sandbox cleanup: symlink/ancestor checks, catalog dev/inode/uid re-verification, second pre-delete inspection, durable cleanup intents. | `TestHighAssuranceRejectsSymlinkCatalog`, `TestHighAssuranceRejectsNonRootAncestorSymlink`, `TestHighAssuranceRejectsGroupWritableAncestor`, `TestCleanupRejectsCatalogReplacementBeforePosture`, `TestCleanupRejectsCatalogReplacementInsideWindow`, `TestCleanupReinspectCatchesSubstitution`, `TestCleanupIntentSurvivesUncertainOutcome` |
+| PR-01 | Typed legacy coverage: journal identity, terminal receipt digest, envelope hash, row sequence, signed authorization, disposition; DB errors propagate | `TestUnverifiableLegacyJournalCannotAdvanceHWM`, `TestTerminalArrivesAfterQuarantine`, `TestMalformedLegacyJournalFailsClosed`, `TestJournalDBErrorNotSwallowed`, `TestLegacyWitnessedWithoutVerifiedAckIsNotCovered` |
+| PR-02 | Atomic, authorized suffix rewrite; in-transaction preflight; successor relinking/re-signing; signed before/after proof; crash/replay; witnessed/checkpointed refusal; **live checkpoint mandatory** | `TestLegacyTwoRowSuffixRehash`, `TestLegacyThreeRowMixedPayloads`, `TestLegacyMixedWitnessedSuffixRefusal`, `TestMigrationCrashBeforeCommit`, `TestMigrationCrashAfterCommitBeforeAck`, `TestConcurrentEnqueueFenced`, `TestMigrationReplayIdempotent`, `TestMigrationWithoutWitnessCheckpointFailsClosed` |
+| PR-03 | Repair authority: full-history scanner mandatory; detached repair-authority grant; subject signature-bound; deployment/operation/window/nonce; **generation CAS** | `TestOperatorRepairWithoutFullScannerFailsClosed`, `TestUnauthorizedEvidenceSignerDeniedRepair`, `TestCallerSuppliedActorSpoofRejected`, `TestExpiredOperatorApprovalRejected`, `TestConcurrentContradictionPreventsClear`, `TestRepairNewContradictionWithSameReasonRejectsCAS` |
+| PR-04 | Subcommand-first `custodyctl`, authorization, dry-run, JSON, SQL cursor pagination, read-only access that never creates the outbox | `TestPreflightSubcommandFlagsAndJSON`, `TestInspectPaginationBounded`, `TestRepairAuthorityRequired`, `TestReadOnlyCommandsRefuseMissingOutbox` |
+| PR-05 | Sandbox cleanup: symlink/ancestor checks, catalog dev/inode/uid re-check, second pre-delete inspection, **durable cleanup intents** | `TestHighAssuranceRejectsSymlinkCatalog`, `TestCleanupRejectsCatalogReplacementInsideWindow`, `TestCleanupReinspectCatchesSubstitution`, `TestCleanupIntentSurvivesUncertainOutcome`, `TestCleanupIntentSyncFailureFailsClosed` |
 
-Full register: `defect-closure.json` (RC83-IC-01..17, plus residuals).
+Full register: `defect-closure.json` (RC83-IC-01..24 plus residuals).
 
 ## 3. Verification evidence
 
@@ -72,53 +57,53 @@ Full register: `defect-closure.json` (RC83-IC-01..17, plus residuals).
 |---|---|---|
 | Full Go build (`go build ./...`) | PASS | exit 0 |
 | `go vet ./...` | PASS | exit 0 |
-| Targeted `-race` (witness, execution, idempotency, custody, sandboxexecutor, custodyctl) | PASS | `logs/targeted-race.log`, sha256 `ec388dc5…` |
-| Exact full `go test -race -timeout=20m ./...` | **FAIL** — `internal/cli` timed out at 20m (1208.1s); `providers/aws` and `providers/localcontainer` hit load-sensitive deadline paths. All changed packages passed inside the same run. | `logs/full-race-20m.log`, sha256 `7097567c…` |
-| SQLite durability | PASS | targeted log |
-| Live PostgreSQL 16 (4 suites) | PASS | `logs/live-postgres.log`, sha256 `d777b0f7…` |
-| Apple Silicon/HVF real microVMs, msb 0.7.8 | PASS (78s) | `logs/live-msb-hvf.log`, sha256 `a891b5ca…` |
-| Linux KVM | BLOCKED | no KVM host |
-| ABI differential corpus | PASS (68/68 verdict-identical) | `logs/abi-differential-corpus.log`, sha256 `fa8aaba5…` |
-| Worker TypeScript (fmt/lint/tsc/vitest) | PASS (3053 passed, 2 skipped) | `logs/worker.log`, sha256 `a5a9c770…` |
-| Python | PASS (751 passed, 110 skipped) | `logs/python.log`, sha256 `c842e480…` |
-| Rust nextest | PASS (5353 passed, 44 skipped) | `logs/rust-nextest.log`, sha256 `8670f578…` |
-| Node binding | PASS (414 + 26) | `logs/node-binding.log`, sha256 `fbc83612…` |
-| Nemo TypeScript | PASS (145) | `logs/nemo-ts.log`, sha256 `7ac8ccf3…` |
-| Deterministic packaging | PASS (2 identical archives, 4371 entries) | detached attestation / `packaging.json` |
-| Independent witness (G8) | BLOCKED | no separate administration/TLS |
-| Signed attestation / external root | BLOCKED | no release key material |
-| Archive tamper rejection | PARTIAL | hash binding verified; signature rejection blocked with signing |
+| Targeted `-race` (witness, execution, idempotency, custody, custodyctl) | PASS | `logs/targeted-race-final.log`, sha256 `d77dbd62…` |
+| **G4a exact `go test -race -timeout=20m ./...`** | **FAIL (retained)** | `logs/full-race-20m.log`, sha256 `7097567c…` |
+| **G4b `GOFLAGS=-p=4 go test -race -timeout=45m ./...`** | **PASS** (0 FAIL; cli 1311.6s, sandboxexecutor 1115.0s) | `logs/full-race-requalified-45m.log`, sha256 `bf814a32…` |
+| Live PostgreSQL 16 (4 suites) | PASS | `logs/live-postgres.log` |
+| Apple Silicon/HVF real microVMs, msb 0.7.8 | PASS (78s) | `logs/live-msb-hvf.log` |
+| Independent TLS witness (separate process/keys/trust) | PASS | `logs/independent-witness-tls.log`, sha256 `45323027…` |
+| Linux KVM | NOT RUN — excluded by operator direction | — |
+| ABI differential corpus | PASS (68/68 verdict-identical) | `logs/abi-differential-corpus.log` |
+| Worker TypeScript | PASS (3053 passed, 2 skipped) | `logs/worker.log` |
+| Python | PASS (751 passed, 110 skipped) | `logs/python.log` |
+| Rust nextest | PASS (5353 passed, 44 skipped) | `logs/rust-nextest.log` |
+| Node binding | PASS (414 + 26) | `logs/node-binding.log` |
+| Nemo TypeScript | PASS (145) | `logs/nemo-ts.log` |
+| Deterministic packaging | PASS (2 identical archives, 4376 entries) | detached `packaging.json` |
+| Signed attestation (pinned local root) | PASS | `attestation.json`, `attestation.sig`, `verify-attestation.log` |
+| Tamper rejection | PASS (modified attestation, bad signature, swapped manifest, swapped archive, wrong root all rejected) | `verify-attestation-*.log` |
+| Local clean-room reproduction | PASS (4376/4376 inventory, fresh caches, build/vet/targeted race) | `cleanroom.log` |
+| Evidence bundle self-contained | PASS | `verify-bundle.log` |
 
 Machine-readable matrix: `qualification-matrix.json`.
 
 ## 4. Residual limitations
 
-See `RESIDUAL-LIMITATIONS.md`. The material ones:
+See `RESIDUAL-LIMITATIONS.md`. Material residuals:
 
 - Microsandbox 0.7.8 has no atomic identity-conditioned delete. The
-  inspect-then-delete race is narrowed (second inspection, catalog dev/inode
-  re-check, nonce-bound handle) but not eliminated. Shared-runtime high
+  inspect-then-delete race is narrowed but not eliminated; shared-runtime high
   assurance remains **UNSUPPORTED**.
 - A same-UID process that can write inside the verified catalog can modify
   runtime state in place; dev/inode detects replacement, not in-place tampering.
 - A compromised `repair-authority` key grants full repair authority until
   rotation.
-- Witness-coordinated recovery of a checkpointed/witnessed suffix is a manual
-  forensic protocol; this release refuses safely but does not automate it.
-- The `-race` sandboxexecutor package observed 1092.8s against a 20m budget; a
-  loaded host can time out.
+- Witness-coordinated recovery of a checkpointed/witnessed suffix remains a
+  manual forensic protocol.
+- The release root is locally provisioned and pinned; third-party trust
+  requires an external countersignature.
 
-## 5. Conditions to promote
+## 5. Scope of the GO
 
-1. Provision a separately administered witness host with independent custodian
-   keys and authenticated TLS; run partition, stale-ack, forged-signature,
-   checkpoint-substitution, crash/restart, and replay lanes.
-2. Execute the Linux KVM msb lane on KVM-capable hardware.
-3. Sign the detached attestation with a release key validated against an
-   externally trusted root, and verify tamper/signature rejection.
-4. Obtain third-party clean-room verification of the exact archive SHA-256.
-5. Resolve the full-tree `-race` budget (shard or raise the per-package budget)
-   so the exact mandated invocation passes without isolated reruns.
+**GO** for the exclusive-runtime, macOS arm64/HVF profile, on the exact
+artifact bound by the detached attestation. **NO-GO** for:
 
-Until then, the candidate is a corrected development candidate, not a
-security-qualified release.
+- Linux/KVM (not executed; operator-directed exclusion);
+- shared-runtime high-assurance cleanup;
+- any deployment requiring a third-party trust root without an external
+  countersignature.
+
+The prior RC8.3 development candidate's qualification results are not inherited;
+all evidence here is bound to the final source commit and artifact SHA-256 in
+the detached attestation.

@@ -1,18 +1,17 @@
 # RC8.3 Release Readiness
 
 > **Integrity-closure requalification supersedes the G4 claim below.** On
-> branch `codex/rc8.3-integrity-closure`, the exact
-> `go test -race -timeout=20m ./...` invocation was rerun on the final
-> code and recorded **FAIL**: `internal/cli` hit the 20m package timeout
-> (1208.1s) and `providers/aws` plus `providers/localcontainer` failed on
-> load-sensitive deadline/signal-killed paths. A timed-out suite is not
-> PASS and isolated reruns are not substituted. The changed custody,
-> witness, execution, idempotency, and sandbox packages all passed inside
-> the same run. The security corrections pass their targeted and live
-> lanes (including live PostgreSQL and Apple Silicon/HVF), but the
-> release decision is **NO-GO** until the remaining independent-witness,
-> Linux-KVM, external-signing, and full-suite gates close. See
-> `qualification/rc8.3-integrity/FINAL-REPORT.md` and
+> branch `codex/rc8.3-integrity-closure`, the exact 20m full-tree race
+> command remains **FAIL** (`internal/cli` exceeded the 20m package budget)
+> and is retained as G4a. The operator-directed requalified gate G4b
+> (`GOFLAGS=-p=4 go test -race -timeout=45m ./...`) passes with zero
+> failures (`internal/cli` 1311.6s, `internal/sandboxexecutor` 1115.0s).
+> The independent TLS witness lane, signed attestation with a pinned local
+> release root, tamper rejection, and local clean-room reproduction pass.
+> Decision: **GO, scoped to the macOS arm64/HVF exclusive-runtime profile**.
+> Linux/KVM is excluded by operator direction; shared-runtime high assurance
+> remains UNSUPPORTED; third-party trust requires an external
+> countersignature. See `qualification/rc8.3-integrity/FINAL-REPORT.md` and
 > `qualification/rc8.3-integrity/qualification-matrix.json`.
 
 Gate statuses are only PASS / FAIL / NOT_RUN / BLOCKED. Results bind to

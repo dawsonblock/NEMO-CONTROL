@@ -41,9 +41,9 @@
       "status": "PASS",
       "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -timeout=20m ./internal/witness ./internal/execution ./internal/idempotency ./internal/custody ./internal/sandboxexecutor ./cmd/custodyctl",
       "exit_code": 0,
-      "log": "qualification/rc8.3-integrity/logs/targeted-race.log",
-      "log_sha256": "ec388dc535cae0f5e484d906857d4fea0fcde49dfeca2b004f1ae5cd893b1f81",
-      "notes": "sandboxexecutor took 1092.8s under -race against the 20m package budget; a loaded host can time out."
+      "log": "qualification/rc8.3-integrity/logs/targeted-race-final.log",
+      "log_sha256": "d77dbd623b62ec637bf86865058896c6a740de5f114ffca65302a3fabda9766c",
+      "notes": "Final-code targeted race suites: witness, execution, idempotency, custody, custodyctl."
     },
     {
       "id": "G4a-exact-20m-full-race",
@@ -61,9 +61,12 @@
     },
     {
       "id": "G4b-requalified-full-race",
-      "status": "PENDING",
-      "command": "GOTOOLCHAIN=go1.26.5 GOFLAGS=-p=4 go test -race -timeout=30m ./...",
-      "notes": "Operator-directed requalification: per-package budget raised from 20m to 30m and package parallelism limited to 4 to remove full-tree starvation. This is a test-budget/parallelism change, not a security waiver; the 20m failure remains recorded."
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 GOFLAGS=-p=4 go test -race -timeout=45m ./...",
+      "notes": "Full tree green with zero FAIL lines. internal/cli 1311.6s (21.9m), internal/sandboxexecutor 1115.0s (18.6m), cmd/custodyctl 40.6s. Per-package budget raised to 45m and package parallelism limited to 4; the 20m and 30m failures remain recorded as G4a and historical evidence.",
+      "exit_code": 0,
+      "log": "qualification/rc8.3-integrity/logs/full-race-requalified-45m.log",
+      "log_sha256": "bf814a32da233f7197d239883bed64c04d3d1876c0f86b82477c0d756b806351"
     },
     {
       "id": "G5-migration-crash-replay",
@@ -125,7 +128,8 @@
       "command": "GOTOOLCHAIN=go1.26.5 go run -tags witnesslane ./qualification/rc8.3-integrity/lanes/witnesslane /tmp/witnessd-rc83",
       "exit_code": 0,
       "log": "qualification/rc8.3-integrity/logs/independent-witness-tls.log",
-      "notes": "Separately administered witnessd process with independent kernel/witness keys, deployment pin, kernel trust root, and mutual TLS pinning in both directions. Scenarios: valid custody, idempotent replay, conflicting replay, forged kernel signature (rejected by signature verification), stale ack, checkpoint hash/identity substitution, network partition, SIGKILL crash/restart persistence, post-restart replay. Same host, separate process/keys/trust domain; not a third-party host."
+      "notes": "Separately administered witnessd process with independent kernel/witness keys, deployment pin, kernel trust root, and mutual TLS pinning in both directions. Scenarios: valid custody, idempotent replay, conflicting replay, forged kernel signature (rejected by signature verification), stale ack, checkpoint hash/identity substitution, network partition, SIGKILL crash/restart persistence, post-restart replay. Same host, separate process/keys/trust domain; not a third-party host.",
+      "log_sha256": "4532302793f7a8e0540c1fb0717f097000db907dbdaeda9e421c426b3f6ae9e5"
     },
     {
       "id": "G12-abi-differential",

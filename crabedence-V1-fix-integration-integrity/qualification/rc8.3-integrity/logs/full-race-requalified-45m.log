@@ -1,0 +1,134 @@
+?   	github.com/openclaw/crabbox/cmd/abi-verdict	[no test files]
+ok  	github.com/openclaw/crabbox/cmd/crabbox	58.447s
+?   	github.com/openclaw/crabbox/cmd/crabbox-apple-vm-helper	[no test files]
+ok  	github.com/openclaw/crabbox/cmd/custodyctl	40.591s
+ok  	github.com/openclaw/crabbox/cmd/evidence-checkpoint	5.163s
+ok  	github.com/openclaw/crabbox/cmd/issue-grant	2.347s
+ok  	github.com/openclaw/crabbox/cmd/nemo-archive-extract	1.722s
+ok  	github.com/openclaw/crabbox/cmd/nemo-component-manifest	2.262s
+ok  	github.com/openclaw/crabbox/cmd/nemo-qualification-attestation	1.591s
+ok  	github.com/openclaw/crabbox/cmd/nemo-runtime-digest	2.114s
+ok  	github.com/openclaw/crabbox/cmd/qual-provider	2.303s
+?   	github.com/openclaw/crabbox/cmd/registry-digest	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-custody-drill	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-custodyd	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-dream	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-evidence-verify	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-executord	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-history	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-job-sign	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-submit	[no test files]
+?   	github.com/openclaw/crabbox/cmd/witnessd	[no test files]
+?   	github.com/openclaw/crabbox/cmd/xcpng-iso-e2e-helper	[no test files]
+ok  	github.com/openclaw/crabbox/internal/applevmhelper	8.683s
+ok  	github.com/openclaw/crabbox/internal/authority	5.594s
+ok  	github.com/openclaw/crabbox/internal/capability	2.042s
+ok  	github.com/openclaw/crabbox/internal/cli	1311.648s
+ok  	github.com/openclaw/crabbox/internal/custody	13.674s
+ok  	github.com/openclaw/crabbox/internal/dream	1.818s
+ok  	github.com/openclaw/crabbox/internal/evidence	14.325s
+ok  	github.com/openclaw/crabbox/internal/execution	89.862s
+ok  	github.com/openclaw/crabbox/internal/experience	2.633s
+ok  	github.com/openclaw/crabbox/internal/history	10.936s
+ok  	github.com/openclaw/crabbox/internal/idempotency	46.849s
+ok  	github.com/openclaw/crabbox/internal/providers/agentsandbox	34.203s
+ok  	github.com/openclaw/crabbox/internal/providers/all	5.101s
+ok  	github.com/openclaw/crabbox/internal/providers/anthropicsandboxruntime	3.110s
+ok  	github.com/openclaw/crabbox/internal/providers/applecontainer	7.074s
+ok  	github.com/openclaw/crabbox/internal/providers/applemachine	6.518s
+ok  	github.com/openclaw/crabbox/internal/providers/applevm	2.213s
+ok  	github.com/openclaw/crabbox/internal/providers/asciibox	13.189s
+ok  	github.com/openclaw/crabbox/internal/providers/aws	41.747s
+ok  	github.com/openclaw/crabbox/internal/providers/awslambdamicrovm	3.214s
+ok  	github.com/openclaw/crabbox/internal/providers/azure	2.808s
+ok  	github.com/openclaw/crabbox/internal/providers/azuredynamicsessions	3.225s
+ok  	github.com/openclaw/crabbox/internal/providers/blacksmith	74.877s
+ok  	github.com/openclaw/crabbox/internal/providers/blaxel	7.888s
+ok  	github.com/openclaw/crabbox/internal/providers/boxd	7.845s
+ok  	github.com/openclaw/crabbox/internal/providers/cloudflare	3.992s
+ok  	github.com/openclaw/crabbox/internal/providers/cloudflaredynamicworkers	2.352s
+ok  	github.com/openclaw/crabbox/internal/providers/cloudflaresandbox	3.552s
+ok  	github.com/openclaw/crabbox/internal/providers/cloudrunsandbox	4.071s
+ok  	github.com/openclaw/crabbox/internal/providers/coder	2.580s
+ok  	github.com/openclaw/crabbox/internal/providers/codesandbox	3.497s
+ok  	github.com/openclaw/crabbox/internal/providers/crownest	5.198s
+ok  	github.com/openclaw/crabbox/internal/providers/cua	2.219s
+ok  	github.com/openclaw/crabbox/internal/providers/cubesandbox	3.397s
+ok  	github.com/openclaw/crabbox/internal/providers/daytona	53.588s
+ok  	github.com/openclaw/crabbox/internal/providers/digitalocean	5.663s
+ok  	github.com/openclaw/crabbox/internal/providers/dockersandbox	2.710s
+ok  	github.com/openclaw/crabbox/internal/providers/e2b	5.551s
+ok  	github.com/openclaw/crabbox/internal/providers/exedev	2.229s
+ok  	github.com/openclaw/crabbox/internal/providers/external	8.648s
+ok  	github.com/openclaw/crabbox/internal/providers/fastapicloud	1.863s
+ok  	github.com/openclaw/crabbox/internal/providers/firecracker	2.213s
+ok  	github.com/openclaw/crabbox/internal/providers/freestyle	34.940s
+ok  	github.com/openclaw/crabbox/internal/providers/gcp	2.190s
+ok  	github.com/openclaw/crabbox/internal/providers/githubcodespaces	9.095s
+ok  	github.com/openclaw/crabbox/internal/providers/hetzner	3.626s
+ok  	github.com/openclaw/crabbox/internal/providers/hostinger	3.091s
+ok  	github.com/openclaw/crabbox/internal/providers/hyperv	2.177s
+ok  	github.com/openclaw/crabbox/internal/providers/incus	14.175s
+ok  	github.com/openclaw/crabbox/internal/providers/islo	7.148s
+ok  	github.com/openclaw/crabbox/internal/providers/kubevirt	3.048s
+ok  	github.com/openclaw/crabbox/internal/providers/lambda	3.769s
+ok  	github.com/openclaw/crabbox/internal/providers/linode	13.271s
+ok  	github.com/openclaw/crabbox/internal/providers/localcontainer	46.209s
+ok  	github.com/openclaw/crabbox/internal/providers/lume	10.434s
+ok  	github.com/openclaw/crabbox/internal/providers/machine0	58.184s
+ok  	github.com/openclaw/crabbox/internal/providers/modal	3.465s
+ok  	github.com/openclaw/crabbox/internal/providers/morph	7.626s
+ok  	github.com/openclaw/crabbox/internal/providers/multipass	1.972s
+ok  	github.com/openclaw/crabbox/internal/providers/mxc	1.843s
+ok  	github.com/openclaw/crabbox/internal/providers/namespace	2.606s
+ok  	github.com/openclaw/crabbox/internal/providers/namespaceinstance	2.916s
+ok  	github.com/openclaw/crabbox/internal/providers/nebius	3.042s
+ok  	github.com/openclaw/crabbox/internal/providers/nomad	9.741s
+ok  	github.com/openclaw/crabbox/internal/providers/nvidiabrev	4.353s
+ok  	github.com/openclaw/crabbox/internal/providers/opencomputer	4.656s
+ok  	github.com/openclaw/crabbox/internal/providers/opensandbox	37.261s
+ok  	github.com/openclaw/crabbox/internal/providers/orgo	24.265s
+ok  	github.com/openclaw/crabbox/internal/providers/ovh	2.770s
+ok  	github.com/openclaw/crabbox/internal/providers/parallels	1.929s
+ok  	github.com/openclaw/crabbox/internal/providers/phala	2.341s
+ok  	github.com/openclaw/crabbox/internal/providers/proxmox	3.071s
+ok  	github.com/openclaw/crabbox/internal/providers/railway	2.178s
+ok  	github.com/openclaw/crabbox/internal/providers/runpod	4.430s
+ok  	github.com/openclaw/crabbox/internal/providers/scaleway	2.427s
+ok  	github.com/openclaw/crabbox/internal/providers/sealosdevbox	7.871s
+ok  	github.com/openclaw/crabbox/internal/providers/semaphore	2.292s
+ok  	github.com/openclaw/crabbox/internal/providers/shared	2.501s
+ok  	github.com/openclaw/crabbox/internal/providers/shared/procjson	1.712s
+ok  	github.com/openclaw/crabbox/internal/providers/smolvm	7.364s
+ok  	github.com/openclaw/crabbox/internal/providers/sprites	2.063s
+ok  	github.com/openclaw/crabbox/internal/providers/ssh	83.833s
+ok  	github.com/openclaw/crabbox/internal/providers/superserve	3.399s
+ok  	github.com/openclaw/crabbox/internal/providers/tart	114.186s
+ok  	github.com/openclaw/crabbox/internal/providers/tencentcloud	2.265s
+ok  	github.com/openclaw/crabbox/internal/providers/tenki	2.256s
+ok  	github.com/openclaw/crabbox/internal/providers/tensorlake	11.446s
+ok  	github.com/openclaw/crabbox/internal/providers/unikraftcloud	5.910s
+ok  	github.com/openclaw/crabbox/internal/providers/upstashbox	4.042s
+ok  	github.com/openclaw/crabbox/internal/providers/vast	3.127s
+ok  	github.com/openclaw/crabbox/internal/providers/vercelsandbox	9.200s
+ok  	github.com/openclaw/crabbox/internal/providers/vultr	6.147s
+ok  	github.com/openclaw/crabbox/internal/providers/wandb	2.338s
+?   	github.com/openclaw/crabbox/internal/providers/wandb/gen/coreweave/sandbox/v1beta2	[no test files]
+ok  	github.com/openclaw/crabbox/internal/providers/windowssandbox	1.834s
+ok  	github.com/openclaw/crabbox/internal/providers/xcpng	55.335s
+ok  	github.com/openclaw/crabbox/internal/providertransport	1.432s
+ok  	github.com/openclaw/crabbox/internal/qualprovider	3.182s
+ok  	github.com/openclaw/crabbox/internal/reconcile	1.689s
+ok  	github.com/openclaw/crabbox/internal/releasectl	2.325s
+ok  	github.com/openclaw/crabbox/internal/research	1.881s
+ok  	github.com/openclaw/crabbox/internal/sandboxcustody	1.713s
+ok  	github.com/openclaw/crabbox/internal/sandboxexecutor	1115.023s
+?   	github.com/openclaw/crabbox/internal/secretpattern	[no test files]
+?   	github.com/openclaw/crabbox/internal/sockfile	[no test files]
+ok  	github.com/openclaw/crabbox/internal/testutil	1.317s
+ok  	github.com/openclaw/crabbox/internal/witness	3.936s
+ok  	github.com/openclaw/crabbox/runtimes/aws-lambda-microvm	2.402s
+ok  	github.com/openclaw/crabbox/scripts	3.750s
+ok  	github.com/openclaw/crabbox/scripts/apple-vm-image-source	1.362s
+ok  	github.com/openclaw/crabbox/scripts/configgen	1.340s
+EXIT=0
