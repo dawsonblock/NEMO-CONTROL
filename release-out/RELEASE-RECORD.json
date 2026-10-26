@@ -2,20 +2,20 @@
   "schema": "rc83-release-record-v1",
   "release": "0.55.0-rc8.3-witness-fence",
   "branch": "codex/rc8.3-witness-fence-proof-qualification",
-  "source_commit": "8ee14134772975bae243ed4f3cca295b2bfb30a1",
+  "source_commit": "fca7ccd0b2ba4853504597a906ebd0f9b7156f8e",
   "baseline_commit": "77956eabec121579316d7b75b6ba0487eabbf60a",
   "artifact": {
     "path": "NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.zip",
-    "sha256": "3253b69a787296a524ddff5b3ecf5837a9b13b053da5da15d54ae2c3a5786f0c",
-    "bytes": 18652538,
-    "entries": 4402,
+    "sha256": "ef2edf69a2ca5991ce84befee668d6220e9bd28719dc28fa84138c889eeeee9e",
+    "bytes": 18658753,
+    "entries": 4411,
     "reproducible": true,
     "reproduction": "two independent runs of qualification/rc8.3-integrity/tools/deterministic-package.py over the same HEAD produced byte-identical archives (a and b)"
   },
   "source_inventory": {
     "path": "NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.source-inventory.txt",
-    "sha256": "19b981b82c0011919d5fc36529e26c4c238f0958bbf4e0ecf5c19a21d8899495",
-    "entries": 4402
+    "sha256": "be3ec2d29b3e70d42fb65b7197cee4f9ab2816664ef152e8f09b48a43e2097d6",
+    "entries": 4411
   },
   "toolchain": {
     "go": "go1.26.5",
@@ -232,7 +232,7 @@
       "reason": "The release root is locally provisioned and self-pinned. An external countersignature is required before anyone else may rely on it."
     }
   ],
-  "generated_at": "2026-10-26T09:31:30Z",
+  "generated_at": "2026-10-26T09:37:55Z",
   "local_extraction_check": {
     "performed": true,
     "what": "extracted the archive into a fresh directory and ran `go build` on internal/witness, internal/custody and cmd/custodyctl, then `go test` on internal/witness and internal/custody",
