@@ -621,9 +621,14 @@ func (o *Outbox) ResolveLegacyCoverage(ctx context.Context, req LegacyCoverageRe
 			return base, nil
 		}
 		// The rewrite itself must be the one the kernel-relay key
-		// signed. Without this, a journal row carrying a copied grant
-		// would be indistinguishable from an authorized rewrite.
-		if perr := VerifyMigrationProof(entry, req.DeploymentID, req.ProofTrust); perr != nil {
+		// signed, under an epoch the custodian froze. Without this, a
+		// journal row carrying a copied grant would be indistinguishable
+		// from an authorized rewrite.
+		if perr := VerifyMigrationProof(entry, MigrationProofTrust{
+			DeploymentID:   req.DeploymentID,
+			ProofTrust:     req.ProofTrust,
+			CustodianTrust: req.CustodianTrust,
+		}); perr != nil {
 			base.Disposition = LegacyCoverageUnresolved
 			base.Reason = fmt.Sprintf("compensated journal entry carries no verifiable signed rewrite proof: %v", perr)
 			return base, nil
@@ -778,17 +783,6 @@ type MigrationRow struct {
 	ContentLen   int    `json:"content_len"`
 }
 
-// CheckpointRef is the verified witness checkpoint a migration is
-// allowed to proceed under. It is fetched live over the authenticated
-// witness transport, verified under the pinned custodian set, and bound
-// into the signed migration proof and journal. A zero value means no
-// checkpoint was verified — callers must treat that as a refusal.
-type CheckpointRef struct {
-	Seq       int64  `json:"seq"`
-	Hash      string `json:"hash"`
-	WitnessFP string `json:"witness_fp"`
-}
-
 // MigrationPreflight is the read-only safety verdict for rewriting a
 // legacy row and its suffix.
 type MigrationPreflight struct {
@@ -813,6 +807,55 @@ func (a MigrationAuthorization) verify(deploymentID, operation string, now time.
 		deploymentID = a.DeploymentID
 	}
 	return VerifyOperatorGrant(a.Grant, a.Trust, deploymentID, operation, now)
+}
+
+// MigrationRequest is the complete input to one suffix rewrite. The
+// fence — not a bare checkpoint — is the authority: it is the
+// custodian's signed statement that the deployment is frozen at a
+// specific head, so nothing can land at the witness while the rewrite
+// is in flight. CustodianTrust is the pinned set the fence receipt is
+// verified against at this boundary; a caller cannot supply its own
+// verification.
+type MigrationRequest struct {
+	RowSeq                int64
+	TerminalReceiptDigest string
+	Native                []byte
+	Fence                 FenceReceipt
+	Authorization         MigrationAuthorization
+	CustodianTrust        *custody.TrustSet
+}
+
+// checkpoint is the head the fence froze, in boundary form. The fence
+// receipt is the authority; the checkpoint fields are what preflight
+// and the journal bind.
+func (r MigrationRequest) checkpoint() CheckpointRef {
+	return CheckpointRef{
+		Seq: r.Fence.BaseSeq, Hash: r.Fence.BaseHash, WitnessFP: r.Fence.WitnessFP,
+		SignerEpoch: r.Fence.SignerEpoch,
+	}
+}
+
+// verifyFence re-checks the fence at the library boundary. It runs
+// before any mutation and again inside the write transaction: a
+// migration that cannot prove a live epoch at the moment it commits is
+// not a fenced migration.
+func (r MigrationRequest) verifyFence(deploymentID string) error {
+	if r.CustodianTrust.Empty() {
+		return fmt.Errorf("%w: migration requires a pinned custodian trust set — an unverified fence is not a fence", ErrEvidenceContradiction)
+	}
+	if err := VerifyFenceReceipt(&r.Fence, deploymentID, r.CustodianTrust); err != nil {
+		return fmt.Errorf("%w: migration fence does not verify: %v", ErrEvidenceContradiction, err)
+	}
+	if r.Fence.State != FenceOpen {
+		return fmt.Errorf("%w: migration fence is %s, not %s — a rewrite commits only inside an open epoch", ErrEvidenceContradiction, r.Fence.State, FenceOpen)
+	}
+	if r.Fence.Epoch < 1 || r.Fence.FenceID == "" {
+		return fmt.Errorf("%w: migration fence carries no epoch identity", ErrEvidenceContradiction)
+	}
+	if r.Fence.BaseSeq >= r.RowSeq {
+		return fmt.Errorf("%w: fence froze seq %d, which covers the migration target %d — the suffix is checkpointed history", ErrEvidenceContradiction, r.Fence.BaseSeq, r.RowSeq)
+	}
+	return nil
 }
 
 // MigrationPreflight examines the target row, every successor, existing
@@ -906,15 +949,22 @@ func migrationPreflight(ctx context.Context, q interface {
 }
 
 // migrationProof is the signed before/after evidence for one suffix
-// rewrite. It is stored in the journal and independently verifiable
-// under the deployment's kernel-relay key.
+// rewrite. It binds the journal identity, the terminal receipt, the
+// frozen epoch, and every rewritten row, so a proof can only describe
+// the rewrite it actually performed — and it is independently
+// verifiable under the deployment's kernel-relay key.
 type migrationProof struct {
-	Schema       string              `json:"schema"`
-	TargetSeq    int64               `json:"target_seq"`
-	Checkpoint   CheckpointRef       `json:"checkpoint"`
-	Rows         []migrationProofRow `json:"rows"`
-	BeforeDigest string              `json:"before_digest"`
-	AfterDigest  string              `json:"after_digest"`
+	Schema                string              `json:"schema"`
+	Action                string              `json:"action"`
+	RowSeq                int64               `json:"row_seq"`
+	ExecutionID           string              `json:"execution_id"`
+	TerminalReceiptDigest string              `json:"terminal_receipt_digest"`
+	OriginalEnvelopeHash  string              `json:"original_envelope_hash"`
+	ResultEnvelopeHash    string              `json:"result_envelope_hash"`
+	Fence                 FenceReceipt        `json:"fence"`
+	Rows                  []migrationProofRow `json:"rows"`
+	BeforeDigest          string              `json:"before_digest"`
+	AfterDigest           string              `json:"after_digest"`
 }
 
 type migrationProofRow struct {
@@ -923,6 +973,21 @@ type migrationProofRow struct {
 	AfterHash  string `json:"after_hash"`
 	BeforePrev string `json:"before_prev"`
 	AfterPrev  string `json:"after_prev"`
+}
+
+// proofDigest re-derives the suffix digest from the proof's own rows.
+// VerifyMigrationProof recomputes it so the before/after digests cannot
+// be replaced with values that describe a different rewrite.
+func proofDigest(rows []migrationProofRow, after bool) string {
+	h := sha256.New()
+	for _, r := range rows {
+		hash, prev := r.BeforeHash, r.BeforePrev
+		if after {
+			hash, prev = r.AfterHash, r.AfterPrev
+		}
+		fmt.Fprintf(h, "%d\x00%s\x00%s\x00", r.Seq, hash, prev)
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // MigrationResult reports one suffix rewrite.
@@ -944,35 +1009,40 @@ type migrationCandidate struct {
 }
 
 // MigrateLegacySuffix atomically rewrites an unacknowledged,
-// never-checkpointed legacy suffix. It verifies the operator grant,
-// re-runs preflight inside the write transaction, rewrites the target
-// and every successor's linkage and signature, records signed
+// never-checkpointed legacy suffix inside an open witness migration
+// epoch. It verifies the fence at this boundary, verifies the operator
+// grant, re-runs preflight inside the write transaction, rewrites the
+// target and every successor's linkage and signature, records signed
 // before/after evidence, and commits. Any witness or checkpoint in the
 // suffix refuses the whole operation.
-func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int64, receiptDigest string, native []byte, checkpoint CheckpointRef, auth MigrationAuthorization) (MigrationResult, error) {
+func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, req MigrationRequest) (MigrationResult, error) {
 	var res MigrationResult
-	res.TargetSeq = rowSeq
-	// WitnessFP is the proof that a live checkpoint was verified: an
-	// initial witness head is seq 0 with an empty hash, but it still
-	// carries the custodian key identity. A zero-value CheckpointRef is
-	// an offline attempt and is refused.
-	if checkpoint.WitnessFP == "" {
-		return res, fmt.Errorf("%w: migration requires a live, verified witness checkpoint — offline suffix rewriting is not authorized", ErrEvidenceContradiction)
-	}
+	res.TargetSeq = req.RowSeq
+	rowSeq, receiptDigest, native, checkpoint := req.RowSeq, req.TerminalReceiptDigest, req.Native, req.checkpoint()
 	if len(native) == 0 {
 		return res, fmt.Errorf("%w: migration requires a non-empty canonical payload", ErrEvidenceContradiction)
 	}
 	if p.Signer == nil || p.DeploymentID == "" {
 		return res, fmt.Errorf("%w: migration requires a deployment-bound kernel-relay signer", ErrEvidenceContradiction)
 	}
-	if err := auth.verify(p.DeploymentID, OperationMigrate, time.Now()); err != nil {
+	// The fence is verified before anything else: an epoch the custodian
+	// did not sign, or one that is already closed, authorizes nothing.
+	if err := req.verifyFence(p.DeploymentID); err != nil {
 		return res, err
 	}
-	digest, err := GrantDigest(auth.Grant)
+	if err := req.Authorization.verify(p.DeploymentID, OperationMigrate, time.Now()); err != nil {
+		return res, err
+	}
+	digest, err := GrantDigest(req.Authorization.Grant)
 	if err != nil {
 		return res, err
 	}
-	if used, err := o.OperatorNonceUsed(ctx, auth.Grant.Nonce, digest); err != nil {
+	// The epoch must be bound to the grant this run acts under: a fence
+	// opened by one authorization cannot launder another.
+	if req.Fence.GrantDigest != digest {
+		return res, fmt.Errorf("%w: fence was opened under grant %s, this migration holds %s", ErrEvidenceContradiction, req.Fence.GrantDigest, digest)
+	}
+	if used, err := o.OperatorNonceUsed(ctx, req.Authorization.Grant.Nonce, digest); err != nil {
 		return res, err
 	} else if !used {
 		return res, fmt.Errorf("%w: migration grant nonce was not consumed — authorization is not live", ErrOperatorAuthorization)
@@ -1072,11 +1142,15 @@ func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int
 	}
 	before := suffixDigest(cands)
 	proof := migrationProof{
-		Schema:       "custody-migration-proof-v1",
-		TargetSeq:    rowSeq,
-		Checkpoint:   checkpoint,
-		BeforeDigest: before,
-		Rows:         make([]migrationProofRow, 0, len(cands)),
+		Schema:                "custody-migration-proof-v1",
+		Action:                JournalCompensated,
+		RowSeq:                rowSeq,
+		ExecutionID:           curExec,
+		TerminalReceiptDigest: receiptDigest,
+		OriginalEnvelopeHash:  pf.EnvelopeHash,
+		Fence:                 req.Fence,
+		BeforeDigest:          before,
+		Rows:                  make([]migrationProofRow, 0, len(cands)),
 	}
 	prev := cands[0].envelope.Sequence.PreviousCheckpointHash
 	for i, c := range cands {
@@ -1135,6 +1209,7 @@ func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int
 	}
 	after := suffixDigest(cands)
 	proof.AfterDigest = after
+	proof.ResultEnvelopeHash = cands[0].envelopeHash
 	proofJSON, err := canonicalJSON(proof)
 	if err != nil {
 		return res, err
@@ -1143,13 +1218,13 @@ func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int
 	if err != nil {
 		return res, fmt.Errorf("migration proof sign: %w", err)
 	}
-	authJSON, err := json.Marshal(auth.Grant)
+	authJSON, err := json.Marshal(req.Authorization.Grant)
 	if err != nil {
 		return res, err
 	}
 	jseq, err := o.journal(ctx, tx, journalRecord{
 		RowSeq: rowSeq, ExecutionID: curExec, Action: JournalCompensated,
-		Detail:                fmt.Sprintf("unacknowledged legacy suffix rebuilt from authoritative terminal record (digest %s); %d rows re-linked and re-signed", receiptDigest, len(cands)),
+		Detail:                fmt.Sprintf("unacknowledged legacy suffix rebuilt from authoritative terminal record (digest %s) inside witness fence epoch %d at seq %d; %d rows re-linked and re-signed", receiptDigest, req.Fence.Epoch, req.Fence.BaseSeq, len(cands)),
 		OriginalEnvelopeHash:  pf.EnvelopeHash,
 		ResultEnvelopeHash:    cands[0].envelopeHash,
 		TerminalReceiptDigest: receiptDigest,
@@ -1158,8 +1233,8 @@ func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int
 		CheckpointWitnessFP:   checkpoint.WitnessFP,
 		AuthorizationJSON:     string(authJSON),
 		AuthorizationDigest:   digest,
-		AuthorizedBy:          auth.Grant.Subject,
-		Nonce:                 auth.Grant.Nonce,
+		AuthorizedBy:          req.Authorization.Grant.Subject,
+		Nonce:                 req.Authorization.Grant.Nonce,
 		BeforeDigest:          before,
 		AfterDigest:           after,
 		ProofJSON:             string(proofJSON),
@@ -1216,9 +1291,24 @@ func canonicalJSON(v any) ([]byte, error) {
 	return []byte(strings.TrimRight(buf.String(), "\n")), nil
 }
 
+// MigrationProofTrust is the independently pinned context a proof
+// verification needs: the kernel-relay set that signed the proof and
+// the custodian set that signed the fence the proof commits under. The
+// two roles are never interchangeable — a custodian key cannot vouch
+// for a kernel rewrite, and a kernel key cannot vouch for an epoch.
+type MigrationProofTrust struct {
+	DeploymentID   string
+	ProofTrust     *custody.TrustSet
+	CustodianTrust *custody.TrustSet
+}
+
 // VerifyMigrationProof verifies a journal entry's signed before/after
-// proof under a pinned kernel-relay trust set.
-func VerifyMigrationProof(entry MigrationJournalEntry, deploymentID string, trust *custody.TrustSet) error {
+// proof. It checks every binding the entry claims — identity, terminal
+// digest, before/after envelope hashes, digests, the frozen epoch, and
+// each rewritten row — and then re-derives the suffix digests from the
+// proof's own rows. A proof that describes a different rewrite than the
+// journal records does not verify, even when it is correctly signed.
+func VerifyMigrationProof(entry MigrationJournalEntry, trust MigrationProofTrust) error {
 	if entry.ProofJSON == "" || entry.ProofSignature == "" {
 		return fmt.Errorf("migration journal entry %d carries no signed proof", entry.Seq)
 	}
@@ -1226,24 +1316,84 @@ func VerifyMigrationProof(entry MigrationJournalEntry, deploymentID string, trus
 	if err := json.Unmarshal([]byte(entry.ProofJSON), &proof); err != nil {
 		return fmt.Errorf("migration proof %d does not parse: %w", entry.Seq, err)
 	}
+	if proof.Schema != "custody-migration-proof-v1" {
+		return fmt.Errorf("migration proof %d: unsupported schema %q", entry.Seq, proof.Schema)
+	}
+	if proof.Action != entry.Action {
+		return fmt.Errorf("migration proof %d describes action %q, journal records %q", entry.Seq, proof.Action, entry.Action)
+	}
+	if proof.RowSeq != entry.RowSeq {
+		return fmt.Errorf("migration proof %d targets seq %d, journal entry records seq %d", entry.Seq, proof.RowSeq, entry.RowSeq)
+	}
+	if proof.ExecutionID != entry.ExecutionID {
+		return fmt.Errorf("migration proof %d binds execution %q, journal records %q", entry.Seq, proof.ExecutionID, entry.ExecutionID)
+	}
+	if proof.TerminalReceiptDigest == "" || proof.TerminalReceiptDigest != entry.TerminalReceiptDigest {
+		return fmt.Errorf("migration proof %d does not bind the journal's terminal receipt digest", entry.Seq)
+	}
+	if proof.OriginalEnvelopeHash != entry.OriginalEnvelopeHash {
+		return fmt.Errorf("migration proof %d binds original envelope %s, journal records %s", entry.Seq, proof.OriginalEnvelopeHash, entry.OriginalEnvelopeHash)
+	}
+	if proof.ResultEnvelopeHash != entry.ResultEnvelopeHash {
+		return fmt.Errorf("migration proof %d binds result envelope %s, journal records %s", entry.Seq, proof.ResultEnvelopeHash, entry.ResultEnvelopeHash)
+	}
 	if proof.BeforeDigest != entry.BeforeDigest || proof.AfterDigest != entry.AfterDigest {
 		return fmt.Errorf("migration proof %d digests do not bind the journal entry", entry.Seq)
 	}
-	if proof.TargetSeq != entry.RowSeq {
-		return fmt.Errorf("migration proof %d targets seq %d, journal entry records seq %d", entry.Seq, proof.TargetSeq, entry.RowSeq)
+	if len(proof.Rows) == 0 {
+		return fmt.Errorf("migration proof %d covers no rows", entry.Seq)
+	}
+	if proof.Rows[0].Seq != entry.RowSeq {
+		return fmt.Errorf("migration proof %d starts at seq %d, journal targets %d", entry.Seq, proof.Rows[0].Seq, entry.RowSeq)
+	}
+	for i, row := range proof.Rows {
+		if i > 0 && row.Seq != proof.Rows[i-1].Seq+1 {
+			return fmt.Errorf("migration proof %d row sequence is not contiguous at %d", entry.Seq, row.Seq)
+		}
+		if row.BeforeHash == "" || row.AfterHash == "" {
+			return fmt.Errorf("migration proof %d row %d omits a before/after hash", entry.Seq, row.Seq)
+		}
+		if i > 0 && row.AfterPrev != proof.Rows[i-1].AfterHash {
+			return fmt.Errorf("migration proof %d row %d does not link to its rewritten predecessor", entry.Seq, row.Seq)
+		}
+	}
+	if got := proofDigest(proof.Rows, false); got != proof.BeforeDigest {
+		return fmt.Errorf("migration proof %d before-digest %s does not describe its own rows (%s)", entry.Seq, proof.BeforeDigest, got)
+	}
+	if got := proofDigest(proof.Rows, true); got != proof.AfterDigest {
+		return fmt.Errorf("migration proof %d after-digest %s does not describe its own rows (%s)", entry.Seq, proof.AfterDigest, got)
+	}
+	// The epoch is the authority for the rewrite: it must verify under
+	// the pinned custodian set, be open at commit, be bound to this
+	// journal entry's authorization, and freeze a head below the target.
+	if err := VerifyFenceReceipt(&proof.Fence, trust.DeploymentID, trust.CustodianTrust); err != nil {
+		return fmt.Errorf("migration proof %d: %w", entry.Seq, err)
+	}
+	if proof.Fence.State != FenceOpen {
+		return fmt.Errorf("migration proof %d commits under a %s epoch, not %s", entry.Seq, proof.Fence.State, FenceOpen)
+	}
+	if proof.Fence.GrantDigest != entry.AuthorizationDigest {
+		return fmt.Errorf("migration proof %d: epoch was opened under grant %s, journal records %s", entry.Seq, proof.Fence.GrantDigest, entry.AuthorizationDigest)
+	}
+	if proof.Fence.BaseSeq >= entry.RowSeq {
+		return fmt.Errorf("migration proof %d: epoch froze seq %d, which covers the rewritten target %d", entry.Seq, proof.Fence.BaseSeq, entry.RowSeq)
+	}
+	if entry.CheckpointSeq != proof.Fence.BaseSeq || entry.CheckpointHash != proof.Fence.BaseHash ||
+		entry.CheckpointWitnessFP != proof.Fence.WitnessFP {
+		return fmt.Errorf("migration proof %d: journal checkpoint does not match the frozen epoch", entry.Seq)
+	}
+	if trust.ProofTrust.Empty() {
+		return fmt.Errorf("migration proof %d: no pinned kernel-relay trust set", entry.Seq)
 	}
 	canon, err := canonicalJSON(proof)
 	if err != nil {
 		return err
 	}
-	if trust.Empty() {
-		return fmt.Errorf("migration proof %d: no pinned kernel-relay trust set", entry.Seq)
-	}
-	for _, k := range trust.Keys() {
+	for _, k := range trust.ProofTrust.Keys() {
 		if k.Role != custody.RoleKernelRelay {
 			continue
 		}
-		if k.DeploymentID != "" && k.DeploymentID != deploymentID {
+		if k.DeploymentID != "" && k.DeploymentID != trust.DeploymentID {
 			continue
 		}
 		if err := evidence.VerifyRecordSignature(k.PublicKey, MigrationProofDomain, entry.ProofSignature, string(canon)); err == nil {
@@ -1253,11 +1403,48 @@ func VerifyMigrationProof(entry MigrationJournalEntry, deploymentID string, trus
 	return fmt.Errorf("migration proof %d does not verify under any pinned kernel-relay key", entry.Seq)
 }
 
+// VerifyMigrationProofAgainstChain re-proves a compensated journal
+// entry against the evidence the outbox holds right now: the target row
+// must still carry the proof's result hash and canonical payload. A
+// journal entry that verified once but no longer describes the durable
+// chain is a contradiction, not coverage.
+func (o *Outbox) VerifyMigrationProofAgainstChain(ctx context.Context, entry MigrationJournalEntry, trust MigrationProofTrust) error {
+	if err := VerifyMigrationProof(entry, trust); err != nil {
+		return err
+	}
+	var proof migrationProof
+	if err := json.Unmarshal([]byte(entry.ProofJSON), &proof); err != nil {
+		return fmt.Errorf("migration proof %d does not parse: %w", entry.Seq, err)
+	}
+	var envJSON string
+	if err := o.db.QueryRowContext(ctx,
+		`SELECT envelope_json FROM custody_outbox WHERE seq = $1`, entry.RowSeq).Scan(&envJSON); err != nil {
+		return fmt.Errorf("migration chain re-check seq %d: %w", entry.RowSeq, err)
+	}
+	var env custody.Envelope
+	if err := json.Unmarshal([]byte(envJSON), &env); err != nil {
+		return fmt.Errorf("migration chain re-check seq %d: %w", entry.RowSeq, err)
+	}
+	hash, err := env.Hash()
+	if err != nil {
+		return fmt.Errorf("migration chain re-check seq %d: %w", entry.RowSeq, err)
+	}
+	if hash != proof.ResultEnvelopeHash {
+		return fmt.Errorf("%w: seq %d now holds %s, the signed proof rewrote it to %s",
+			ErrEvidenceContradiction, entry.RowSeq, hash, proof.ResultEnvelopeHash)
+	}
+	content, err := env.ContentBytes()
+	if err != nil || len(content) == 0 {
+		return fmt.Errorf("%w: seq %d holds no canonical payload after a compensated rewrite", ErrEvidenceContradiction, entry.RowSeq)
+	}
+	return nil
+}
+
 // CompensateLegacyRow is the single-row compatibility entry point. It
 // is only safe when the row has no successors; MigrateLegacySuffix is
 // the general path and the one custodyctl uses.
-func (o *Outbox) CompensateLegacyRow(ctx context.Context, p Producer, rowSeq int64, receiptDigest string, native []byte, checkpoint CheckpointRef, auth MigrationAuthorization) (MigrationResult, error) {
-	return o.MigrateLegacySuffix(ctx, p, rowSeq, receiptDigest, native, checkpoint, auth)
+func (o *Outbox) CompensateLegacyRow(ctx context.Context, p Producer, req MigrationRequest) (MigrationResult, error) {
+	return o.MigrateLegacySuffix(ctx, p, req)
 }
 
 // JournalLegacyWitnessed records the operator-approved classification

@@ -3,7 +3,8 @@ package witness
 // RC8.3 PR-02 — migration and hash-chain integrity. A rewrite of a
 // legacy suffix must update every successor link and signature, never
 // touch witnessed or checkpointed history, and survive crash/replay and
-// concurrent writers without forking the chain.
+// concurrent writers without forking the chain. Every rewrite runs
+// inside a witness migration epoch.
 
 import (
 	"context"
@@ -32,7 +33,7 @@ func TestLegacyTwoRowSuffixRehash(t *testing.T) {
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
 	payload := []byte(`{"canonical":"a"}`)
-	res, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest-a", payload, CheckpointRef{WitnessFP: "test-witness"}, auth)
+	res, err := h.migrate(t, auth, 1, "digest-a", payload)
 	if err != nil {
 		t.Fatalf("suffix migration: %v", err)
 	}
@@ -65,7 +66,9 @@ func TestLegacyTwoRowSuffixRehash(t *testing.T) {
 	if journal[0].Action != JournalCompensated || journal[0].BeforeDigest == "" || journal[0].AfterDigest == "" {
 		t.Fatalf("journal lacks before/after evidence: %+v", journal[0])
 	}
-	if err := VerifyMigrationProof(journal[0], h.dep, h.ktrust); err != nil {
+	if err := VerifyMigrationProof(journal[0], MigrationProofTrust{
+		DeploymentID: h.dep, ProofTrust: h.ktrust, CustodianTrust: h.ctrust,
+	}); err != nil {
 		t.Fatalf("signed migration proof: %v", err)
 	}
 }
@@ -80,7 +83,7 @@ func TestLegacyThreeRowMixedPayloads(t *testing.T) {
 
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
-	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest-mixed-a", []byte(`{"payload":"one"}`), CheckpointRef{WitnessFP: "test-witness"}, auth); err != nil {
+	if _, err := h.migrate(t, auth, 1, "digest-mixed-a", []byte(`{"payload":"one"}`)); err != nil {
 		t.Fatalf("mixed suffix migration: %v", err)
 	}
 	if _, err := h.outbox.VerifyChain(context.Background()); err != nil {
@@ -109,7 +112,7 @@ func TestLegacyMixedWitnessedSuffixRefusal(t *testing.T) {
 	before1, before2 := rowHash(t, h, 1), rowHash(t, h, 2)
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
-	_, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"new":true}`), CheckpointRef{WitnessFP: "test-witness"}, auth)
+	_, err := h.migrate(t, auth, 1, "digest", []byte(`{"new":true}`))
 	if err == nil {
 		t.Fatal("migration rewrote a suffix containing a witnessed row")
 	}
@@ -130,6 +133,7 @@ func TestMigrationCrashBeforeCommit(t *testing.T) {
 	insertLegacyRow(t, h, 1, "crash-before", "")
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
+	fence := h.openFence(t, auth)
 
 	h.outbox.migrationHook = func(stage string) error {
 		if stage == "before_commit" {
@@ -137,7 +141,8 @@ func TestMigrationCrashBeforeCommit(t *testing.T) {
 		}
 		return nil
 	}
-	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"x":1}`), CheckpointRef{WitnessFP: "test-witness"}, auth); err == nil {
+	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
+		h.migrateRequest(auth, fence, 1, "digest", []byte(`{"x":1}`))); err == nil {
 		t.Fatal("injected pre-commit crash did not fail the migration")
 	}
 	h.outbox.migrationHook = nil
@@ -153,7 +158,10 @@ func TestMigrationCrashBeforeCommit(t *testing.T) {
 	if _, err := h.outbox.VerifyChain(context.Background()); err != nil {
 		t.Fatalf("chain after pre-commit crash: %v", err)
 	}
-	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"x":1}`), CheckpointRef{WitnessFP: "test-witness"}, auth); err != nil {
+	// The epoch is still open, so the retry runs inside the same frozen
+	// window rather than under a fresh, possibly stale, head.
+	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
+		h.migrateRequest(auth, fence, 1, "digest", []byte(`{"x":1}`))); err != nil {
 		t.Fatalf("retry after pre-commit crash: %v", err)
 	}
 }
@@ -165,6 +173,7 @@ func TestMigrationCrashAfterCommitBeforeAck(t *testing.T) {
 	h.enqueue("crash-after-b", `{"payload":"two"}`)
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
+	fence := h.openFence(t, auth)
 
 	h.outbox.migrationHook = func(stage string) error {
 		if stage == "after_commit" {
@@ -172,7 +181,8 @@ func TestMigrationCrashAfterCommitBeforeAck(t *testing.T) {
 		}
 		return nil
 	}
-	res, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"x":1}`), CheckpointRef{WitnessFP: "test-witness"}, auth)
+	res, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
+		h.migrateRequest(auth, fence, 1, "digest", []byte(`{"x":1}`)))
 	if err == nil {
 		t.Fatal("injected post-commit crash was not reported")
 	}
@@ -183,12 +193,20 @@ func TestMigrationCrashAfterCommitBeforeAck(t *testing.T) {
 	if _, err := h.outbox.VerifyChain(context.Background()); err != nil {
 		t.Fatalf("chain after post-commit crash: %v", err)
 	}
-	replay, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"x":1}`), CheckpointRef{WitnessFP: "test-witness"}, auth)
+	replay, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
+		h.migrateRequest(auth, fence, 1, "digest", []byte(`{"x":1}`)))
 	if err != nil {
 		t.Fatalf("replay after post-commit crash: %v", err)
 	}
 	if !replay.AlreadyMigrated {
 		t.Fatal("replay after post-commit crash was not idempotent")
+	}
+	fc, err := h.fenceClient(auth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fc.End(context.Background(), fence, "result"); err != nil {
+		t.Fatalf("close epoch: %v", err)
 	}
 	if !h.drain() {
 		t.Fatalf("drain after recovered migration: %s", h.sender.LastError())
@@ -201,6 +219,7 @@ func TestConcurrentEnqueueFenced(t *testing.T) {
 	insertLegacyRow(t, h, 1, "fenced-a", "")
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
+	fence := h.openFence(t, auth)
 
 	migrating := make(chan struct{})
 	release := make(chan struct{})
@@ -213,7 +232,8 @@ func TestConcurrentEnqueueFenced(t *testing.T) {
 	}
 	migErr := make(chan error, 1)
 	go func() {
-		_, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"x":1}`), CheckpointRef{WitnessFP: "test-witness"}, auth)
+		_, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
+			h.migrateRequest(auth, fence, 1, "digest", []byte(`{"x":1}`)))
 		migErr <- err
 	}()
 	<-migrating
@@ -255,11 +275,14 @@ func TestMigrationReplayIdempotent(t *testing.T) {
 	insertLegacyRow(t, h, 1, "replay-a", "")
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
-	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"x":1}`), CheckpointRef{WitnessFP: "test-witness"}, auth); err != nil {
+	fence := h.openFence(t, auth)
+	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
+		h.migrateRequest(auth, fence, 1, "digest", []byte(`{"x":1}`))); err != nil {
 		t.Fatal(err)
 	}
 	chain1, _ := h.outbox.VerifyChain(context.Background())
-	res, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"x":1}`), CheckpointRef{WitnessFP: "test-witness"}, auth)
+	res, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
+		h.migrateRequest(auth, fence, 1, "digest", []byte(`{"x":1}`)))
 	if err != nil {
 		t.Fatalf("idempotent replay: %v", err)
 	}
@@ -276,16 +299,25 @@ func TestMigrationReplayIdempotent(t *testing.T) {
 	}
 }
 
+// TestMigrationRefusesCheckpointedSuffix: the custodian already holds
+// the target sequence (an RC8.1-era witness, or an acknowledgement lost
+// in transit). The epoch freezes at that head, and the rewrite is
+// refused: rewriting it would fork history the witness already holds.
 func TestMigrationRefusesCheckpointedSuffix(t *testing.T) {
 	h := newHarness(t, true)
 	defer h.cancel()
 	insertLegacyRow(t, h, 1, "checkpoint-a", "")
 	hash1 := rowHash(t, h, 1)
-	insertLegacyRow(t, h, 2, "checkpoint-b", hash1)
-	hash2 := rowHash(t, h, 2)
+	h.injectWitnessRecord(t, 1, "checkpoint-a", h.row(t, 1).Envelope)
+
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
-	_, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"x":1}`), CheckpointRef{Seq: 2, Hash: hash2, WitnessFP: "test-witness"}, auth)
+	fence := h.openFence(t, auth)
+	if fence.BaseSeq != 1 {
+		t.Fatalf("epoch froze seq %d, want the custodian head 1", fence.BaseSeq)
+	}
+	_, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
+		h.migrateRequest(auth, fence, 1, "digest", []byte(`{"x":1}`)))
 	if err == nil {
 		t.Fatal("migration rewrote a checkpointed suffix")
 	}
@@ -295,14 +327,15 @@ func TestMigrationRefusesCheckpointedSuffix(t *testing.T) {
 }
 
 // TestLostLocalAckWithRemoteCheckpointRefusesRewrite: the local outbox
-// has no acknowledgement, but the custodian's verified checkpoint covers
-// the target sequence. The suffix must be refused: rewriting it would
-// fork history the witness already holds.
+// has no acknowledgement, but the custodian holds the sequence. The
+// suffix must be refused at both preflight and the library boundary.
 func TestLostLocalAckWithRemoteCheckpointRefusesRewrite(t *testing.T) {
 	h := newHarness(t, true)
 	defer h.cancel()
 	insertLegacyRow(t, h, 1, "lost-ack-a", "")
 	hash := rowHash(t, h, 1)
+	h.injectWitnessRecord(t, 1, "lost-ack-a", h.row(t, 1).Envelope)
+
 	checkpoint := CheckpointRef{Seq: 1, Hash: hash, WitnessFP: h.wsigner.Fingerprint()}
 	pf, err := h.outbox.MigrationPreflight(context.Background(), 1, checkpoint)
 	if err != nil {
@@ -313,21 +346,24 @@ func TestLostLocalAckWithRemoteCheckpointRefusesRewrite(t *testing.T) {
 	}
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
-	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"x":1}`), checkpoint, auth); err == nil {
+	fence := h.openFence(t, auth)
+	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
+		h.migrateRequest(auth, fence, 1, "digest", []byte(`{"x":1}`))); err == nil {
 		t.Fatal("migration rewrote a suffix covered by a remote checkpoint")
 	}
 }
 
-// TestMigrationRequiresVerifiedCheckpoint: a zero-value checkpoint is an
-// offline attempt and must be refused before any mutation.
-func TestMigrationRequiresVerifiedCheckpoint(t *testing.T) {
+// TestMigrationRefusesZeroFence: a zero-value epoch is an offline
+// attempt and must be refused before any mutation.
+func TestMigrationRefusesZeroFence(t *testing.T) {
 	h := newHarness(t, true)
 	defer h.cancel()
 	insertLegacyRow(t, h, 1, "offline-a", "")
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
-	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest", []byte(`{"x":1}`), CheckpointRef{}, auth); err == nil {
-		t.Fatal("offline migration without a verified checkpoint was admitted")
+	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
+		h.migrateRequest(auth, FenceReceipt{}, 1, "digest", []byte(`{"x":1}`))); err == nil {
+		t.Fatal("offline migration without a verified epoch was admitted")
 	}
 	if _, err := h.outbox.VerifyChain(context.Background()); err != nil {
 		t.Fatalf("refused offline migration mutated the chain: %v", err)

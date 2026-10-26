@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -105,11 +106,79 @@ func (s *Service) Handle(ctx context.Context, req Request) Response {
 		ack, err := s.ledger.Submit(ctx, signer, req.Envelope, s.deploymentID, s.kernelTrust)
 		if err != nil {
 			s.log.Warn("witness submission refused", "deployment", req.DeploymentID, "error", err)
-			return Response{Error: err.Error()}
+			return Response{Error: err.Error(), Code: refusalCode(err)}
 		}
 		return Response{OK: true, Ack: ack, WitnessFP: signer.Fingerprint()}
+	case OpFenceBegin, OpFenceEnd, OpFenceAbort:
+		return s.handleFence(ctx, signer, req.Fence)
+	case OpFenceStatus:
+		fence, err := s.ledger.ActiveFence(ctx, s.deploymentID)
+		if err != nil {
+			return Response{Error: fmt.Sprintf("fence status: %v", err)}
+		}
+		if fence == nil {
+			return Response{OK: true, WitnessFP: signer.Fingerprint(), DeploymentID: s.deploymentID}
+		}
+		return Response{OK: true, Fence: fence.receipt(), WitnessFP: signer.Fingerprint()}
 	default:
 		return Response{Error: fmt.Sprintf("unknown op %q", req.Op)}
+	}
+}
+
+// handleFence admits, closes, or aborts a migration epoch. The request
+// must verify under the pinned kernel-relay set before it can touch
+// the fence table — the witness does not take an unauthenticated
+// kernel's word for it that a migration is under way.
+func (s *Service) handleFence(ctx context.Context, signer *evidence.Signer, req *FenceRequest) Response {
+	if err := VerifyFenceRequest(req, s.deploymentID, s.kernelTrust); err != nil {
+		s.log.Warn("fence request refused", "op", req.Op, "error", err)
+		return Response{Error: err.Error(), Code: CodeFenceState}
+	}
+	var (
+		rec FenceRecord
+		err error
+	)
+	switch req.Op {
+	case OpFenceBegin:
+		rec, err = s.ledger.OpenFence(ctx, req)
+	case OpFenceEnd:
+		rec, err = s.ledger.CloseFence(ctx, req)
+	case OpFenceAbort:
+		rec, err = s.ledger.AbortFence(ctx, req)
+	}
+	if err != nil {
+		s.log.Warn("fence operation refused", "op", req.Op, "fence", req.FenceID, "error", err)
+		return Response{Error: err.Error(), Code: refusalCode(err)}
+	}
+	epoch, err := s.ledger.SignerEpoch(ctx)
+	if err != nil {
+		return Response{Error: fmt.Sprintf("fence signer epoch: %v", err)}
+	}
+	receipt, err := SignFenceReceipt(signer, epoch, rec.receipt())
+	if err != nil {
+		return Response{Error: fmt.Sprintf("fence receipt: %v", err)}
+	}
+	s.log.Info("custody migration epoch transition", "op", req.Op, "fence", rec.FenceID,
+		"epoch", rec.Epoch, "state", rec.State, "base_seq", rec.BaseSeq)
+	return Response{OK: true, Fence: receipt, WitnessFP: signer.Fingerprint()}
+}
+
+// refusalCode maps a typed refusal onto a wire code so the kernel can
+// tell "wait for the migration" from "escalate a contradiction".
+func refusalCode(err error) string {
+	switch {
+	case errors.Is(err, ErrFenced):
+		return CodeFenced
+	case errors.Is(err, ErrFenceActive):
+		return CodeFenceActive
+	case errors.Is(err, ErrStaleFenceBase):
+		return CodeStaleFence
+	case errors.Is(err, ErrFenceState):
+		return CodeFenceState
+	case errors.Is(err, ErrContradiction):
+		return CodeContradiction
+	default:
+		return ""
 	}
 }
 

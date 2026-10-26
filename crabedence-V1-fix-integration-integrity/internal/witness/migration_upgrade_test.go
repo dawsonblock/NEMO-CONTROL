@@ -79,8 +79,7 @@ func migratedLegacyRow(t *testing.T, h *harness, seq int64, exec, digest string)
 	insertLegacyRow(t, h, seq, exec, "")
 	authority, repairTrust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, repairTrust, h.dep, OperationMigrate)
-	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, seq, digest,
-		[]byte(`{"canonical":"`+exec+`"}`), CheckpointRef{WitnessFP: "test-witness"}, auth); err != nil {
+	if _, err := h.migrate(t, auth, seq, digest, []byte(`{"canonical":"`+exec+`"}`)); err != nil {
 		t.Fatalf("migrate %s: %v", exec, err)
 	}
 	return LegacyCoverageRequest{
@@ -146,8 +145,7 @@ func TestCopiedMigrationProofDoesNotTransferCoverage(t *testing.T) {
 	authority, repairTrust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, repairTrust, h.dep, OperationMigrate)
 	// Migrate the second row only; row 1 stays an unclassified legacy row.
-	if _, err := h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 2, "digest-b",
-		[]byte(`{"canonical":"b"}`), CheckpointRef{WitnessFP: "test-witness"}, auth); err != nil {
+	if _, err := h.migrate(t, auth, 2, "digest-b", []byte(`{"canonical":"b"}`)); err != nil {
 		t.Fatalf("migrate row 2: %v", err)
 	}
 	journal, err := h.outbox.MigrationJournal(context.Background())
@@ -201,8 +199,7 @@ func TestMigrationRefusesSuffixAcrossKeyRotation(t *testing.T) {
 
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
-	_, err = h.outbox.MigrateLegacySuffix(context.Background(), h.prod, 1, "digest-rot",
-		[]byte(`{"canonical":"rot"}`), CheckpointRef{WitnessFP: "test-witness"}, auth)
+	_, err = h.migrate(t, auth, 1, "digest-rot", []byte(`{"canonical":"rot"}`))
 	if !errors.Is(err, ErrEvidenceContradiction) {
 		t.Fatalf("suffix spanning a rotation = %v, want ErrEvidenceContradiction", err)
 	}

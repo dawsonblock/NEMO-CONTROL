@@ -83,6 +83,7 @@ func OpenLedger(path string) (*Ledger, error) {
 			PRIMARY KEY (deployment_id, seq),
 			UNIQUE (deployment_id, execution_id)
 		)`,
+		fenceDDL,
 	} {
 		if _, err := db.Exec(stmt); err != nil {
 			db.Close()
@@ -139,8 +140,12 @@ func (l *Ledger) AdvanceSignerEpoch(ctx context.Context) (int64, error) {
 // MaxEnvelopeEpoch is the highest subject-sequence epoch custodied —
 // prior-epoch replays are refused below it.
 func (l *Ledger) MaxEnvelopeEpoch(ctx context.Context, deploymentID string) (int64, error) {
+	return maxEnvelopeEpochFrom(ctx, l.db, deploymentID)
+}
+
+func maxEnvelopeEpochFrom(ctx context.Context, q fenceQueryer, deploymentID string) (int64, error) {
 	var v sql.NullInt64
-	err := l.db.QueryRowContext(ctx, `
+	err := q.QueryRowContext(ctx, `
 		SELECT MAX(CAST(json_extract(envelope_json, '$.sequence.epoch') AS INTEGER))
 		FROM custody_log WHERE deployment_id = $1`, deploymentID).Scan(&v)
 	if err != nil || !v.Valid {
@@ -152,7 +157,11 @@ func (l *Ledger) MaxEnvelopeEpoch(ctx context.Context, deploymentID string) (int
 // Head returns the deployment's custody head — the highest contiguous
 // sequence stored — and the identity of the head record.
 func (l *Ledger) Head(ctx context.Context, deploymentID string) (seq int64, hash, executionID string, err error) {
-	err = l.db.QueryRowContext(ctx, `
+	return headFrom(ctx, l.db, deploymentID)
+}
+
+func headFrom(ctx context.Context, q fenceQueryer, deploymentID string) (seq int64, hash, executionID string, err error) {
+	err = q.QueryRowContext(ctx, `
 		SELECT seq, envelope_hash, execution_id FROM custody_log
 		WHERE deployment_id = $1 ORDER BY seq DESC LIMIT 1`, deploymentID).
 		Scan(&seq, &hash, &executionID)
@@ -171,9 +180,13 @@ func (l *Ledger) Records(ctx context.Context, deploymentID string) (int64, error
 
 // Stored returns the custody row for (deployment, seq) or nil.
 func (l *Ledger) Stored(ctx context.Context, deploymentID string, seq int64) (*CustodyRow, error) {
+	return storedFrom(ctx, l.db, deploymentID, seq)
+}
+
+func storedFrom(ctx context.Context, q fenceQueryer, deploymentID string, seq int64) (*CustodyRow, error) {
 	var row CustodyRow
 	var envJSON, ackJSON, receivedAt string
-	err := l.db.QueryRowContext(ctx, `
+	err := q.QueryRowContext(ctx, `
 		SELECT deployment_id, seq, execution_id, envelope_hash, envelope_json, ack, received_at
 		FROM custody_log WHERE deployment_id = $1 AND seq = $2`, deploymentID, seq).
 		Scan(&row.DeploymentID, &row.Seq, &row.ExecutionID, &row.EnvelopeHash, &envJSON, &ackJSON, &receivedAt)
@@ -195,15 +208,23 @@ func (l *Ledger) Stored(ctx context.Context, deploymentID string, seq int64) (*C
 }
 
 // Submit verifies, stores, and countersigns one custody submission.
-// The binding rules, in order: the deployment must equal the witness's
-// pinned identity; the envelope must satisfy the full
-// custody-envelope-v1 verification pipeline under the pinned kernel
-// trust set (family allowlist, deployment, sequence expectation,
-// content hash, signature under a pinned kernel-relay key); an
-// identical re-submission returns the stored ack (recovery resends are
-// idempotent); a divergent record at a custodied index is a
-// contradictory checkpoint and fails closed; a new record must extend
-// the head by exactly one and chain to its hash.
+// The binding rules, in order: no migration epoch may be open for the
+// deployment; the deployment must equal the witness's pinned identity;
+// the envelope must satisfy the full custody-envelope-v1 verification
+// pipeline under the pinned kernel trust set (family allowlist,
+// deployment, sequence expectation, content hash, signature under a
+// pinned kernel-relay key); an identical re-submission returns the
+// stored ack (recovery resends are idempotent); a divergent record at
+// a custodied index is a contradictory checkpoint and fails closed; a
+// new record must extend the head by exactly one and chain to its
+// hash.
+//
+// The fence check, the head read, and the insert share one immediate
+// transaction. That is what makes a migration epoch an actual barrier:
+// a submission racing a fence-begin either commits before the fence
+// (and is therefore inside the head the fence freezes) or observes the
+// fence and is refused. There is no window in which a submission is
+// admitted against a head a migration has already frozen.
 func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, env *custody.Envelope, deploymentID string, kernelTrust *custody.TrustSet) (*Ack, error) {
 	if env == nil {
 		return nil, fmt.Errorf("%w: submission carries no custody-envelope-v1 record — capability negotiation is explicit", ErrEnvelope)
@@ -217,14 +238,27 @@ func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, env *custo
 		return nil, fmt.Errorf("%w: %v", ErrEnvelope, err)
 	}
 
+	tx, err := l.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if fence, open, err := activeFenceFrom(ctx, tx, deploymentID); err != nil {
+		return nil, err
+	} else if open {
+		return nil, fmt.Errorf("%w: epoch %d (fence %s) is open at seq %d — submissions are suspended until the migration closes it",
+			ErrFenced, fence.Epoch, fence.FenceID, fence.BaseSeq)
+	}
+
 	// Idempotent resend first: an identical record already custodied
 	// returns its stored acknowledgement — recovery redelivery is never
 	// a second custody.
-	if existing, err := l.Stored(ctx, deploymentID, env.Sequence.Index); err != nil {
+	if existing, err := storedFrom(ctx, tx, deploymentID, env.Sequence.Index); err != nil {
 		return nil, err
 	} else if existing != nil {
 		if existing.EnvelopeHash == envHash {
-			return existing.Ack, nil
+			return existing.Ack, tx.Commit()
 		}
 		return nil, fmt.Errorf("%w: index %d already custodies %s, submission presents %s",
 			ErrContradiction, env.Sequence.Index, existing.EnvelopeHash, envHash)
@@ -233,11 +267,11 @@ func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, env *custo
 	// A new execution_id at a custodied-less index must extend the head
 	// exactly and chain to it — gaps, replays, and rollback disguises
 	// are refused before the signature is even checked.
-	head, headHash, _, err := l.Head(ctx, deploymentID)
+	head, headHash, _, err := headFrom(ctx, tx, deploymentID)
 	if err != nil {
 		return nil, err
 	}
-	maxEpoch, err := l.MaxEnvelopeEpoch(ctx, deploymentID)
+	maxEpoch, err := maxEnvelopeEpochFrom(ctx, tx, deploymentID)
 	if err != nil {
 		return nil, err
 	}
@@ -264,11 +298,11 @@ func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, env *custo
 	// Execution-id uniqueness is durable state, not just the index
 	// check: a new index reusing a custodied execution id is a replay
 	// under a different sequence.
-	var dup string
-	err = l.db.QueryRowContext(ctx, `SELECT seq FROM custody_log WHERE deployment_id = $1 AND execution_id = $2`,
+	var dup int64
+	err = tx.QueryRowContext(ctx, `SELECT seq FROM custody_log WHERE deployment_id = $1 AND execution_id = $2`,
 		deploymentID, env.Subject.ExecutionID).Scan(&dup)
 	if err == nil {
-		return nil, fmt.Errorf("%w: execution %s already custodied at seq %s", ErrDuplicate, env.Subject.ExecutionID, dup)
+		return nil, fmt.Errorf("%w: execution %s already custodied at seq %d", ErrDuplicate, env.Subject.ExecutionID, dup)
 	}
 	if err != sql.ErrNoRows {
 		return nil, err
@@ -290,7 +324,7 @@ func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, env *custo
 	if err != nil {
 		return nil, err
 	}
-	_, err = l.db.ExecContext(ctx, `
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO custody_log (deployment_id, seq, execution_id, envelope_hash, envelope_json, ack, signer_epoch, received_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		deploymentID, env.Sequence.Index, env.Subject.ExecutionID, envHash,
@@ -298,6 +332,9 @@ func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, env *custo
 		time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return nil, fmt.Errorf("witness custody insert: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("witness custody commit: %w", err)
 	}
 	return ack, nil
 }

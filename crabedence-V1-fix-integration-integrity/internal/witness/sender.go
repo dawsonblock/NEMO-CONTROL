@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -319,6 +320,16 @@ func (s *Sender) drainPass(ctx context.Context) bool {
 		}
 		ack, err := s.client.Submit(ctx, s.deploymentID, r.Envelope)
 		if err != nil {
+			if errors.Is(err, ErrFenced) {
+				// A migration epoch freezes the custodian. This is not a
+				// custody fault: the witness is doing exactly what the
+				// fence promised, and the backlog resumes when the epoch
+				// closes. The pass still fails closed — nothing is
+				// recorded and readiness is not claimed.
+				s.lastErr.Store(fmt.Sprintf("custody is fenced for a migration epoch — submissions suspended: %v", err))
+				s.log.Info("custody submissions suspended by a migration epoch", "seq", r.Seq, "execution", r.ExecutionID)
+				return false
+			}
 			s.lastErr.Store(fmt.Sprintf("witness submit seq %d: %v", r.Seq, err))
 			s.log.Warn("custody submission failed — sender degraded until next pass",
 				"seq", r.Seq, "execution", r.ExecutionID, "error", err)

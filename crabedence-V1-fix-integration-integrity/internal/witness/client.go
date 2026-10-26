@@ -82,9 +82,28 @@ func (c *Client) Submit(ctx context.Context, deploymentID string, env *custody.E
 		return nil, err
 	}
 	if !resp.OK {
-		return nil, fmt.Errorf("witness submit refused: %s", resp.Error)
+		return nil, refusal(fmt.Errorf("witness submit refused: %s", resp.Error), resp.Code)
 	}
 	return resp.Ack, nil
+}
+
+// refusal attaches the witness's typed refusal to the transport error,
+// so a caller can tell a fence (wait) from a contradiction (escalate).
+func refusal(err error, code string) error {
+	switch code {
+	case CodeFenced:
+		return fmt.Errorf("%w: %v", ErrFenced, err)
+	case CodeFenceActive:
+		return fmt.Errorf("%w: %v", ErrFenceActive, err)
+	case CodeStaleFence:
+		return fmt.Errorf("%w: %v", ErrStaleFenceBase, err)
+	case CodeFenceState:
+		return fmt.Errorf("%w: %v", ErrFenceState, err)
+	case CodeContradiction:
+		return fmt.Errorf("%w: %v", ErrContradiction, err)
+	default:
+		return err
+	}
 }
 
 // Checkpoint returns the witness's signed custody head. The signature
@@ -106,4 +125,46 @@ func (c *Client) Checkpoint(ctx context.Context, deploymentID string) (*Checkpoi
 		WitnessFP:       resp.WitnessFP,
 		Signature:       resp.CheckpointSig,
 	}, nil
+}
+
+// BeginFence asks the witness to freeze the deployment at the head
+// named in the (already signed) request. The returned receipt is NOT
+// verified here — VerifyFenceReceipt is the boundary's obligation.
+func (c *Client) BeginFence(ctx context.Context, req *FenceRequest) (*FenceReceipt, error) {
+	return c.fenceCall(ctx, OpFenceBegin, req)
+}
+
+// EndFence closes a migration epoch with its result digest.
+func (c *Client) EndFence(ctx context.Context, req *FenceRequest) (*FenceReceipt, error) {
+	return c.fenceCall(ctx, req.Op, req)
+}
+
+// ActiveFence reports the open migration epoch, or nil.
+func (c *Client) ActiveFence(ctx context.Context, deploymentID string) (*FenceReceipt, error) {
+	resp, err := c.call(ctx, Request{Op: OpFenceStatus, DeploymentID: deploymentID})
+	if err != nil {
+		return nil, err
+	}
+	if !resp.OK {
+		return nil, fmt.Errorf("witness fence status refused: %s", resp.Error)
+	}
+	return resp.Fence, nil
+}
+
+func (c *Client) fenceCall(ctx context.Context, op string, req *FenceRequest) (*FenceReceipt, error) {
+	if req == nil {
+		return nil, fmt.Errorf("witness %s: no fence request", op)
+	}
+	req.Op = op
+	resp, err := c.call(ctx, Request{Op: op, DeploymentID: req.DeploymentID, Fence: req})
+	if err != nil {
+		return nil, err
+	}
+	if !resp.OK {
+		return nil, refusal(fmt.Errorf("witness %s refused: %s", op, resp.Error), resp.Code)
+	}
+	if resp.Fence == nil {
+		return nil, fmt.Errorf("witness %s returned no signed fence receipt", op)
+	}
+	return resp.Fence, nil
 }

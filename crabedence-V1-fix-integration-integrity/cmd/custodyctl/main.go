@@ -23,11 +23,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"hash"
 	"os"
 	"time"
 
@@ -50,15 +53,21 @@ func usage() {
   custodyctl status    -outbox <path> [-json]
   custodyctl inspect   -outbox <path> [-limit N] [-cursor N] [-page-size N] [-json]
   custodyctl preflight -outbox <path> [-page-size N] [-json]
+  custodyctl fence     status -outbox <path> [-json]
+  custodyctl fence     abort  (same authority flags as migrate)
   custodyctl migrate   -outbox <path> -effect-store <path> -deployment <id>
-                       -signer-key <pem> -operator-token <json> -repair-trust-roots <file>
-                       -trust-roots <file> [-witness-socket <path> | -witness-tls <addr> -witness-tls-key <fp>]
+                       -signer-key <pem> -operator-token <json>
+                       -custodian-trust-roots <file> -kernel-trust-roots <file>
+                       -repair-trust-roots <file>
+                       [-witness-socket <path> | -witness-tls <addr> -witness-tls-key <fp>]
                        [-actor <subject>] [-dry-run] [-json]
   custodyctl rescan    (same authority flags as migrate) [-dry-run] [-json]
   custodyctl repair    (same authority flags as migrate) -reason <text> [-actor <subject>] [-dry-run] [-json]
 
 Read-only commands need no authority. Mutating commands require a
 repair-authority-signed grant; -actor must match the grant subject.
+Custodian, kernel-relay, and repair authorities resolve from three
+separate role-pinned trust files — one file may only pin its own role.
 `)
 }
 
@@ -76,6 +85,48 @@ func main() {
 		runReadOnly(op, os.Args[2:])
 	case "migrate", "rescan", "repair":
 		runMutating(op, os.Args[2:])
+	case "fence":
+		runFence(os.Args[2:])
+	default:
+		usage()
+		os.Exit(2)
+	}
+}
+
+// runFence is the migration-epoch operator surface. status is
+// read-only; abort releases an epoch whose migration will never
+// complete, and requires the same grant that opened it.
+func runFence(args []string) {
+	if len(args) == 0 {
+		usage()
+		os.Exit(2)
+	}
+	switch args[0] {
+	case "status":
+		f := parseReadFlags("fence status", args[1:])
+		outbox, err := witness.OpenOutboxReadOnly(f.outbox)
+		if err != nil {
+			fatalf("outbox (read-only): %v", err)
+		}
+		defer outbox.Close()
+		intents, err := outbox.FenceIntents(context.Background(), f.limit)
+		if err != nil {
+			fatalf("fence status: %v", err)
+		}
+		if f.json {
+			writeJSON(map[string]any{"fences": intents})
+			return
+		}
+		if len(intents) == 0 {
+			fmt.Println("no migration epochs recorded")
+			return
+		}
+		for _, in := range intents {
+			fmt.Printf("fence=%s state=%s epoch_base=%d base_hash=%s grant=%s opened=%s closed=%s\n",
+				in.FenceID, in.State, in.BaseSeq, in.BaseHash, in.GrantDigest, in.OpenedAt, in.ClosedAt)
+		}
+	case "abort":
+		runMutating("fence-abort", args[1:])
 	default:
 		usage()
 		os.Exit(2)
@@ -361,6 +412,7 @@ type mutateFlags struct {
 	outbox        string
 	deployment    string
 	trustRoots    string
+	kernelTrust   string
 	repairTrust   string
 	socket        string
 	tlsAddr       string
@@ -384,7 +436,9 @@ func parseMutateFlags(op string, args []string) mutateFlags {
 	var f mutateFlags
 	fs.StringVar(&f.outbox, "outbox", os.Getenv("CRABEDENCE_WITNESS_OUTBOX"), "custody outbox sqlite path")
 	fs.StringVar(&f.deployment, "deployment", os.Getenv("CRABEDENCE_WITNESS_DEPLOYMENT"), "custody deployment id")
-	fs.StringVar(&f.trustRoots, "trust-roots", os.Getenv("CRABEDENCE_WITNESS_TRUST_ROOTS"), "custodian trust set JSON")
+	fs.StringVar(&f.trustRoots, "custodian-trust-roots", os.Getenv("CRABEDENCE_WITNESS_TRUST_ROOTS"), "custodian trust set JSON (custodian keys only)")
+	fs.StringVar(&f.trustRoots, "trust-roots", os.Getenv("CRABEDENCE_WITNESS_TRUST_ROOTS"), "alias for -custodian-trust-roots")
+	fs.StringVar(&f.kernelTrust, "kernel-trust-roots", os.Getenv("CRABEDENCE_WITNESS_KERNEL_TRUST_ROOTS"), "kernel-relay trust set JSON (kernel-relay keys only)")
 	fs.StringVar(&f.repairTrust, "repair-trust-roots", os.Getenv("CRABEDENCE_REPAIR_TRUST_ROOTS"), "pinned repair-authority trust set JSON")
 	fs.StringVar(&f.socket, "witness-socket", os.Getenv("CRABEDENCE_WITNESS_SOCKET"), "witness unix socket")
 	fs.StringVar(&f.tlsAddr, "witness-tls", os.Getenv("CRABEDENCE_WITNESS_TLS"), "witness TLS addr:port")
@@ -431,6 +485,10 @@ type migrateOutput struct {
 	Blocked     int      `json:"blocked"`
 	AlreadyDone int      `json:"already_done"`
 	Checkpoint  bool     `json:"checkpoint_verified"`
+	FenceID     string   `json:"fence_id,omitempty"`
+	FenceEpoch  int64    `json:"fence_epoch,omitempty"`
+	FenceResult string   `json:"fence_result_digest,omitempty"`
+	Resumed     bool     `json:"resumed_epoch,omitempty"`
 	Errors      []string `json:"errors,omitempty"`
 }
 
@@ -478,7 +536,10 @@ func runMutating(op string, args []string) {
 		fatalf("%s requires -repair-trust-roots — repair authority is never inferred from the evidence signer", op)
 	}
 	if f.trustRoots == "" {
-		fatalf("%s requires -trust-roots — witness acknowledgements and checkpoints are unverifiable without a pinned custodian set", op)
+		fatalf("%s requires -custodian-trust-roots — witness acknowledgements, checkpoints and migration epochs are unverifiable without a pinned custodian set", op)
+	}
+	if f.kernelTrust == "" {
+		fatalf("%s requires -kernel-trust-roots — migration proofs are signed by the kernel relay and verified against a set pinned separately from the custodian set", op)
 	}
 	if op == "repair" && f.reason == "" {
 		fatalf("repair requires -reason — an auditable operator justification")
@@ -489,9 +550,25 @@ func runMutating(op string, args []string) {
 	if err != nil {
 		fatalf("%s: %v", op, err)
 	}
-	repairTrust, err := custody.LoadTrustSet(f.repairTrust)
+	// Each authority resolves from its own role-pinned file. A set that
+	// pins another role's key is a configuration fault, not a broader
+	// trust decision, so the loader refuses it rather than filtering.
+	repairTrust, err := custody.LoadTrustSetForRole(f.repairTrust, custody.RoleRepairAuthority)
 	if err != nil {
 		fatalf("%s repair trust: %v", op, err)
+	}
+	trust, err := custody.LoadTrustSetForRole(f.trustRoots, custody.RoleCustodian)
+	if err != nil {
+		fatalf("%s custodian trust: %v", op, err)
+	}
+	kernelTrust, err := custody.LoadTrustSetForRole(f.kernelTrust, custody.RoleKernelRelay)
+	if err != nil {
+		fatalf("%s kernel-relay trust: %v", op, err)
+	}
+	if err := custody.CheckDisjointRoles(map[string]*custody.TrustSet{
+		"custodian": trust, "kernel-relay": kernelTrust, "repair-authority": repairTrust,
+	}); err != nil {
+		fatalf("%s trust configuration: %v", op, err)
 	}
 	operation := witness.OperationMigrate
 	switch op {
@@ -510,6 +587,10 @@ func runMutating(op string, args []string) {
 	if err != nil {
 		fatalf("%s: %v", op, err)
 	}
+	if op == "fence-abort" {
+		runFenceAbort(ctx, f, grant, grantDigest, trust, kernelTrust)
+		return
+	}
 
 	rawKey, err := os.ReadFile(f.signerKey)
 	if err != nil {
@@ -518,10 +599,6 @@ func runMutating(op string, args []string) {
 	signer, err := evidence.ParseSignerPEM(rawKey)
 	if err != nil {
 		fatalf("signer key: %v", err)
-	}
-	trust, err := custody.LoadTrustSet(f.trustRoots)
-	if err != nil {
-		fatalf("trust roots: %v", err)
 	}
 	outbox, err := witness.OpenOutbox(f.outbox)
 	if err != nil {
@@ -551,7 +628,7 @@ func runMutating(op string, args []string) {
 		DeploymentID:   f.deployment,
 		RepairTrust:    repairTrust,
 		CustodianTrust: trust,
-		ProofTrust:     trust,
+		ProofTrust:     kernelTrust,
 	}
 	var client *witness.Client
 	if f.tlsAddr != "" {
@@ -586,7 +663,18 @@ func runMutating(op string, args []string) {
 	}
 
 	if !f.dryRun {
-		if err := outbox.ConsumeOperatorNonce(ctx, grant, operation); err != nil {
+		// A migration that crashed after opening its epoch still holds
+		// the consumed nonce. Resuming that epoch is the same
+		// authorization act, not a replay: the durable fence intent is
+		// the evidence, and the witness will only accept the same
+		// fence identity.
+		pending, perr := outbox.PendingFenceIntent(ctx, f.deployment, grantDigest)
+		if perr != nil {
+			fatalf("%s: %v", op, perr)
+		}
+		if pending != nil && op == "migrate" {
+			fmt.Fprintf(os.Stderr, "custodyctl: resuming migration epoch %s (base seq %d)\n", pending.FenceID, pending.BaseSeq)
+		} else if err := outbox.ConsumeOperatorNonce(ctx, grant, operation); err != nil {
 			fatalf("%s: %v", op, err)
 		}
 	}
@@ -629,25 +717,101 @@ func runMutating(op string, args []string) {
 	}
 }
 
+// runFenceAbort releases a migration epoch whose rewrite will never
+// complete. It requires the same grant that opened the epoch, so an
+// unrelated operator cannot unfreeze custody, and the witness refuses
+// the abort if custody moved while the epoch was open.
+func runFenceAbort(ctx context.Context, f mutateFlags, grant *witness.OperatorGrant, grantDigest string, trust, kernelTrust *custody.TrustSet) {
+	if f.socket == "" && f.tlsAddr == "" {
+		fatalf("fence abort requires -witness-socket or -witness-tls — an epoch is released at the custodian, never locally")
+	}
+	rawKey, err := os.ReadFile(f.signerKey)
+	if err != nil {
+		fatalf("signer key: %v", err)
+	}
+	signer, err := evidence.ParseSignerPEM(rawKey)
+	if err != nil {
+		fatalf("signer key: %v", err)
+	}
+	outbox, err := witness.OpenOutbox(f.outbox)
+	if err != nil {
+		fatalf("outbox: %v", err)
+	}
+	defer outbox.Close()
+	pending, err := outbox.PendingFenceIntent(ctx, f.deployment, grantDigest)
+	if err != nil {
+		fatalf("fence abort: %v", err)
+	}
+	if pending == nil {
+		fatalf("fence abort: no open migration epoch was opened by this grant")
+	}
+	client, err := witnessClient(f, signer)
+	if err != nil {
+		fatalf("fence abort: %v", err)
+	}
+	fc := &witness.FenceClient{
+		Client: client, Signer: signer, DeploymentID: f.deployment,
+		GrantDigest: grantDigest, KernelTrust: kernelTrust, CustodianTrust: trust,
+	}
+	receipt, err := fc.Abort(ctx, witness.FenceReceipt{
+		FenceID: pending.FenceID, GrantDigest: grantDigest,
+		BaseSeq: pending.BaseSeq, BaseHash: pending.BaseHash,
+	})
+	if err != nil {
+		fatalf("fence abort: %v", err)
+	}
+	if err := outbox.CompleteFenceIntent(ctx, receipt.FenceID, receipt.State, ""); err != nil {
+		fatalf("fence abort: %v", err)
+	}
+	if f.jsonOut {
+		writeJSON(map[string]any{"operation": "fence-abort", "fence_id": receipt.FenceID, "state": receipt.State, "subject": grant.Subject})
+		return
+	}
+	fmt.Printf("fence abort: epoch %s released (%s); submissions resume on the next drain\n", receipt.FenceID, receipt.State)
+}
+
+// witnessClient builds the kernel's transport handle from the
+// configured posture.
+func witnessClient(f mutateFlags, signer *evidence.Signer) (*witness.Client, error) {
+	if f.tlsAddr != "" {
+		tlsCfg, err := witness.ClientTLSConfig(signer, f.tlsKeyFP)
+		if err != nil {
+			return nil, fmt.Errorf("witness tls: %w", err)
+		}
+		return witness.NewTLSClient(f.tlsAddr, tlsCfg), nil
+	}
+	if f.socket != "" {
+		return witness.NewClient(f.socket), nil
+	}
+	return nil, fmt.Errorf("no witness transport configured")
+}
+
 func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.EffectStore, producer witness.Producer, policy execution.CustodyCoveragePolicy, f mutateFlags, auth witness.OperatorAuthorization, grant *witness.OperatorGrant, grantDigest string, client *witness.Client) {
 	out := migrateOutput{Operation: "migrate", Subject: grant.Subject, Grant: grantDigest}
-	// Offline suffix rewriting is not authorized: a local outbox that
-	// lost an acknowledgement must not rewrite history the custodian may
-	// already hold. The checkpoint is fetched live and verified under the
-	// pinned custodian set; its identity, sequence, and hash are bound
-	// into the signed migration proof and journal.
+	// Offline suffix rewriting is not authorized. A checkpoint proves
+	// the custodian's state at one instant; only an open migration
+	// epoch proves nothing can still land while the rewrite commits.
+	// The epoch is opened first and closed last, and every rewrite
+	// binds its signed receipt.
 	if client == nil {
-		fatalf("migrate requires -witness-socket or -witness-tls — offline suffix rewriting is not authorized without a verified custodian checkpoint")
+		fatalf("migrate requires -witness-socket or -witness-tls — offline suffix rewriting is not authorized without a verified custodian epoch")
 	}
-	head, err := client.Checkpoint(ctx, f.deployment)
+	fenceClient := &witness.FenceClient{
+		Client: client, Signer: producer.Signer, DeploymentID: f.deployment,
+		GrantDigest: grantDigest, KernelTrust: policy.ProofTrust, CustodianTrust: policy.CustodianTrust,
+	}
+	fence, resumed, err := openMigrationEpoch(ctx, outbox, fenceClient, f.deployment, grantDigest)
 	if err != nil {
-		fatalf("migrate: witness checkpoint: %v", err)
+		fatalf("migrate: %v", err)
 	}
-	if err := witness.VerifyCheckpoint(head, f.deployment, policy.CustodianTrust); err != nil {
-		fatalf("migrate: witness checkpoint unverifiable — refusing rewrite of possibly checkpointed history: %v", err)
-	}
-	checkpoint := witness.CheckpointRef{Seq: head.Seq, Hash: head.Hash, WitnessFP: head.WitnessFP}
+	out.FenceID, out.FenceEpoch, out.Resumed = fence.FenceID, fence.Epoch, resumed
 	out.Checkpoint = true
+
+	// The epoch is closed exactly once, on the success path: a failed
+	// rewrite leaves the custodian frozen on purpose, so a second
+	// migration cannot start against a half-rewritten suffix.
+	result := newMigrationDigest()
+
 	cursor := f.cursor
 	processed := 0
 	for {
@@ -697,7 +861,9 @@ func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.E
 				out.Quarantined++
 				continue
 			}
-			pf, err := outbox.MigrationPreflight(ctx, r.Seq, checkpoint)
+			pf, err := outbox.MigrationPreflight(ctx, r.Seq, witness.CheckpointRef{
+				Seq: fence.BaseSeq, Hash: fence.BaseHash, WitnessFP: fence.WitnessFP,
+			})
 			if err != nil {
 				fatalf("migrate seq %d preflight: %v", r.Seq, err)
 			}
@@ -710,15 +876,26 @@ func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.E
 				out.Compensated++
 				continue
 			}
-			res, err := outbox.MigrateLegacySuffix(ctx, producer, r.Seq, rec.TerminalReceiptDigest, payload, checkpoint, auth)
+			res, err := outbox.MigrateLegacySuffix(ctx, producer, witness.MigrationRequest{
+				RowSeq:                r.Seq,
+				TerminalReceiptDigest: rec.TerminalReceiptDigest,
+				Native:                payload,
+				Fence:                 fence,
+				Authorization:         auth,
+				CustodianTrust:        policy.CustodianTrust,
+			})
 			if err != nil {
-				fatalf("migrate seq %d: %v", r.Seq, err)
+				// The epoch stays open deliberately: a failed rewrite
+				// must not silently release custody, and the operator
+				// re-runs migrate with the same grant to resume it.
+				fatalf("migrate seq %d: %v (epoch %s stays open; re-run with the same grant to resume)", r.Seq, err, fence.FenceID)
 			}
 			if res.AlreadyMigrated {
 				out.AlreadyDone++
 			} else {
 				out.Compensated++
 			}
+			result.add(r.Seq, res.AfterDigest)
 		}
 		if len(page) > 0 {
 			cursor = page[len(page)-1].Seq
@@ -727,12 +904,22 @@ func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.E
 			break
 		}
 	}
+	if !f.dryRun {
+		receipt, cerr := fenceClient.End(ctx, fence, result.sum())
+		if cerr != nil {
+			fatalf("migrate: migration epoch %s could not be closed: %v — custody stays fenced until an operator resolves it", fence.FenceID, cerr)
+		}
+		if cerr := outbox.CompleteFenceIntent(ctx, fence.FenceID, receipt.State, receipt.ResultDigest); cerr != nil {
+			fatalf("migrate: fence intent: %v", cerr)
+		}
+		out.FenceResult = receipt.ResultDigest
+	}
 	out.DryRun = f.dryRun
 	if f.jsonOut {
 		writeJSON(out)
 	} else {
-		fmt.Printf("migrate: %d compensated, %d journaled legacy-witnessed, %d quarantined unverifiable, %d blocked, %d already migrated\n",
-			out.Compensated, out.Witnessed, out.Quarantined, out.Blocked, out.AlreadyDone)
+		fmt.Printf("migrate: %d compensated, %d journaled legacy-witnessed, %d quarantined unverifiable, %d blocked, %d already migrated (epoch %s at seq %d)\n",
+			out.Compensated, out.Witnessed, out.Quarantined, out.Blocked, out.AlreadyDone, fence.FenceID, fence.BaseSeq)
 		for _, e := range out.Errors {
 			fmt.Fprintln(os.Stderr, "custodyctl: blocked:", e)
 		}
@@ -741,3 +928,62 @@ func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.E
 		os.Exit(3)
 	}
 }
+
+// openMigrationEpoch resumes the epoch this grant already planned, or
+// plans and opens a new one. The local intent is durable before the
+// witness is asked to freeze, so a crash in between is recoverable
+// rather than an orphaned epoch nobody can name.
+func openMigrationEpoch(ctx context.Context, outbox *witness.Outbox, fenceClient *witness.FenceClient, deploymentID, grantDigest string) (witness.FenceReceipt, bool, error) {
+	pending, err := outbox.PendingFenceIntent(ctx, deploymentID, grantDigest)
+	if err != nil {
+		return witness.FenceReceipt{}, false, err
+	}
+	if pending != nil {
+		receipt, rerr := fenceClient.Reenter(ctx, pending.FenceID, pending.BaseSeq, pending.BaseHash)
+		if rerr == nil {
+			return receipt, true, nil
+		}
+		// A witness that never saw the planned epoch has no fence to
+		// re-enter; fall through and plan a fresh one.
+		if !errors.Is(rerr, witness.ErrFenceState) {
+			return witness.FenceReceipt{}, false, rerr
+		}
+	}
+	const attempts = 8
+	var last error
+	for attempt := 0; attempt < attempts; attempt++ {
+		req, perr := fenceClient.Plan(ctx)
+		if perr != nil {
+			return witness.FenceReceipt{}, false, perr
+		}
+		if err := outbox.RecordFenceIntent(ctx, witness.FenceIntent{
+			FenceID: req.FenceID, DeploymentID: deploymentID, GrantDigest: grantDigest,
+			BaseSeq: req.BaseSeq, BaseHash: req.BaseHash, State: witness.FenceOpen,
+			OpenedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		}); err != nil {
+			return witness.FenceReceipt{}, false, err
+		}
+		receipt, oerr := fenceClient.Open(ctx, req)
+		if oerr == nil {
+			return receipt, false, nil
+		}
+		if !errors.Is(oerr, witness.ErrStaleFenceBase) {
+			return witness.FenceReceipt{}, false, oerr
+		}
+		last = oerr
+	}
+	return witness.FenceReceipt{}, false, fmt.Errorf("custody head kept moving across %d attempts — submissions must quiesce before a migration epoch can open: %w", attempts, last)
+}
+
+// migrationDigest is the ordered digest of the rewrites one epoch
+// performed. It is what the fence closes over, so the custodian records
+// which migrations ran inside the frozen window.
+type migrationDigest struct{ h hash.Hash }
+
+func newMigrationDigest() *migrationDigest { return &migrationDigest{h: sha256.New()} }
+
+func (m *migrationDigest) add(seq int64, afterDigest string) {
+	fmt.Fprintf(m.h, "%d\x00%s\x00", seq, afterDigest)
+}
+
+func (m *migrationDigest) sum() string { return hex.EncodeToString(m.h.Sum(nil)) }

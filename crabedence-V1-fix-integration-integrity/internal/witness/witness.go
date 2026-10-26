@@ -50,7 +50,19 @@ type Request struct {
 	// A submission without an envelope is refused: capability
 	// negotiation is explicit, never a silent downgrade.
 	Envelope *custody.Envelope `json:"envelope,omitempty"`
+	// Fence is the signed migration-epoch request for the fence ops.
+	Fence *FenceRequest `json:"fence,omitempty"`
 }
+
+// Response codes let the kernel distinguish a refusal it must escalate
+// from one it must simply wait out (a fence) without parsing prose.
+const (
+	CodeFenced        = "fenced"
+	CodeFenceActive   = "fence-active"
+	CodeStaleFence    = "stale-fence-base"
+	CodeFenceState    = "fence-state"
+	CodeContradiction = "contradiction"
+)
 
 // Response carries the operation result: a signed acknowledgement on
 // submit, the signed custody head on checkpoint, or service counters
@@ -58,6 +70,7 @@ type Request struct {
 type Response struct {
 	OK    bool   `json:"ok"`
 	Error string `json:"error,omitempty"`
+	Code  string `json:"code,omitempty"`
 
 	Ack *Ack `json:"ack,omitempty"`
 
@@ -68,6 +81,9 @@ type Response struct {
 	LastExecutionID string `json:"last_execution_id,omitempty"`
 	SignerEpoch     int64  `json:"signer_epoch,omitempty"`
 	CheckpointSig   string `json:"checkpoint_sig,omitempty"`
+
+	// Fence fields — the signed migration epoch.
+	Fence *FenceReceipt `json:"fence,omitempty"`
 
 	// Status fields.
 	WitnessFP    string `json:"witness_fp,omitempty"`

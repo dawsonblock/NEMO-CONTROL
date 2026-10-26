@@ -92,6 +92,7 @@ func OpenOutbox(path string) (*Outbox, error) {
 		)`,
 		legacyJournalDDL,
 		nonceLedgerDDL,
+		fenceIntentDDL,
 	} {
 		if _, err := db.Exec(stmt); err != nil {
 			db.Close()

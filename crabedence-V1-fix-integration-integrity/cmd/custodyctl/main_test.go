@@ -176,6 +176,33 @@ func writeTrustFile(t *testing.T, path, role, deployment string, signer *evidenc
 	writeOwnerFile(t, path, raw)
 }
 
+// roleTrustFiles writes the three role-separated trust roots a mutating
+// command requires and returns the repair authority that signs grants.
+// The keys are deliberately distinct: one key never holds two
+// authorities, and each file pins only its own role.
+func roleTrustFiles(t *testing.T, dir, deployment string) (custodian, kernel, repair string, repairSigner *evidence.Signer) {
+	t.Helper()
+	custodianKey, err := evidence.GenerateSigner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	kernelKey, err := evidence.GenerateSigner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	repairSigner, err = evidence.GenerateSigner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	custodian = filepath.Join(dir, "custodian-trust.json")
+	writeTrustFile(t, custodian, custody.RoleCustodian, deployment, custodianKey)
+	kernel = filepath.Join(dir, "kernel-trust.json")
+	writeTrustFile(t, kernel, custody.RoleKernelRelay, deployment, kernelKey)
+	repair = filepath.Join(dir, "repair-trust.json")
+	writeTrustFile(t, repair, custody.RoleRepairAuthority, deployment, repairSigner)
+	return custodian, kernel, repair, repairSigner
+}
+
 func TestReadOnlyCommandsRefuseMissingOutbox(t *testing.T) {
 	bin := buildCLI(t)
 	path := filepath.Join(t.TempDir(), "missing.db")
@@ -292,7 +319,6 @@ func TestMigrateDryRunDoesNotMutate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authority, err := evidence.GenerateSigner()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,10 +328,7 @@ func TestMigrateDryRunDoesNotMutate(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeOwnerFile(t, signerPath, pem)
-	trustPath := filepath.Join(dir, "custodian-trust.json")
-	writeTrustFile(t, trustPath, custody.RoleCustodian, "dep-cli", authority)
-	repairTrustPath := filepath.Join(dir, "repair-trust.json")
-	writeTrustFile(t, repairTrustPath, custody.RoleRepairAuthority, "dep-cli", authority)
+	trustPath, kernelTrustPath, repairTrustPath, authority := roleTrustFiles(t, dir, "dep-cli")
 	now := time.Now().UTC()
 	grant := &witness.OperatorGrant{
 		Subject: "alice@example.com", DeploymentID: "dep-cli",
@@ -323,7 +346,7 @@ func TestMigrateDryRunDoesNotMutate(t *testing.T) {
 
 	stdout, stderr, code := runCLI(t, bin, "migrate",
 		"-outbox", outboxPath, "-effect-store", storePath, "-deployment", "dep-cli",
-		"-signer-key", signerPath, "-trust-roots", trustPath,
+		"-signer-key", signerPath, "-trust-roots", trustPath, "-kernel-trust-roots", kernelTrustPath,
 		"-repair-trust-roots", repairTrustPath, "-operator-token", grantPath,
 		"-actor", "alice@example.com", "-dry-run", "-json")
 	// Dry-run still requires a verified witness checkpoint: without one
@@ -360,18 +383,14 @@ func TestRepairAuthorityRequired(t *testing.T) {
 	}
 	db.Close()
 	evidenceSigner, _ := evidence.GenerateSigner()
-	authority, _ := evidence.GenerateSigner()
 	signerPath := filepath.Join(dir, "evidence.pem")
 	pem, _ := evidenceSigner.MarshalPEM()
 	writeOwnerFile(t, signerPath, pem)
-	trustPath := filepath.Join(dir, "custodian-trust.json")
-	writeTrustFile(t, trustPath, custody.RoleCustodian, "dep-cli", authority)
-	repairTrustPath := filepath.Join(dir, "repair-trust.json")
-	writeTrustFile(t, repairTrustPath, custody.RoleRepairAuthority, "dep-cli", authority)
+	trustPath, kernelTrustPath, repairTrustPath, authority := roleTrustFiles(t, dir, "dep-cli")
 
 	_, stderr, code := runCLI(t, bin, "repair",
 		"-outbox", outboxPath, "-effect-store", storePath, "-deployment", "dep-cli",
-		"-signer-key", signerPath, "-trust-roots", trustPath,
+		"-signer-key", signerPath, "-trust-roots", trustPath, "-kernel-trust-roots", kernelTrustPath,
 		"-repair-trust-roots", repairTrustPath, "-reason", "test")
 	if code != 1 || !strings.Contains(stderr, "operator grant required") {
 		t.Fatalf("repair without grant exit=%d stderr=%s", code, stderr)
@@ -396,7 +415,7 @@ func TestRepairAuthorityRequired(t *testing.T) {
 	// refused before any scan.
 	_, stderr, code = runCLI(t, bin, "repair",
 		"-outbox", outboxPath, "-effect-store", storePath, "-deployment", "dep-cli",
-		"-signer-key", signerPath, "-trust-roots", trustPath,
+		"-signer-key", signerPath, "-trust-roots", trustPath, "-kernel-trust-roots", kernelTrustPath,
 		"-repair-trust-roots", repairTrustPath, "-operator-token", grantPath,
 		"-actor", "mallory@example.com", "-reason", "test")
 	if code != 1 || !strings.Contains(stderr, "does not match the signed grant subject") {
@@ -406,7 +425,7 @@ func TestRepairAuthorityRequired(t *testing.T) {
 	// Valid authority but no witness transport: repair must refuse.
 	_, stderr, code = runCLI(t, bin, "repair",
 		"-outbox", outboxPath, "-effect-store", storePath, "-deployment", "dep-cli",
-		"-signer-key", signerPath, "-trust-roots", trustPath,
+		"-signer-key", signerPath, "-trust-roots", trustPath, "-kernel-trust-roots", kernelTrustPath,
 		"-repair-trust-roots", repairTrustPath, "-operator-token", grantPath,
 		"-actor", "alice@example.com", "-reason", "test")
 	if code != 1 || !strings.Contains(stderr, "requires -witness-socket or -witness-tls") {
@@ -431,14 +450,10 @@ func TestMigrationWithoutWitnessCheckpointFailsClosed(t *testing.T) {
 	db.Close()
 
 	evidenceSigner, _ := evidence.GenerateSigner()
-	authority, _ := evidence.GenerateSigner()
 	signerPath := filepath.Join(dir, "evidence.pem")
 	pem, _ := evidenceSigner.MarshalPEM()
 	writeOwnerFile(t, signerPath, pem)
-	trustPath := filepath.Join(dir, "custodian-trust.json")
-	writeTrustFile(t, trustPath, custody.RoleCustodian, "dep-cli", authority)
-	repairTrustPath := filepath.Join(dir, "repair-trust.json")
-	writeTrustFile(t, repairTrustPath, custody.RoleRepairAuthority, "dep-cli", authority)
+	trustPath, kernelTrustPath, repairTrustPath, authority := roleTrustFiles(t, dir, "dep-cli")
 	now := time.Now().UTC()
 	grant := &witness.OperatorGrant{
 		Subject: "alice@example.com", DeploymentID: "dep-cli",
@@ -456,7 +471,7 @@ func TestMigrationWithoutWitnessCheckpointFailsClosed(t *testing.T) {
 
 	_, stderr, code := runCLI(t, bin, "migrate",
 		"-outbox", outboxPath, "-effect-store", storePath, "-deployment", "dep-cli",
-		"-signer-key", signerPath, "-trust-roots", trustPath,
+		"-signer-key", signerPath, "-trust-roots", trustPath, "-kernel-trust-roots", kernelTrustPath,
 		"-repair-trust-roots", repairTrustPath, "-operator-token", grantPath,
 		"-actor", "alice@example.com")
 	if code != 1 || !strings.Contains(stderr, "offline suffix rewriting is not authorized") {

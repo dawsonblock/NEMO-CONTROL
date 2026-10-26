@@ -60,7 +60,7 @@ func TestLegacyMigrationCompensateAndDrain(t *testing.T) {
 	payload := []byte(`{"receipt":"v1","exec":"legacy-exec"}`)
 	authority, trust := testRepairAuthority(t, h.dep)
 	auth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
-	if _, err := h.outbox.CompensateLegacyRow(context.Background(), h.prod, 1, "digest-legacy-exec", payload, CheckpointRef{WitnessFP: "test-witness"}, auth); err != nil {
+	if _, err := h.migrate(t, auth, 1, "digest-legacy-exec", payload); err != nil {
 		t.Fatalf("compensate: %v", err)
 	}
 	row := h.row(t, 1)
@@ -108,7 +108,7 @@ func TestLegacyMigrationWitnessedAndUnverifiable(t *testing.T) {
 	// Evidence bytes are never rewritten.
 	authority, trust := testRepairAuthority(t, h.dep)
 	refuseAuth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)
-	if _, err := h.outbox.CompensateLegacyRow(context.Background(), h.prod, 1, "d", []byte("x"), CheckpointRef{WitnessFP: "test-witness"}, refuseAuth); err == nil {
+	if _, err := h.migrate(t, refuseAuth, 1, "d", []byte("x")); err == nil {
 		t.Fatal("compensation rewrote a witnessed row")
 	}
 	journalAuth := testAuth(t, h.outbox, authority, trust, h.dep, OperationMigrate)

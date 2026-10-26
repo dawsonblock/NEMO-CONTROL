@@ -24,21 +24,22 @@ import (
 const testDeployment = "dep-alpha"
 
 type harness struct {
-	t       *testing.T
-	dir     string
-	dep     string
-	kernel  *evidence.Signer
-	wsigner *evidence.Signer
-	ktrust  *custody.TrustSet // pinned kernel-relay keys (witness side)
-	ctrust  *custody.TrustSet // pinned custodian keys (kernel side)
-	ledger  *Ledger
-	service *Service
-	socket  string
-	client  *Client
-	outbox  *Outbox
-	prod    Producer
-	sender  *Sender
-	cancel  context.CancelFunc
+	t          *testing.T
+	dir        string
+	dep        string
+	kernel     *evidence.Signer
+	wsigner    *evidence.Signer
+	ktrust     *custody.TrustSet // pinned kernel-relay keys (witness side)
+	ctrust     *custody.TrustSet // pinned custodian keys (kernel side)
+	ledger     *Ledger
+	ledgerPath string
+	service    *Service
+	socket     string
+	client     *Client
+	outbox     *Outbox
+	prod       Producer
+	sender     *Sender
+	cancel     context.CancelFunc
 }
 
 func newHarness(t *testing.T, serve bool) *harness {
@@ -63,7 +64,8 @@ func newHarness(t *testing.T, serve bool) *harness {
 		Role: custody.RoleCustodian, KeyID: h.wsigner.Fingerprint(),
 		PublicKey: h.wsigner.PublicKey(), DeploymentID: h.dep,
 	})
-	if h.ledger, err = OpenLedger(filepath.Join(h.dir, "witness-ledger.db")); err != nil {
+	h.ledgerPath = filepath.Join(h.dir, "witness-ledger.db")
+	if h.ledger, err = OpenLedger(h.ledgerPath); err != nil {
 		t.Fatalf("ledger: %v", err)
 	}
 	h.service = NewService(h.ledger, h.wsigner, h.dep, h.ktrust, nil)
