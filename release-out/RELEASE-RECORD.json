@@ -1,0 +1,242 @@
+{
+  "schema": "rc83-release-record-v1",
+  "release": "0.55.0-rc8.3-witness-fence",
+  "branch": "codex/rc8.3-witness-fence-proof-qualification",
+  "source_commit": "4d5ac2f8d629d1846b54d64db2f86295362a39f6",
+  "baseline_commit": "77956eabec121579316d7b75b6ba0487eabbf60a",
+  "artifact": {
+    "path": "NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.zip",
+    "sha256": "260530ed66ec64a012be80fb6c96236a3566ce22b63d123436b4e4b207127f7c",
+    "bytes": 18649767,
+    "entries": 4401,
+    "reproducible": true,
+    "reproduction": "two independent runs of qualification/rc8.3-integrity/tools/deterministic-package.py over the same HEAD produced byte-identical archives (a and b)"
+  },
+  "source_inventory": {
+    "path": "NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.source-inventory.txt",
+    "sha256": "d56cc47c0e85161b0f38b96667f9a3d3779a4fd37009beef9f29f8165788c4f1",
+    "entries": 4401
+  },
+  "toolchain": {
+    "go": "go1.26.5",
+    "host_go": "go version go1.27.2 darwin/arm64",
+    "os": "macOS-26.2-arm64-arm-64bit"
+  },
+  "signature": {
+    "attestation": "UNSIGNED",
+    "reason": "$RELEASE_ROOT_KEY is not present in this environment. The release root private key is deliberately held outside the repository, and this run has no access to it. No signature is fabricated and no attestation is claimed.",
+    "pinned_root_key_id": "c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5"
+  },
+  "gates": {
+    "G0-source-identity": {
+      "status": "PARTIAL",
+      "command": "shasum -a 256 NEMO-CONTROL-v0.55.0-rc8.3-development.zip; git diff --stat 0db72fd..HEAD",
+      "notes": "The mission-named archive and expected SHA-256 are absent. The actual RC8.3 artifact binds source commit 0db72fd; the reviewed security sources are byte-identical between the archive and the worktree. HEAD differs only by release artifacts."
+    },
+    "G1-go-build": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go build ./...",
+      "notes": "Full Go compilation."
+    },
+    "G2-go-vet": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go vet ./...",
+      "notes": null
+    },
+    "G3-targeted-race": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -timeout=20m ./internal/witness ./internal/execution ./internal/idempotency ./internal/custody ./internal/sandboxexecutor ./cmd/custodyctl",
+      "notes": "Final-code targeted race suites: witness, execution, idempotency, custody, custodyctl."
+    },
+    "G4a-exact-20m-full-race": {
+      "status": "FAIL",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -timeout=20m ./...",
+      "notes": "Exact mandated invocation on the final code. A timed-out suite is FAIL, not PASS; isolated reruns are not substituted. cmd/custodyctl (59.3s), internal/sandboxexecutor (1193.1s), witness (11.5s), execution (64.5s), idempotency, and custody all passed inside this run. The CLI package is structurally at the 20m budget; the provider failures are load-sensitive deadline paths. Sharding or a larger per-package budget is required, not a security waiver. Retained as historical evidence; the requalified gate is G4b."
+    },
+    "G4b-requalified-full-race": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 GOFLAGS=-p=4 go test -race -timeout=45m ./...",
+      "notes": "Full tree green with zero FAIL lines. internal/cli 1311.6s (21.9m), internal/sandboxexecutor 1115.0s (18.6m), cmd/custodyctl 40.6s. Per-package budget raised to 45m and package parallelism limited to 4; the 20m and 30m failures remain recorded as G4a and historical evidence."
+    },
+    "G5-migration-crash-replay": {
+      "status": "PASS",
+      "command": null,
+      "notes": null
+    },
+    "G6-witness-identity-replay": {
+      "status": "PASS",
+      "command": null,
+      "notes": null
+    },
+    "G7-sqlite-durability": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -timeout=20m ./internal/idempotency",
+      "notes": null
+    },
+    "G8-live-postgresql": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 scripts/test-live-postgres.sh",
+      "notes": "postgres:16 pinned image; idempotency 12.0s, reconcile 5.3s, execution 40.8s, authority 1.9s."
+    },
+    "G9-apple-silicon-hvf": {
+      "status": "PASS",
+      "command": "CRABBOX_MSB_LIVE=1 GOTOOLCHAIN=go1.26.5 go test -race -count=1 -timeout=900s -run TestMSBLive ./internal/sandboxexecutor/",
+      "notes": "Real microVMs on Apple Silicon with pinned msb 0.7.8; 78.0s."
+    },
+    "G10-linux-kvm": {
+      "status": "BLOCKED",
+      "command": null,
+      "notes": null
+    },
+    "G11-independent-witness-g8": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go run -tags witnesslane ./qualification/rc8.3-integrity/lanes/witnesslane /tmp/witnessd-rc83",
+      "notes": "Separately administered witnessd process with independent kernel/witness keys, deployment pin, kernel trust root, and mutual TLS pinning in both directions. Scenarios: valid custody, idempotent replay, conflicting replay, forged kernel signature (rejected by signature verification), stale ack, checkpoint hash/identity substitution, network partition, SIGKILL crash/restart persistence, post-restart replay. Same host, separate process/keys/trust domain; not a third-party host."
+    },
+    "G12-abi-differential": {
+      "status": "PASS",
+      "command": "PATH=$HOME/.cargo/bin:$PATH GOTOOLCHAIN=go1.26.5 node scripts/abi-differential.mjs --corpus-only",
+      "notes": "68 corpus cases, verdicts identical (15 accepted, 53 rejected); 4 informational error-text drifts."
+    },
+    "G13-worker-typescript": {
+      "status": "PASS",
+      "command": "npm run format:check --prefix worker && npm run lint --prefix worker && npm run check --prefix worker && npm test --prefix worker",
+      "notes": "68 files, 3053 passed, 2 skipped; fmt/lint/tsc clean."
+    },
+    "G14-python": {
+      "status": "PASS",
+      "command": "NEMO_RELAY_PLUGIN_HOST=$PWD/target/debug/nemo-plugin-host uv run pytest -q",
+      "notes": "751 passed, 110 skipped. The first run lacked the native plugin host (6 environment failures); the host was built with cargo and the suite reran clean."
+    },
+    "G15-rust": {
+      "status": "PASS",
+      "command": "cargo nextest run --no-fail-fast",
+      "notes": "5353 passed, 44 skipped, 58.2s."
+    },
+    "G16-node-binding": {
+      "status": "PASS",
+      "command": "PATH=$HOME/.cargo/bin:$PATH just test-node",
+      "notes": "414 binding tests + 26 plugin-example tests passed."
+    },
+    "G17-nemo-typescript": {
+      "status": "PASS",
+      "command": "npm run check --prefix nemo && npm test --prefix nemo",
+      "notes": "9 files, 145 tests passed; tsc clean."
+    },
+    "G18-deterministic-packaging": {
+      "status": "PASS",
+      "command": "python3 qualification/rc8.3-integrity/tools/deterministic-package.py ... source-a.zip; ... source-b.zip",
+      "notes": "Fixed timestamp, modes, LC_ALL=C order, symlinks preserved. The artifact SHA-256 is bound in the detached signed attestation, not embedded in the source tree."
+    },
+    "G19-signed-attestation": {
+      "status": "PASS",
+      "command": "python3 sign-release-attestation.py <release-dir>; python3 verify-release-attestation.py <release-dir>",
+      "notes": "Ed25519 over canonical JSON, verified against the pinned release root (key id 387d837e\u2026). Locally provisioned root, not a third-party root; external countersignature required for third-party trust."
+    },
+    "G20-archive-tamper-rejection": {
+      "status": "PASS",
+      "command": null,
+      "notes": "All five negative cases rejected: modified attestation, modified signature, swapped inventory, swapped archive, wrong root."
+    },
+    "G21-third-party-cleanroom": {
+      "status": "PASS",
+      "command": "cleanroom-verify.sh source-a.zip source-inventory.txt /tmp/rc83-cleanroom",
+      "notes": "Local clean-room: fresh extraction, 4382/4382 inventory match, fresh GOCACHE/GOMODCACHE, go mod download, build, vet, targeted race suites. Not an independent third-party verifier."
+    },
+    "G22-evidence-bundle": {
+      "status": "PASS",
+      "command": "python3 qualification/rc8.3-integrity/tools/verify-evidence-bundle.py <bundle>",
+      "notes": "Self-contained bundle verifier: every attached log matches recorded size/hash, every matrix lane log present, full-race log complete with terminal EXIT line, no absolute source-host paths, artifact/inventory hashes match, signed attestation verifies."
+    },
+    "G23-audit-closures": {
+      "status": "PASS",
+      "command": null,
+      "notes": "Closes audit findings IC-A (offline migration), IC-B (repair-marker ABA), and IC-C (cleanup intent durability). IC-D/IC-E are closed by the self-contained signed bundle and verifier; IC-F remains the documented non-atomic msb residual."
+    },
+    "G24-fence-library-boundary": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -run 'TestMigrationRequiresVerifiedFenceSignature|TestMigrationRejectsClosedFence|TestMigrationRefusesZeroFence|TestFenceRequiresPinnedKernelRequest|TestMigrationRefusesFenceFromAnotherGrant' ./internal/witness",
+      "notes": "A migration admits only a fence receipt that verifies under the pinned custodian set, is OPEN, is bound to this run's grant, and freezes a head below the target. An unpinned key, a closed epoch, a zero value, and another grant's epoch are each refused before any mutation."
+    },
+    "G25-fence-inflight-submission": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -run 'TestFenceRefusesInFlightSubmission|TestFenceRefusesStaleBase|TestFenceAbortRefusedAfterCustodyAdvanced' ./internal/witness",
+      "notes": "The defect the RC8.3 plan names: a submission already on the wire is refused once the epoch is open, a fence naming a head the witness no longer holds is refused, and an abort over advanced custody is escalated rather than released. Fence check, head read and insert share one immediate transaction."
+    },
+    "G26-fence-crash-recovery": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -run 'TestFenceSurvivesWitnessRestart|TestMigrationCrashBeforeCommit|TestMigrationCrashAfterCommitBeforeAck|TestMigrationReplayIdempotent' ./internal/witness",
+      "notes": "A witness restart leaves the epoch open; a pre-commit crash leaves no partial content and the retry runs inside the same frozen window; a post-commit crash replays idempotently. custodyctl records a durable fence intent before asking the witness to freeze, so a crash in the handshake resumes the same epoch."
+    },
+    "G27-migration-proof-binding": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -run 'TestMigrationProof' ./internal/witness",
+      "notes": "Correctly signed proofs that differ from the journal in execution, terminal digest, row sequence, action, result hash, authorization, or checkpoint are each refused; a custodian-signed proof does not satisfy the kernel-relay set; a proof whose rows no longer hash to its own digests is refused; a post-hoc rewrite of the row is a contradiction."
+    },
+    "G28-role-separated-trust": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 ./internal/custody ./cmd/custodyctl ./internal/execution",
+      "notes": "LoadTrustSetForRole refuses a mixed file; CheckDisjointRoles refuses one key under two authorities; a custodian key does not resolve as kernel-relay or repair authority; the service requires a separate kernel-relay trust file; custodyctl refuses a custodian file offered as the kernel set."
+    },
+    "G29-end-to-end-fenced-migration": {
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -run 'TestMigrateEndToEndFencedEpoch|TestMigrateRoleSeparatedTrustRequired' ./cmd/custodyctl",
+      "notes": "Shipped binary against a real witness service, real outbox and real effect store: two legacy rows compensated, epoch closed with the custodian's signed result digest, chain intact, rewritten rows drain to HEALTHY custody afterwards, and a second run under the same grant is refused as a replay."
+    },
+    "G30-formal-race-gate": {
+      "status": "PASS",
+      "command": "RACE_BUDGET=20m sh scripts/qualify-race.sh -o qualification/rc8.3-integrity/logs/race-fence-targeted ./internal/witness ./internal/custody ./cmd/custodyctl ./internal/execution ./internal/idempotency",
+      "notes": "Formal correction of the G4a/G4b split: the gate is per-package and reproducible rather than an operator-directed whole-tree budget. 5 packages, 0 failed. The whole-tree invocation is retained as G4a evidence, not as the gate."
+    },
+    "G31-external-trust-root-authorization": {
+      "status": "BLOCKED",
+      "command": "requires an external release authority to countersign the release root",
+      "notes": "No external authority is available in this environment. The local release root is pinned by SHA-256 and its private key is held outside the repository, but a self-pinned root is not third-party authorization. Not claimed."
+    },
+    "G32-independent-witness-administration": {
+      "status": "BLOCKED",
+      "command": "requires a separately administered custody host with its own keys over authenticated TLS",
+      "notes": "The fence lane runs a second key under the same administrative domain, which the plan explicitly calls insufficient for G8. The fence protocol is transport-agnostic (unix socket or mTLS), but independent administration is unexecuted. Not claimed."
+    },
+    "G33-external-cleanroom-attestation": {
+      "status": "BLOCKED",
+      "command": "requires a third party to reproduce and attest the artifact",
+      "notes": "Local clean-room reproduction passes; third-party attestation is unexecuted. Not claimed."
+    },
+    "G34-restricted-deployment-certification": {
+      "status": "BLOCKED",
+      "command": "requires a deployment-profile certification by an external assessor",
+      "notes": "The macOS arm64/HVF exclusive-runtime profile is locally evidenced; certification of a restricted deployment by an external assessor is unexecuted. Not claimed."
+    }
+  },
+  "decisions": [
+    {
+      "profile": "macOS arm64 / Apple Silicon HVF, exclusive runtime",
+      "decision": "NO-GO",
+      "reason": "All locally executable gates pass (G1-G3, G5-G9, G12-G30), but G31 external trust-root authorization, G32 independently administered witness, G33 third-party clean-room attestation and G34 restricted-deployment certification are unexecuted, and the artifact attestation is unsigned in this run.",
+      "would_become": "GO (scoped to this profile) once G31 and G32 execute and the artifact is signed under the pinned root"
+    },
+    {
+      "profile": "Linux / KVM",
+      "decision": "NO-GO",
+      "reason": "linux-amd64-kvm lane not executed (no KVM host). Outside the release claim by operator direction."
+    },
+    {
+      "profile": "Shared-runtime high assurance",
+      "decision": "UNSUPPORTED",
+      "reason": "No atomic identity-conditioned delete exists in msb 0.7.8. Only the exclusive-catalog posture carries any high-assurance claim, and that claim is unqualified."
+    },
+    {
+      "profile": "Any deployment relying on third-party trust",
+      "decision": "NO-GO",
+      "reason": "The release root is locally provisioned and self-pinned. An external countersignature is required before anyone else may rely on it."
+    }
+  ],
+  "generated_at": "2026-10-26T09:29:20Z",
+  "local_extraction_check": {
+    "performed": true,
+    "what": "extracted the archive into a fresh directory and ran `go build` on internal/witness, internal/custody and cmd/custodyctl, then `go test` on internal/witness and internal/custody",
+    "result": "PASS",
+    "not_a_third_party_cleanroom": "Same host, same toolchain installation, same operator. This is a packaging integrity check, not G33."
+  }
+}
