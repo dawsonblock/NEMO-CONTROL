@@ -2,7 +2,9 @@
 
 Release: `0.55.0-rc8.3-witness-fence`
 Branch: `codex/rc8.3-witness-fence-proof-qualification`
-Source commit: `8ee14134772975bae243ed4f3cca295b2bfb30a1`
+Source commit: `8ee14134772975bae243ed4f3cca295b2bfb30a1` (the commit whose tree
+was packaged; the packaging commit adds only `release-out/` and does not
+alter source)
 Artifact: `NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.zip`
 SHA-256: `3253b69a787296a524ddff5b3ecf5837a9b13b053da5da15d54ae2c3a5786f0c`
 Source inventory SHA-256: `19b981b82c0011919d5fc36529e26c4c238f0958bbf4e0ecf5c19a21d8899495`

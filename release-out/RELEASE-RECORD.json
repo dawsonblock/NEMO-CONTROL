@@ -238,5 +238,6 @@
     "what": "extracted the archive into a fresh directory and ran `go build` on internal/witness, internal/custody and cmd/custodyctl, then `go test` on internal/witness and internal/custody",
     "result": "PASS",
     "not_a_third_party_cleanroom": "Same host, same toolchain installation, same operator. This is a packaging integrity check, not G33."
-  }
+  },
+  "source_commit_note": "source_commit is the commit whose tree was packaged. The packaging commit that carries this record adds only release-out/ and does not alter source, so the artifact and the record describe the same source tree."
 }
