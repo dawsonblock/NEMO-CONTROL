@@ -1,13 +1,13 @@
 {
   "archive_a": {
     "path": "source-a.zip",
-    "sha256": "8328e3156f25200ff0519c6f944192ffebc995f055d614a9ab0890297004abd6",
-    "size": 18859443
+    "sha256": "514f0cd9b83f0fde0dcfb7fc517e82212c6d91ffd2dbf6c1af703f58b3fbc03e",
+    "size": 18859490
   },
   "archive_b": {
     "path": "source-b.zip",
-    "sha256": "8328e3156f25200ff0519c6f944192ffebc995f055d614a9ab0890297004abd6",
-    "size": 18859443
+    "sha256": "514f0cd9b83f0fde0dcfb7fc517e82212c6d91ffd2dbf6c1af703f58b3fbc03e",
+    "size": 18859490
   },
   "byte_identical": true,
   "command": "python3 qualification/rc8.3-integrity/tools/deterministic-package.py <repo> crabedence-V1-fix-integration-integrity nemo-control-0.55.0-rc8.3-integrity-closure <output>",
@@ -16,6 +16,6 @@
   "schema": "rc83-integrity-packaging-v1",
   "source_inventory": {
     "path": "source-inventory.txt",
-    "sha256": "884df9b76310da0808702704b9f2206fbaa2caf54626b60a829e6a21b0741958"
+    "sha256": "fe1aa411e0ffac57575e44f17443acfa586c9526c990b5514ed04eb5dbae7023"
   }
 }

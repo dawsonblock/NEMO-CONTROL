@@ -1,10 +1,10 @@
 {
   "artifact": {
     "path": "source-a.zip",
-    "sha256": "8328e3156f25200ff0519c6f944192ffebc995f055d614a9ab0890297004abd6",
-    "size": 18859443
+    "sha256": "514f0cd9b83f0fde0dcfb7fc517e82212c6d91ffd2dbf6c1af703f58b3fbc03e",
+    "size": 18859490
   },
-  "created_at": "2026-10-26T00:45:55Z",
+  "created_at": "2026-10-26T00:49:50Z",
   "qualification_verdict": "GO (macOS arm64/HVF exclusive-runtime; Linux/KVM excluded by operator direction; shared-runtime high assurance UNSUPPORTED; release root pinned locally, external countersignature required for third-party trust)",
   "release": "0.55.0-rc8.3-integrity-closure",
   "schema": "rc83-integrity-attestation-v1",
@@ -19,11 +19,11 @@
     "status": "SIGNED",
     "trust_anchor": "locally provisioned release root pinned by SHA-256; not a third-party root"
   },
-  "source_commit": "ca378d3758ef3c6a8f54420ed89b6027b5c051d9",
+  "source_commit": "e1144ccc87f81321d696f47c9c1c15214b0ecc9b",
   "source_inventory": {
     "entries": 4382,
     "path": "source-inventory.txt",
-    "sha256": "884df9b76310da0808702704b9f2206fbaa2caf54626b60a829e6a21b0741958"
+    "sha256": "fe1aa411e0ffac57575e44f17443acfa586c9526c990b5514ed04eb5dbae7023"
   },
   "test_logs": {
     "abi-differential-corpus.log": {
