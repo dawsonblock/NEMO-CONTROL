@@ -1,13 +1,12 @@
-clean-room root: /tmp/rc83-cleanroom-final2/nemo-control-0.55.0-rc8.3-integrity-closure
-inventory_entries=4382 verified=4382 mismatches=0
+clean-room root: /tmp/rc83-cleanroom-postreview/nemo-control-0.55.0-rc8.3-integrity-closure
+inventory_entries=4385 verified=4385 mismatches=0
 == go mod download ==
 go: downloading go1.26.5 (darwin/arm64)
 == go build ./... ==
 == go vet ./... ==
 == targeted race suites ==
-ok  	github.com/openclaw/crabbox/internal/witness	4.131s
-ok  	github.com/openclaw/crabbox/internal/custody	1.763s
-ok  	github.com/openclaw/crabbox/internal/execution	52.801s
-ok  	github.com/openclaw/crabbox/cmd/custodyctl	9.196s
+ok  	github.com/openclaw/crabbox/internal/witness	4.583s
+ok  	github.com/openclaw/crabbox/internal/custody	1.353s
+ok  	github.com/openclaw/crabbox/internal/execution	53.070s
+ok  	github.com/openclaw/crabbox/cmd/custodyctl	12.063s
 CLEAN-ROOM PASS
-EXIT=0

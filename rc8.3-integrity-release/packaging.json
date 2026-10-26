@@ -1,21 +1,21 @@
 {
   "archive_a": {
     "path": "source-a.zip",
-    "sha256": "514f0cd9b83f0fde0dcfb7fc517e82212c6d91ffd2dbf6c1af703f58b3fbc03e",
-    "size": 18859490
+    "sha256": "02e1c4a233ba2c5758fb4ba55993ea4e13507513d2a0fedc87d07875fffbc9ce",
+    "size": 18874679
   },
   "archive_b": {
     "path": "source-b.zip",
-    "sha256": "514f0cd9b83f0fde0dcfb7fc517e82212c6d91ffd2dbf6c1af703f58b3fbc03e",
-    "size": 18859490
+    "sha256": "02e1c4a233ba2c5758fb4ba55993ea4e13507513d2a0fedc87d07875fffbc9ce",
+    "size": 18874679
   },
   "byte_identical": true,
   "command": "python3 qualification/rc8.3-integrity/tools/deterministic-package.py <repo> crabedence-V1-fix-integration-integrity nemo-control-0.55.0-rc8.3-integrity-closure <output>",
-  "entries": 4382,
+  "entries": 4385,
   "notes": "Fixed timestamp 2020-01-01, fixed modes, LC_ALL=C path order, symlinks preserved. Two independent builds are byte-identical.",
   "schema": "rc83-integrity-packaging-v1",
   "source_inventory": {
     "path": "source-inventory.txt",
-    "sha256": "fe1aa411e0ffac57575e44f17443acfa586c9526c990b5514ed04eb5dbae7023"
+    "sha256": "c0bf95165fd41fdfb34a427dfde0a1fc211627187f33f2a9a8180754e6c9f0a7"
   }
 }

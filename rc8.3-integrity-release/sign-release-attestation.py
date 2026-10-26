@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Sign the RC8.3 integrity-closure attestation with a pinned Ed25519 root.
+"""Sign the RC8.3 integrity-closure attestation with an Ed25519 release root.
 
 The signature covers the canonical JSON of the attestation with the
 `signature` block removed. The block is added after signing, so the
 signed bytes never depend on the signature itself.
 
-This root is provisioned locally for the qualification run. It is a
-real cryptographic trust anchor (the public key is pinned by SHA-256 and
-must be distributed out of band), but it is not a third-party root.
+The private key MUST live outside this repository and outside the bundle.
+A key committed to the tree cannot be a trust anchor — anyone with the
+repository could sign a replacement. The bundle receives only a
+distribution copy of the public key, and verification still requires the
+pinned key id to be supplied from outside.
 
 Usage: sign-release-attestation.py <release-dir>
+
+Key: $RELEASE_ROOT_KEY, default ~/.config/crabbox/release-root.pem
 """
 
 import hashlib
@@ -31,13 +35,31 @@ def sha256_file(path: str) -> str:
     return h.hexdigest()
 
 
+def repo_root_of(path: str):
+    cur = os.path.dirname(os.path.abspath(path))
+    while True:
+        if os.path.exists(os.path.join(cur, ".git")):
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return None
+        cur = parent
+
+
 def main() -> int:
     base = os.path.abspath(sys.argv[1])
-    att_path = os.path.join(base, "attestation.json")
-    root = os.path.join(base, "release-root")
-    priv = os.path.join(root, "release-root.pem")
-    pub = os.path.join(root, "release-root.pub")
+    key_path = os.environ.get("RELEASE_ROOT_KEY") or os.path.expanduser("~/.config/crabbox/release-root.pem")
+    if not os.path.isfile(key_path):
+        print(f"REJECT: release root key not found at {key_path} (set RELEASE_ROOT_KEY)", file=sys.stderr)
+        return 1
+    if os.path.commonpath([os.path.abspath(key_path), base]) == base:
+        print("REJECT: the signing key must not live inside the bundle it signs", file=sys.stderr)
+        return 1
+    if repo_root_of(key_path) is not None:
+        print("REJECT: the signing key must not live inside a git repository", file=sys.stderr)
+        return 1
 
+    att_path = os.path.join(base, "attestation.json")
     att = json.load(open(att_path, encoding="utf-8"))
     att.pop("signature", None)
     # Make paths relative to the release directory so the attestation is
@@ -54,14 +76,23 @@ def main() -> int:
 
     sig_path = os.path.join(base, "attestation.sig")
     subprocess.run(
-        ["openssl", "pkeyutl", "-sign", "-inkey", priv, "-rawin", "-in", canon_path, "-out", sig_path],
+        ["openssl", "pkeyutl", "-sign", "-inkey", key_path, "-rawin", "-in", canon_path, "-out", sig_path],
         check=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
     )
 
-    der = subprocess.check_output(["openssl", "pkey", "-pubin", "-in", pub, "-outform", "DER"])
-    key_id = hashlib.sha256(der).hexdigest()
+    # Distribution copy of the public key. It is not the trust anchor:
+    # the verifier requires the key id from outside the bundle.
+    root_dir = os.path.join(base, "release-root")
+    os.makedirs(root_dir, exist_ok=True)
+    pub_der = subprocess.check_output(["openssl", "pkey", "-in", key_path, "-pubout", "-outform", "DER"])
+    key_id = hashlib.sha256(pub_der).hexdigest()
+    with open(os.path.join(root_dir, "release-root.pub"), "wb") as fh:
+        fh.write(subprocess.check_output(["openssl", "pkey", "-in", key_path, "-pubout"]))
+    with open(os.path.join(root_dir, "key-id.txt"), "w", encoding="utf-8") as fh:
+        fh.write(key_id + "\n")
+
     att["signature"] = {
         "status": "SIGNED",
         "algorithm": "ed25519",
@@ -71,7 +102,10 @@ def main() -> int:
         "signature_file": "attestation.sig",
         "signed_file": "attestation.canonical.json",
         "covers": "canonical JSON of this attestation with the signature block removed",
-        "trust_anchor": "locally provisioned release root pinned by SHA-256; not a third-party root",
+        "trust_anchor": (
+            "the release root is pinned by SHA-256 outside the bundle; the bundled public key is a "
+            "distribution copy only, and verification requires the pinned key id from outside"
+        ),
     }
     with open(att_path, "w", encoding="utf-8") as fh:
         json.dump(att, fh, indent=2, sort_keys=True)
