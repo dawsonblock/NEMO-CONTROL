@@ -1,0 +1,9 @@
+=== RUN   TestReproUnverifiedCheckpointAuthorizesRewrite
+    zz_repro_test.go:38: DEFECT CONFIRMED: rewrite authorized by unpinned checkpoint key 6e97346c5b0067c543a1a4b834941deae724af61610337441387a9b668a34a7c
+--- PASS: TestReproUnverifiedCheckpointAuthorizesRewrite (0.02s)
+=== RUN   TestReproInFlightSubmissionForksCustody
+    zz_repro_test.go:94: DEFECT CONFIRMED: witness holds 99c0e3182390e33a84700ee389995bad14b226d1ec7d69e28bcb38118d1e590a at seq 1, outbox holds e3048f21f1fd41caed37fac7ced61aa028ae1f3a4ff7026a3dd92a031b35c9cc — the stores have forked
+    zz_repro_test.go:100: sender state after fork: contradictory custody head: witness seq 1 custodies 99c0e3182390e33a84700ee389995bad14b226d1ec7d69e28bcb38118d1e590a, outbox holds e3048f21f1fd41caed37fac7ced61aa028ae1f3a4ff7026a3dd92a031b35c9cc — escalated, never reconciled silently
+--- PASS: TestReproInFlightSubmissionForksCustody (0.02s)
+PASS
+ok  	github.com/openclaw/crabbox/internal/witness	0.355s
