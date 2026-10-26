@@ -2,10 +2,10 @@
 
 Release: `0.55.0-rc8.3-witness-fence`
 Branch: `codex/rc8.3-witness-fence-proof-qualification`
-Source commit: `4d5ac2f8d629d1846b54d64db2f86295362a39f6`
+Source commit: `8ee14134772975bae243ed4f3cca295b2bfb30a1`
 Artifact: `NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.zip`
-SHA-256: `260530ed66ec64a012be80fb6c96236a3566ce22b63d123436b4e4b207127f7c`
-Source inventory SHA-256: `d56cc47c0e85161b0f38b96667f9a3d3779a4fd37009beef9f29f8165788c4f1`
+SHA-256: `3253b69a787296a524ddff5b3ecf5837a9b13b053da5da15d54ae2c3a5786f0c`
+Source inventory SHA-256: `19b981b82c0011919d5fc36529e26c4c238f0958bbf4e0ecf5c19a21d8899495`
 
 ## Decision by deployment profile
 
@@ -75,7 +75,7 @@ python3 crabedence-V1-fix-integration-integrity/qualification/rc8.3-integrity/to
 shasum -a 256 release-out/NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.zip
 ```
 
-The rebuild must equal `260530ed…`. A different hash on the same commit
+The rebuild must equal `3253b69a…`. A different hash on the same commit
 means the worktree bytes differ from the tree the inventory describes —
 investigate before relying on either.
 
