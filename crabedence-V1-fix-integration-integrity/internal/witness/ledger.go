@@ -115,7 +115,19 @@ func (l *Ledger) setMeta(ctx context.Context, key, value string) error {
 // exactly once per authorized key rotation, so acknowledgements record
 // which key generation minted them.
 func (l *Ledger) SignerEpoch(ctx context.Context) (int64, error) {
-	v, err := l.meta(ctx, "signer_epoch")
+	return signerEpochFrom(ctx, l.db)
+}
+
+// signerEpochFrom reads the epoch on an explicit queryer so a
+// submission can number its acknowledgement from inside the same
+// transaction that admitted it, instead of opening a second connection
+// while holding the write lock.
+func signerEpochFrom(ctx context.Context, q fenceQueryer) (int64, error) {
+	var v string
+	err := q.QueryRowContext(ctx, `SELECT value FROM witness_meta WHERE key = $1`, "signer_epoch").Scan(&v)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
 	if err != nil || v == "" {
 		return 0, err
 	}
@@ -308,7 +320,7 @@ func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, env *custo
 		return nil, err
 	}
 
-	epoch, err := l.SignerEpoch(ctx)
+	epoch, err := signerEpochFrom(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
