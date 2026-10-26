@@ -1,0 +1,15 @@
+abi-differential: 68 corpus + 0 generated (seed 20261023)
+TEXT-DRIFT malformed-json: wire={"capability":"system.echo",
+  go:   reject	invalid JSON: unexpected end of input
+  rust: reject	invalid JSON: expected an object key
+TEXT-DRIFT malformed-number: wire={"capability":"system.echo","arguments":{"n":01},"authority":{"principal":"alice"}}
+  go:   reject	invalid JSON: invalid character '1' after object key:value pair
+  rust: reject	invalid JSON: invalid number
+TEXT-DRIFT raw-control-char: wire={"capability":"system.echo","arguments":{"text":"line\x0abreak"},"authority":{"principal":"alice"}}
+  go:   reject	invalid JSON: invalid character '\n' in string literal
+  rust: reject	invalid JSON: invalid string
+TEXT-DRIFT unterminated-string: wire={"capability":"system.echo
+  go:   reject	invalid JSON: unexpected EOF
+  rust: reject	invalid JSON: invalid string
+abi-differential: 68 cases, verdicts identical (15 accepted, 53 rejected), 4 informational error-text drift
+EXIT=0

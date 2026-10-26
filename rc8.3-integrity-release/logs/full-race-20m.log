@@ -1,0 +1,1148 @@
+?   	github.com/openclaw/crabbox/cmd/abi-verdict	[no test files]
+ok  	github.com/openclaw/crabbox/cmd/crabbox	95.972s
+?   	github.com/openclaw/crabbox/cmd/crabbox-apple-vm-helper	[no test files]
+ok  	github.com/openclaw/crabbox/cmd/custodyctl	59.322s
+ok  	github.com/openclaw/crabbox/cmd/evidence-checkpoint	2.229s
+ok  	github.com/openclaw/crabbox/cmd/issue-grant	4.727s
+ok  	github.com/openclaw/crabbox/cmd/nemo-archive-extract	4.705s
+ok  	github.com/openclaw/crabbox/cmd/nemo-component-manifest	5.335s
+ok  	github.com/openclaw/crabbox/cmd/nemo-qualification-attestation	5.424s
+ok  	github.com/openclaw/crabbox/cmd/nemo-runtime-digest	5.878s
+ok  	github.com/openclaw/crabbox/cmd/qual-provider	5.782s
+?   	github.com/openclaw/crabbox/cmd/registry-digest	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-custody-drill	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-custodyd	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-dream	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-evidence-verify	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-executord	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-history	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-job-sign	[no test files]
+?   	github.com/openclaw/crabbox/cmd/sandbox-submit	[no test files]
+?   	github.com/openclaw/crabbox/cmd/witnessd	[no test files]
+?   	github.com/openclaw/crabbox/cmd/xcpng-iso-e2e-helper	[no test files]
+ok  	github.com/openclaw/crabbox/internal/applevmhelper	24.755s
+ok  	github.com/openclaw/crabbox/internal/authority	8.158s
+ok  	github.com/openclaw/crabbox/internal/capability	6.252s
+2026/10/25 16:48:00 execution service: write frame header: write unix /var/folders/xt/jh84t2kj6hl26tk5qx3m_28h0000gn/T/cbx-2052328233/crabedence/execution.sock->: write: broken pipe
+--- FAIL: TestHybridSSHScriptCancellationAndSameLeaseReplay (11.07s)
+    run_ssh_script_test.go:310: script did not start
+panic: test timed out after 20m0s
+	running tests:
+		TestRemoteGitCoherenceRollsBackFailuresAndRetries (14s)
+		TestRemoteGitCoherenceRollsBackFailuresAndRetries/cas (1s)
+
+goroutine 40792 [running]:
+testing.(*M).startAlarm.func1()
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2802 +0x498
+created by time.goFunc
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/time/sleep.go:215 +0x44
+
+goroutine 1 [chan receive]:
+testing.(*T).Run(0xc0005ba6c8, {0x1072b4e56, 0x31}, 0x10ad24278)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2109 +0x7dc
+testing.runTests.func1(0xc0005ba6c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2585 +0x78
+testing.tRunner(0xc0005ba6c8, 0xc000761738)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+testing.runTests({0x10720f0f2, 0x1b}, {0x10727162f, 0x28}, 0xc000010930, {0x10b28d2c0, 0xf60, 0xf60}, {0xc0007617b8?, 0x10431d4a0?, ...})
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2583 +0x7a4
+testing.(*M).Run(0xc0006814a0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2443 +0xb3c
+github.com/openclaw/crabbox/internal/testutil.RunWithIsolatedUserDirs(0xc0006814a0)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/testutil/userdirs.go:69 +0x63c
+github.com/openclaw/crabbox/internal/cli.runCLITests(0xc0006814a0)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/built_binary_test.go:56 +0x68
+github.com/openclaw/crabbox/internal/cli.TestMain(0xc0006814a0)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/egress_daemon_double_provision_test.go:33 +0x2dc
+main.main()
+	_testmain.go:7918 +0x108
+
+goroutine 2398 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e54248)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSameLocation(0xc000e54248)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:668 +0x2c
+testing.tRunner(0xc000e54248, 0x10ad1fac0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2397 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e54008)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureRegionCandidates(0xc000e54008)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:645 +0x40
+testing.tRunner(0xc000e54008, 0x10ad1fa78)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2399 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e54488)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestApplyAzureSpotCapacity(0xc000e54488)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:681 +0x34
+testing.tRunner(0xc000e54488, 0x10ad1f568)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2402 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e54b48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSupportsEphemeralFullCaching(0xc000e54b48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:726 +0x34
+testing.tRunner(0xc000e54b48, 0x10ad1fb20)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2401 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e54908)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSupportsEphemeralOS(0xc000e54908)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:704 +0x34
+testing.tRunner(0xc000e54908, 0x10ad1fb28)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40424 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc000672b48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWindowsGitSeedAndCoherenceUseContainingBranch(0xc000672b48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:3895 +0x48
+testing.tRunner(0xc000672b48, 0x10ad267f0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2400 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e546c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestServerTypeForProviderClassAzure(0xc000e546c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:696 +0x2c
+testing.tRunner(0xc000e546c8, 0x10ad25558)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2403 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e54d88)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestNormalizeAzureOSDiskMode(0xc000e54d88)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:748 +0x34
+testing.tRunner(0xc000e54d88, 0x10ad22f78)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2385 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4a488)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureVMSizeCandidatesForConfigHonorsARM64(0xc000e4a488)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:295 +0x48
+testing.tRunner(0xc000e4a488, 0x10ad1fb48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2396 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4bd48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureWindowsSnapshotRehydrateDefinesVNCPathWithoutDesktop(0xc000e4bd48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:627 +0x48
+testing.tRunner(0xc000e4bd48, 0x10ad1fb70)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2395 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4bb08)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureWindowsSnapshotRehydrateRotatesServiceVNCCredentials(0xc000e4bb08)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:600 +0x48
+testing.tRunner(0xc000e4bb08, 0x10ad1fb78)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2393 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4b688)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSnapshotExposureSequence(0xc000e4b688)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:510 +0x34
+testing.tRunner(0xc000e4b688, 0x10ad1fae0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2394 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4b8c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSnapshotQuarantineCleanupRetries(0xc000e4b8c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:551 +0x2c
+testing.tRunner(0xc000e4b8c8, 0x10ad1fb10)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2364 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000db3688)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureServerHostSelectsPrivateIP(0xc000db3688)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1557 +0x34
+testing.tRunner(0xc000db3688, 0x10ad1fad8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2386 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4a6c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureVMSizeCandidatesForConfigFiltersEphemeralPreview(0xc000e4a6c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:319 +0x48
+testing.tRunner(0xc000e4a6c8, 0x10ad1fb40)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2392 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4b448)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSnapshotNICReleaseRequestRequiresProperties(0xc000e4b448)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:502 +0x34
+testing.tRunner(0xc000e4b448, 0x10ad1fae8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2389 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4ad88)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSnapshotOSDiskTypeMatchesTarget(0xc000e4ad88)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:411 +0x2c
+testing.tRunner(0xc000e4ad88, 0x10ad1fb00)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2391 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4b208)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSnapshotNICReleaseRequestUsesWritableCreatePayload(0xc000e4b208)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:448 +0x34
+testing.tRunner(0xc000e4b208, 0x10ad1faf0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2390 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4afc8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSnapshotQuarantineSecurityGroupDeniesAllInbound(0xc000e4afc8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:421 +0x34
+testing.tRunner(0xc000e4afc8, 0x10ad1fb18)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2388 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4ab48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureWindowsSnapshotRehydrateCommandIsBounded(0xc000e4ab48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:384 +0x48
+testing.tRunner(0xc000e4ab48, 0x10ad1fb68)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2387 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4a908)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureProvisioningCandidatesSkipsStaleEphemeralPreviewDefault(0xc000e4a908)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:347 +0x48
+testing.tRunner(0xc000e4a908, 0x10ad1fa70)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2369 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000498908)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzAccountInfoParsesValidJSON(0xc000498908)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_cli_test.go:10 +0x30
+testing.tRunner(0xc000498908, 0x10ad1f9c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 4324 [chan receive, 16 minutes]:
+testing.(*T).Parallel(0xc000db2248)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestCheckpointCaptureProcessOwnership(0xc000db2248)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/checkpoint_capture_process_test.go:97 +0x30
+testing.tRunner(0xc000db2248, 0x10ad1fdf8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2335 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000498488)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestRetryAzureCleanupResourceReadsDoesNotRetryValidationFailure(0xc000498488)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_cleanup_retry_test.go:34 +0x34
+testing.tRunner(0xc000498488, 0x10ad24a20)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 18912 [chan receive, 11 minutes]:
+testing.(*T).Parallel(0xc0017686c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestBestEffortLeaseTouchHTTPBudget(0xc0017686c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/provider_touch_test.go:20 +0x30
+testing.tRunner(0xc0017686c8, 0x10ad1fba0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40791 [IO wait]:
+internal/poll.runtime_pollWait(0x13ba06600, 0x72)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/runtime/netpoll.go:351 +0xa0
+internal/poll.(*pollDesc).wait(0xc0012d5340, 0x72, 0x1)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/internal/poll/fd_poll_runtime.go:84 +0xb8
+internal/poll.(*pollDesc).waitRead(...)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0xc0012d5320, {0xc00011b000, 0x200, 0x200})
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/internal/poll/fd_unix.go:165 +0x34c
+os.(*File).read(...)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/file_posix.go:30
+os.(*File).Read(0xc000502328, {0xc00011b000, 0x200, 0x200})
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/file.go:144 +0xb0
+bytes.(*Buffer).ReadFrom(0xc001f308d0, {0x10ad45468, 0xc000502328})
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/bytes/buffer.go:229 +0xf0
+io.copyBuffer({0x10ad45660, 0xc001f308d0}, {0x10ad45468, 0xc000502328}, {0x0, 0x0, 0x0})
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/io/io.go:415 +0x1c0
+io.Copy(...)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/io/io.go:388
+os.genericWriteTo(0xc000502328, {0x10ad45660, 0xc001f308d0})
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/file.go:295 +0x50
+os.(*File).WriteTo(0xc000502328, {0x10ad45660, 0xc001f308d0})
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/file.go:273 +0x90
+io.copyBuffer({0x10ad45660, 0xc001f308d0}, {0x10ad455a0, 0xc000502328}, {0x0, 0x0, 0x0})
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/io/io.go:411 +0xac
+io.Copy(...)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/io/io.go:388
+os/exec.(*Cmd).writerDescriptor.func1()
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/exec/exec.go:602 +0x5c
+os/exec.(*Cmd).Start.func2(0xc0003063a0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/exec/exec.go:757 +0x3c
+created by os/exec.(*Cmd).Start in goroutine 40807
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/exec/exec.go:756 +0xb20
+
+goroutine 39844 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc000728248)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWindowsToWSLPathSupportsHostMountRoot(0xc000728248)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:2818 +0x2c
+testing.tRunner(0xc000728248, 0x10ad26910)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2375 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc0004998c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestParseAzureImageRef(0xc0004998c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:40 +0x34
+testing.tRunner(0xc0004998c8, 0x10ad231d8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 7798 [chan receive, 15 minutes]:
+testing.(*T).Parallel(0xc0005bafc8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestDirectAzureWindowsCheckpointRejectsInvalidSnapshotName(0xc0005bafc8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/checkpoint_test.go:2261 +0x40
+testing.tRunner(0xc0005bafc8, 0x10ad21818)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2104 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000cccb48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAWSRecommendedClassForQuotaIncludesSmallClasses(0xc000cccb48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/aws_test.go:836 +0x48
+testing.tRunner(0xc000cccb48, 0x10ad1f1e8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2336 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc0004986c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestRetryAzureCleanupResourceReadsIsBounded(0xc0004986c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_cleanup_retry_test.go:50 +0x34
+testing.tRunner(0xc0004986c8, 0x10ad24a28)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2365 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000db38c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureServerHostFallsBackToPublicWhenNoPrivateIP(0xc000db38c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1577 +0x34
+testing.tRunner(0xc000db38c8, 0x10ad1fad0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2366 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000db3b08)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureVMToServerSetsPrivateIP(0xc000db3b08)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1587 +0x34
+testing.tRunner(0xc000db3b08, 0x10ad1fb50)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40295 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc000499b08)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestRsyncLocalPathPassesThroughNonWindowsPath(0xc000499b08)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:2646 +0x2c
+testing.tRunner(0xc000499b08, 0x10ad24a90)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2334 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000498248)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestRetryAzureCleanupResourceReadsPreservesValidatedIdentities(0xc000498248)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_cleanup_retry_test.go:10 +0x34
+testing.tRunner(0xc000498248, 0x10ad24a30)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2384 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e4a248)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureImageForConfig(0xc000e4a248)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:255 +0x48
+testing.tRunner(0xc000e4a248, 0x10ad1fa40)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 15755 [chan receive, 12 minutes]:
+testing.(*T).Parallel(0xc001768b48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestUbuntu2604AppleVMImageSourceContract(0xc001768b48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/os_image_test.go:13 +0x34
+testing.tRunner(0xc001768b48, 0x10ad25c78)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 37292 [chan receive, 2 minutes]:
+testing.(*T).Parallel(0xc00184b8c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestSleepContextCompletesWhenContextStaysLive(0xc00184b8c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/sleep_context_test.go:29 +0x30
+testing.tRunner(0xc00184b8c8, 0x10ad25688)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 15831 [chan receive, 12 minutes]:
+testing.(*T).Parallel(0xc00184ad88)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestContainerDefaultsUseReviewedMultiPlatformReferences(0xc00184ad88)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/os_image_test.go:128 +0x48
+testing.tRunner(0xc00184ad88, 0x10ad209e8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2370 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000498b48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzAccountInfoRejectsEmptySubscription(0xc000498b48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_cli_test.go:28 +0x2c
+testing.tRunner(0xc000498b48, 0x10ad1f9d0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2404 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e54fc8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestNormalizeAzureSnapshotStorageSKUs(0xc000e54fc8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:772 +0x30
+testing.tRunner(0xc000e54fc8, 0x10ad22f80)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2405 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e55208)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSnapshotPrerequisitesRunConcurrently(0xc000e55208)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:790 +0x34
+testing.tRunner(0xc000e55208, 0x10ad1fb08)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2406 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e55448)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureUseEphemeralOSDiskModes(0xc000e55448)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:847 +0x4c
+testing.tRunner(0xc000e55448, 0x10ad1fb38)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2407 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e55688)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureCreateServerWithFallbackRejectsEphemeralPreviewBeforeSharedInfra(0xc000e55688)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:914 +0x48
+testing.tRunner(0xc000e55688, 0x10ad1fa08)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2408 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e558c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureCreateServerWithFallbackRejectsEmptyPolicyOverlay(0xc000e558c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:936 +0x48
+testing.tRunner(0xc000e558c8, 0x10ad1fa00)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2409 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e55b08)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSnapshotOSDiskID(0xc000e55b08)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:955 +0x34
+testing.tRunner(0xc000e55b08, 0x10ad1faf8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2410 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e55d48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureEphemeralFullCachingVMPayload(0xc000e55d48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1009 +0x34
+testing.tRunner(0xc000e55d48, 0x10ad1fa38)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2411 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8e008)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureComputerNameWindowsLimit(0xc000e8e008)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1052 +0x30
+testing.tRunner(0xc000e8e008, 0x10ad1f9f8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2412 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8e248)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureWindowsBootstrapPowerShell(0xc000e8e248)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1066 +0x48
+testing.tRunner(0xc000e8e248, 0x10ad1fb58)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2413 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8e488)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureTagsMapReservedWindowsPrefix(0xc000e8e488)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1105 +0x34
+testing.tRunner(0xc000e8e488, 0x10ad1fb30)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2414 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8e6c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureSKUCapabilityTrue(0xc000e8e6c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1126 +0x30
+testing.tRunner(0xc000e8e6c8, 0x10ad1fa80)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2415 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8e908)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestStringMapToPtrMap(0xc000e8e908)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1140 +0x34
+testing.tRunner(0xc000e8e908, 0x10ad258b0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2416 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8eb48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestIsAzureRetryableProvisioningError(0xc000e8eb48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1152 +0x34
+testing.tRunner(0xc000e8eb48, 0x10ad22780)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2417 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8ed88)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestIsAzureNotFoundError(0xc000e8ed88)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1174 +0x34
+testing.tRunner(0xc000e8ed88, 0x10ad22770)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2418 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8efc8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestIsAzureRetryableDeleteError(0xc000e8efc8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1193 +0x34
+testing.tRunner(0xc000e8efc8, 0x10ad22778)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2419 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8f208)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWaitForAzureExtensionUsesResourceSuccess(0xc000e8f208)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1217 +0x34
+testing.tRunner(0xc000e8f208, 0x10ad26328)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2420 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8f448)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWaitForAzureExtensionReturnsTerminalResourceFailure(0xc000e8f448)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1239 +0x30
+testing.tRunner(0xc000e8f448, 0x10ad26320)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2421 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8f688)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWaitForAzureExtensionReturnsPollerFailure(0xc000e8f688)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1254 +0x30
+testing.tRunner(0xc000e8f688, 0x10ad26318)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2422 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8f8c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWaitForAzureExtensionHonorsContextCancellation(0xc000e8f8c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1267 +0x2c
+testing.tRunner(0xc000e8f8c8, 0x10ad26310)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2423 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8fb08)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestPreserveNonCrabboxRules(0xc000e8fb08)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1282 +0x30
+testing.tRunner(0xc000e8fb08, 0x10ad236a0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2424 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000e8fd48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestNextAzureNSGPrioritySkipsPreservedRules(0xc000e8fd48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1296 +0x34
+testing.tRunner(0xc000e8fd48, 0x10ad22f40)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 2425 [chan receive, 17 minutes]:
+testing.(*T).Parallel(0xc000eb8008)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureManagedByCrabbox(0xc000eb8008)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/azure_test.go:1317 +0x34
+testing.tRunner(0xc000eb8008, 0x10ad1fa60)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40300 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc000672908)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestNormalizeRsyncOptionsNoTimesForcesChecksum(0xc000672908)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:2750 +0x30
+testing.tRunner(0xc000672908, 0x10ad22fb8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 21853 [chan receive, 11 minutes]:
+testing.(*T).Parallel(0xc001768908)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestSyncGitCoherencePlanRanksContainingOriginBranches(0xc001768908)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/repo_test.go:1746 +0x34
+testing.tRunner(0xc001768908, 0x10ad25918)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 15830 [chan receive, 12 minutes]:
+testing.(*T).Parallel(0xc00184ab48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestOSImageSharedFixtures(0xc00184ab48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/os_image_test.go:86 +0x34
+testing.tRunner(0xc00184ab48, 0x10ad23008)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 11602 [chan receive, 14 minutes]:
+testing.(*T).Parallel(0xc0005ba488)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.runParallelCLIContract(0xc0005ba488, 0x0)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/parallel_contract_test.go:34 +0x470
+github.com/openclaw/crabbox/internal/cli.TestCoordinatorStopReleasesAfterUnreachableGuestCleanup(0xc0005ba488)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/coordinator_stop_connection_test.go:240 +0x38
+testing.tRunner(0xc0005ba488, 0x10ad21360)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40366 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc0007286c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestRemoteGitSeedAndCoherencePreferContainingBranchOverDeletedTopic(0xc0007286c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:3838 +0x34
+testing.tRunner(0xc0007286c8, 0x10ad24328)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40527 [chan receive]:
+testing.(*T).Run(0xc00184afc8, {0x107197d36, 0x3}, 0xc00033e150)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2109 +0x7dc
+github.com/openclaw/crabbox/internal/cli.TestRemoteGitCoherenceRollsBackFailuresAndRetries(0xc00184afc8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:4164 +0x12c
+testing.tRunner(0xc00184afc8, 0x10ad24278)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 7796 [chan receive, 15 minutes]:
+testing.(*T).Parallel(0xc0005bab48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestDirectAzureWindowsCheckpointRequiresRebootOptIn(0xc0005bab48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/checkpoint_test.go:2235 +0x40
+testing.tRunner(0xc0005bab48, 0x10ad21820)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 10543 [chan receive, 14 minutes]:
+testing.(*T).Parallel(0xc000eb8248)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestCoordinatorLeaseReadStallsAreBounded(0xc000eb8248)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/coordinator_budget_test.go:85 +0x2c
+testing.tRunner(0xc000eb8248, 0x10ad211d0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 17946 [chan receive, 12 minutes]:
+testing.(*T).Parallel(0xc00184b448)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestCoordinatorAcquireValidatesBeforeAllocation(0xc00184b448)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/provider_coordinator_test.go:40 +0x2c
+testing.tRunner(0xc00184b448, 0x10ad20f48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40299 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc0006726c8)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWindowsWSLNativeToolPathsRejectsWindowsShims(0xc0006726c8)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:2696 +0x34
+testing.tRunner(0xc0006726c8, 0x10ad26930)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40294 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc000499208)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestRsyncLocalPathConvertsWindowsDrivePath(0xc000499208)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:2630 +0x34
+testing.tRunner(0xc000499208, 0x10ad24a88)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 15828 [chan receive, 12 minutes]:
+testing.(*T).Parallel(0xc00184a008)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestNormalizeOSImage(0xc00184a008)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/os_image_test.go:42 +0x34
+testing.tRunner(0xc00184a008, 0x10ad22fa0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40298 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc000672488)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWindowsWSLNativeToolProbeUsesDirectCommandOutput(0xc000672488)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:2682 +0x30
+testing.tRunner(0xc000672488, 0x10ad26938)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 37291 [chan receive, 2 minutes]:
+testing.(*T).Parallel(0xc00184b688)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestSleepContextHonorsCancellation(0xc00184b688)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/sleep_context_test.go:15 +0x30
+testing.tRunner(0xc00184b688, 0x10ad25690)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40807 [syscall]:
+syscall.syscalln(0x1042ef360, {0xc000fc57d8, 0x6, 0x6})
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/runtime/sys_darwin.go:38 +0x20
+syscall.syscall6(0x1042ef360, 0x5629, 0xc000fc58a8, 0x0, 0xc0018fc000, 0x0, 0x0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/syscall/syscall_darwin.go:407 +0xb4
+syscall.wait4(0x5629, 0xc000fc58a8, 0x0, 0xc0018fc000)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/syscall/zsyscall_darwin_arm64.go:44 +0x60
+syscall.Wait4(0x5629, 0xc000fc5900, 0x0, 0xc0018fc000)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/syscall/syscall_bsd.go:144 +0x48
+os.(*Process).pidWait.func1(...)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/exec_unix.go:64
+os.ignoringEINTR2[...](...)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/file_posix.go:273
+os.(*Process).pidWait(0xc0028c0000)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/exec_unix.go:63 +0xe8
+os.(*Process).wait(0xc0028c0000)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/exec_unix.go:28 +0x44
+os.(*Process).Wait(...)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/exec.go:346
+os/exec.(*Cmd).Wait(0xc001a7e4e0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/exec/exec.go:930 +0x74
+os/exec.(*Cmd).Run(0xc001a7e4e0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/exec/exec.go:632 +0x58
+os/exec.(*Cmd).CombinedOutput(0xc001a7e4e0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/exec/exec.go:1047 +0x1fc
+github.com/openclaw/crabbox/internal/cli.gitCoherenceFixture.workspace({{0xc000b6a500, 0x76}, {0xc0018e6000, 0x7a}, {0xc000d105d0, 0x28}, {0xc0009e6420, 0x28}, {0xc000d10660, 0x28}}, ...)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:3729 +0x150
+github.com/openclaw/crabbox/internal/cli.TestRemoteGitCoherenceRollsBackFailuresAndRetries.func1(0xc001768488)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:4165 +0x94
+testing.tRunner(0xc001768488, 0xc00033e150)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 40527
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 10739 [chan receive, 14 minutes]:
+testing.(*T).Parallel(0xc000eb8488)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.runParallelCLIContract(0xc000eb8488, 0x0)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/parallel_contract_test.go:34 +0x470
+github.com/openclaw/crabbox/internal/cli.TestStopCoordinatorStalledLookup(0xc000eb8488)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/coordinator_budget_test.go:184 +0x34
+testing.tRunner(0xc000eb8488, 0x10ad25818)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 7795 [chan receive, 15 minutes]:
+testing.(*T).Parallel(0xc0005ba908)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestDirectAzureWindowsCheckpointRejectsImageStrategy(0xc0005ba908)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/checkpoint_test.go:2225 +0x40
+testing.tRunner(0xc0005ba908, 0x10ad21810)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 7797 [chan receive, 15 minutes]:
+testing.(*T).Parallel(0xc0005bad88)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAzureOSDiskSnapshotNamePreservesTimestampWithinProviderLimit(0xc0005bad88)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/checkpoint_test.go:2246 +0x34
+testing.tRunner(0xc0005bad88, 0x10ad1fa68)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 12373 [syscall, 13 minutes]:
+os/signal.signal_recv()
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/runtime/sigqueue.go:149 +0x108
+os/signal.loop()
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/signal/signal_unix.go:23 +0x24
+created by os/signal.Notify.func1.1 in goroutine 12395
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/os/signal/signal.go:152 +0x50
+
+goroutine 10786 [chan receive, 14 minutes]:
+testing.(*T).Parallel(0xc000ccc908)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestCoordinatorHeartbeatControlFailure(0xc000ccc908)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/coordinator_heartbeat_failure_test.go:28 +0x30
+testing.tRunner(0xc000ccc908, 0x10ad21140)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40296 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc000672008)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWindowsToWSLMountPathSupportsHostMountRoot(0xc000672008)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:2653 +0x34
+testing.tRunner(0xc000672008, 0x10ad26900)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 14028 [chan receive, 13 minutes]:
+testing.(*T).Parallel(0xc000db2488)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestEgressOpenRemoteTimeoutLeaksPendingAndNeverClosesHostConn(0xc000db2488)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/egress_openremote_leak_test.go:40 +0x34
+testing.tRunner(0xc000db2488, 0x10ad21b28)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 37293 [chan receive, 2 minutes]:
+testing.(*T).Parallel(0xc00184bb08)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWaitForLoopbackVNCHonorsCancellation(0xc00184bb08)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/sleep_context_test.go:41 +0x34
+testing.tRunner(0xc00184bb08, 0x10ad26338)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 15829 [chan receive, 12 minutes]:
+testing.(*T).Parallel(0xc00184a248)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestAWSLinuxAMIQueryForOS(0xc00184a248)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/os_image_test.go:68 +0x30
+testing.tRunner(0xc00184a248, 0x10ad1f1c0)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 39843 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc000728008)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWindowsToWSLPath(0xc000728008)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:2797 +0x34
+testing.tRunner(0xc000728008, 0x10ad26908)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 37294 [chan receive, 2 minutes]:
+testing.(*T).Parallel(0xc00184bd48)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestResolveVNCEndpointStaticHonorsCancellation(0xc00184bd48)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/sleep_context_test.go:55 +0x40
+testing.tRunner(0xc00184bd48, 0x10ad24898)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 40297 [chan receive, 1 minutes]:
+testing.(*T).Parallel(0xc000672248)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestWindowsHostPathConvertsMSYSDrivePath(0xc000672248)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/ssh_test.go:2668 +0x34
+testing.tRunner(0xc000672248, 0x10ad26810)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 10971 [chan receive, 14 minutes]:
+testing.(*T).Parallel(0xc000498d88)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.runParallelCLIContract(0xc000498d88, 0x0)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/parallel_contract_test.go:34 +0x470
+github.com/openclaw/crabbox/internal/cli.TestCoordinatorStopAggregateGuestCleanupPreservesReleaseBudget(0xc000498d88)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/coordinator_stop_aggregate_test.go:20 +0x30
+testing.tRunner(0xc000498d88, 0x10ad21358)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+
+goroutine 15396 [chan receive, 12 minutes]:
+testing.(*T).Parallel(0xc001768248)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:1803 +0x344
+github.com/openclaw/crabbox/internal/cli.TestNormalizeInitSkillPath(0xc001768248)
+	/Users/dawsonblock/NEMO-CONTROL/crabedence-V1-fix-integration-integrity/internal/cli/init_test.go:153 +0x34
+testing.tRunner(0xc001768248, 0x10ad22f98)
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2036 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/dawsonblock/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.darwin-arm64/src/testing/testing.go:2101 +0x7c0
+FAIL	github.com/openclaw/crabbox/internal/cli	1208.133s
+ok  	github.com/openclaw/crabbox/internal/custody	6.616s
+ok  	github.com/openclaw/crabbox/internal/dream	7.166s
+ok  	github.com/openclaw/crabbox/internal/evidence	14.071s
+ok  	github.com/openclaw/crabbox/internal/execution	64.459s
+ok  	github.com/openclaw/crabbox/internal/experience	7.926s
+ok  	github.com/openclaw/crabbox/internal/history	9.231s
+ok  	github.com/openclaw/crabbox/internal/idempotency	38.939s
+ok  	github.com/openclaw/crabbox/internal/providers/agentsandbox	48.909s
+ok  	github.com/openclaw/crabbox/internal/providers/all	10.376s
+ok  	github.com/openclaw/crabbox/internal/providers/anthropicsandboxruntime	11.605s
+ok  	github.com/openclaw/crabbox/internal/providers/applecontainer	13.197s
+ok  	github.com/openclaw/crabbox/internal/providers/applemachine	13.714s
+ok  	github.com/openclaw/crabbox/internal/providers/applevm	10.224s
+ok  	github.com/openclaw/crabbox/internal/providers/asciibox	17.234s
+--- FAIL: TestAWSStatusWaitAndConnectRenewOrdinaryAndFixedClaims (18.43s)
+    --- FAIL: TestAWSStatusWaitAndConnectRenewOrdinaryAndFixedClaims/fixed=false (9.22s)
+        heartbeat_test.go:356: status-wait failed: err=timed out waiting for cbx_6159fa850c175f372456722201d28538 to become ready stderr=
+    --- FAIL: TestAWSStatusWaitAndConnectRenewOrdinaryAndFixedClaims/fixed=true (9.20s)
+        heartbeat_test.go:356: status-wait failed: err=timed out waiting for cbx_abcdef123499 to become ready stderr=
+--- FAIL: TestAWSLinuxReadinessWaitsForCurrentBootCloudInit (16.92s)
+    provider_test.go:139: ready check rejected completed current boot: signal: killed: 
+FAIL
+FAIL	github.com/openclaw/crabbox/internal/providers/aws	84.380s
+ok  	github.com/openclaw/crabbox/internal/providers/awslambdamicrovm	12.301s
+ok  	github.com/openclaw/crabbox/internal/providers/azure	12.198s
+ok  	github.com/openclaw/crabbox/internal/providers/azuredynamicsessions	12.259s
+ok  	github.com/openclaw/crabbox/internal/providers/blacksmith	186.515s
+ok  	github.com/openclaw/crabbox/internal/providers/blaxel	15.901s
+ok  	github.com/openclaw/crabbox/internal/providers/boxd	17.118s
+ok  	github.com/openclaw/crabbox/internal/providers/cloudflare	17.779s
+ok  	github.com/openclaw/crabbox/internal/providers/cloudflaredynamicworkers	16.770s
+ok  	github.com/openclaw/crabbox/internal/providers/cloudflaresandbox	15.387s
+ok  	github.com/openclaw/crabbox/internal/providers/cloudrunsandbox	10.107s
+ok  	github.com/openclaw/crabbox/internal/providers/coder	11.118s
+ok  	github.com/openclaw/crabbox/internal/providers/codesandbox	12.762s
+ok  	github.com/openclaw/crabbox/internal/providers/crownest	16.350s
+ok  	github.com/openclaw/crabbox/internal/providers/cua	8.192s
+ok  	github.com/openclaw/crabbox/internal/providers/cubesandbox	22.489s
+ok  	github.com/openclaw/crabbox/internal/providers/daytona	63.596s
+ok  	github.com/openclaw/crabbox/internal/providers/digitalocean	14.322s
+ok  	github.com/openclaw/crabbox/internal/providers/dockersandbox	11.922s
+ok  	github.com/openclaw/crabbox/internal/providers/e2b	20.741s
+ok  	github.com/openclaw/crabbox/internal/providers/exedev	10.916s
+ok  	github.com/openclaw/crabbox/internal/providers/external	18.371s
+ok  	github.com/openclaw/crabbox/internal/providers/fastapicloud	10.127s
+ok  	github.com/openclaw/crabbox/internal/providers/firecracker	7.736s
+ok  	github.com/openclaw/crabbox/internal/providers/freestyle	52.062s
+ok  	github.com/openclaw/crabbox/internal/providers/gcp	6.795s
+ok  	github.com/openclaw/crabbox/internal/providers/githubcodespaces	13.854s
+ok  	github.com/openclaw/crabbox/internal/providers/hetzner	5.372s
+ok  	github.com/openclaw/crabbox/internal/providers/hostinger	7.684s
+ok  	github.com/openclaw/crabbox/internal/providers/hyperv	5.521s
+ok  	github.com/openclaw/crabbox/internal/providers/incus	20.586s
+ok  	github.com/openclaw/crabbox/internal/providers/islo	12.488s
+ok  	github.com/openclaw/crabbox/internal/providers/kubevirt	6.669s
+ok  	github.com/openclaw/crabbox/internal/providers/lambda	3.886s
+ok  	github.com/openclaw/crabbox/internal/providers/linode	13.456s
+--- FAIL: TestBrowserBootstrapPackageSelection (65.43s)
+    --- FAIL: TestBrowserBootstrapPackageSelection/working_ESR_untouched (10.08s)
+        browser_bootstrap_test.go:114: err=signal: killed output=
+    --- FAIL: TestBrowserBootstrapPackageSelection/working_Firefox_untouched (10.20s)
+        browser_bootstrap_test.go:114: err=signal: killed output=
+    --- FAIL: TestBrowserBootstrapPackageSelection/Ubuntu_native_Firefox (10.78s)
+        browser_bootstrap_test.go:114: err=signal: killed output=
+    --- FAIL: TestBrowserBootstrapPackageSelection/Ubuntu_broken_Chromium_advances (10.02s)
+        browser_bootstrap_test.go:114: err=signal: killed output=
+FAIL
+FAIL	github.com/openclaw/crabbox/internal/providers/localcontainer	104.309s
+ok  	github.com/openclaw/crabbox/internal/providers/lume	8.073s
+ok  	github.com/openclaw/crabbox/internal/providers/machine0	113.600s
+ok  	github.com/openclaw/crabbox/internal/providers/modal	7.693s
+ok  	github.com/openclaw/crabbox/internal/providers/morph	12.217s
+ok  	github.com/openclaw/crabbox/internal/providers/multipass	5.880s
+ok  	github.com/openclaw/crabbox/internal/providers/mxc	2.101s
+ok  	github.com/openclaw/crabbox/internal/providers/namespace	3.127s
+ok  	github.com/openclaw/crabbox/internal/providers/namespaceinstance	4.154s
+ok  	github.com/openclaw/crabbox/internal/providers/nebius	4.551s
+ok  	github.com/openclaw/crabbox/internal/providers/nomad	10.796s
+ok  	github.com/openclaw/crabbox/internal/providers/nvidiabrev	4.744s
+ok  	github.com/openclaw/crabbox/internal/providers/opencomputer	7.499s
+ok  	github.com/openclaw/crabbox/internal/providers/opensandbox	39.963s
+ok  	github.com/openclaw/crabbox/internal/providers/orgo	27.033s
+ok  	github.com/openclaw/crabbox/internal/providers/ovh	4.900s
+ok  	github.com/openclaw/crabbox/internal/providers/parallels	3.030s
+ok  	github.com/openclaw/crabbox/internal/providers/phala	3.673s
+ok  	github.com/openclaw/crabbox/internal/providers/proxmox	3.456s
+ok  	github.com/openclaw/crabbox/internal/providers/railway	2.968s
+ok  	github.com/openclaw/crabbox/internal/providers/runpod	5.264s
+ok  	github.com/openclaw/crabbox/internal/providers/scaleway	4.886s
+ok  	github.com/openclaw/crabbox/internal/providers/sealosdevbox	9.488s
+ok  	github.com/openclaw/crabbox/internal/providers/semaphore	4.252s
+ok  	github.com/openclaw/crabbox/internal/providers/shared	3.906s
+ok  	github.com/openclaw/crabbox/internal/providers/shared/procjson	4.336s
+ok  	github.com/openclaw/crabbox/internal/providers/smolvm	22.838s
+ok  	github.com/openclaw/crabbox/internal/providers/sprites	6.282s
+ok  	github.com/openclaw/crabbox/internal/providers/ssh	107.538s
+ok  	github.com/openclaw/crabbox/internal/providers/superserve	16.957s
+ok  	github.com/openclaw/crabbox/internal/providers/tart	154.020s
+ok  	github.com/openclaw/crabbox/internal/providers/tencentcloud	3.504s
+ok  	github.com/openclaw/crabbox/internal/providers/tenki	5.156s
+ok  	github.com/openclaw/crabbox/internal/providers/tensorlake	33.784s
+ok  	github.com/openclaw/crabbox/internal/providers/unikraftcloud	7.903s
+ok  	github.com/openclaw/crabbox/internal/providers/upstashbox	8.554s
+ok  	github.com/openclaw/crabbox/internal/providers/vast	5.454s
+ok  	github.com/openclaw/crabbox/internal/providers/vercelsandbox	12.064s
+ok  	github.com/openclaw/crabbox/internal/providers/vultr	8.629s
+ok  	github.com/openclaw/crabbox/internal/providers/wandb	3.102s
+?   	github.com/openclaw/crabbox/internal/providers/wandb/gen/coreweave/sandbox/v1beta2	[no test files]
+ok  	github.com/openclaw/crabbox/internal/providers/windowssandbox	3.179s
+ok  	github.com/openclaw/crabbox/internal/providers/xcpng	60.825s
+ok  	github.com/openclaw/crabbox/internal/providertransport	3.435s
+ok  	github.com/openclaw/crabbox/internal/qualprovider	5.717s
+ok  	github.com/openclaw/crabbox/internal/reconcile	4.439s
+ok  	github.com/openclaw/crabbox/internal/releasectl	5.359s
+ok  	github.com/openclaw/crabbox/internal/research	4.689s
+ok  	github.com/openclaw/crabbox/internal/sandboxcustody	3.415s
+ok  	github.com/openclaw/crabbox/internal/sandboxexecutor	1193.066s
+?   	github.com/openclaw/crabbox/internal/secretpattern	[no test files]
+?   	github.com/openclaw/crabbox/internal/sockfile	[no test files]
+ok  	github.com/openclaw/crabbox/internal/testutil	3.279s
+ok  	github.com/openclaw/crabbox/internal/witness	11.499s
+ok  	github.com/openclaw/crabbox/runtimes/aws-lambda-microvm	4.139s
+ok  	github.com/openclaw/crabbox/scripts	6.387s
+ok  	github.com/openclaw/crabbox/scripts/apple-vm-image-source	1.758s
+ok  	github.com/openclaw/crabbox/scripts/configgen	1.852s
+FAIL
+EXIT=1

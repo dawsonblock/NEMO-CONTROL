@@ -1,0 +1,2 @@
+REJECT: signature verification failed: 406C710702000000:error:030000EA:digital envelope routines:EVP_DigestVerify:provider signature failure:crypto/evp/m_sigver.c:785:ED25519 digest_verify:
+BADSIG_EXIT=1

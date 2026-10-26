@@ -1,0 +1,4 @@
+OK: signature verified under pinned key 387d837e235aa095b4370e9ce9198a4a42c0a16e32ecdd1d9494870261e1736f
+OK: artifact source-a.zip sha256=8328e3156f25200ff0519c6f944192ffebc995f055d614a9ab0890297004abd6
+OK: source inventory source-inventory.txt sha256=884df9b76310da0808702704b9f2206fbaa2caf54626b60a829e6a21b0741958
+verdict=GO (macOS arm64/HVF exclusive-runtime; Linux/KVM excluded by operator direction; shared-runtime high assurance UNSUPPORTED; release root pinned locally, external countersignature required for third-party trust)

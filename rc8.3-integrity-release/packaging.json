@@ -1,22 +1,21 @@
 {
-  "schema": "rc83-integrity-packaging-v1",
-  "source_commit": "8da328a2d350ce84ae5ff7abf8530530a78a2614",
-  "command": "python3 qualification/rc8.3-integrity/tools/deterministic-package.py <repo> crabedence-V1-fix-integration-integrity nemo-control-0.55.0-rc8.3-integrity-closure <output>",
-  "entries": 4376,
   "archive_a": {
-    "path": "/Users/dawsonblock/NEMO-CONTROL/rc8.3-integrity-release/source-a.zip",
-    "sha256": "59fdea52a94fbd0e7a2cea6ac3c0bbc6456a82d8dbabd76084e75621895760c8",
-    "size": 18836753
+    "path": "source-a.zip",
+    "sha256": "8328e3156f25200ff0519c6f944192ffebc995f055d614a9ab0890297004abd6",
+    "size": 18859443
   },
   "archive_b": {
-    "path": "/Users/dawsonblock/NEMO-CONTROL/rc8.3-integrity-release/source-b.zip",
-    "sha256": "59fdea52a94fbd0e7a2cea6ac3c0bbc6456a82d8dbabd76084e75621895760c8",
-    "size": 18836753
+    "path": "source-b.zip",
+    "sha256": "8328e3156f25200ff0519c6f944192ffebc995f055d614a9ab0890297004abd6",
+    "size": 18859443
   },
   "byte_identical": true,
+  "command": "python3 qualification/rc8.3-integrity/tools/deterministic-package.py <repo> crabedence-V1-fix-integration-integrity nemo-control-0.55.0-rc8.3-integrity-closure <output>",
+  "entries": 4382,
+  "notes": "Fixed timestamp 2020-01-01, fixed modes, LC_ALL=C path order, symlinks preserved. Two independent builds are byte-identical.",
+  "schema": "rc83-integrity-packaging-v1",
   "source_inventory": {
-    "path": "/Users/dawsonblock/NEMO-CONTROL/rc8.3-integrity-release/source-inventory.txt",
-    "sha256": "76b8c9c5550339fd4fbf16322db98aa88f8dbb44d72be071994070aa0874a2ad"
-  },
-  "notes": "Fixed timestamp 2020-01-01, fixed modes, LC_ALL=C path order, symlinks preserved. Two independent builds are byte-identical."
+    "path": "source-inventory.txt",
+    "sha256": "884df9b76310da0808702704b9f2206fbaa2caf54626b60a829e6a21b0741958"
+  }
 }
