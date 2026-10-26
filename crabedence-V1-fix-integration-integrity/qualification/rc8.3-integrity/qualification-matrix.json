@@ -189,8 +189,8 @@
       "id": "G18-deterministic-packaging",
       "status": "PASS",
       "command": "python3 qualification/rc8.3-integrity/tools/deterministic-package.py ... source-a.zip; ... source-b.zip",
-      "evidence": "qualification/rc8.3-integrity/packaging.json",
-      "notes": "Two byte-identical archives over 4371 tracked entries; fixed timestamps, modes, sorted paths, symlinks preserved."
+      "evidence": "detached rc8.3-integrity-release/packaging.json (two byte-identical archives, 4382 entries)",
+      "notes": "Fixed timestamp, modes, LC_ALL=C order, symlinks preserved. The artifact SHA-256 is bound in the detached signed attestation, not embedded in the source tree."
     },
     {
       "id": "G19-signed-attestation",
@@ -198,12 +198,14 @@
       "reason": "No externally trusted release root or release signing key material is available. A locally generated key would not satisfy independent root validation.",
       "command": "python3 sign-release-attestation.py <release-dir>; python3 verify-release-attestation.py <release-dir>",
       "exit_code": 0,
-      "notes": "Ed25519 detached signature over canonical attestation, verified against a pinned release root (key id 387d837e\u2026). The root is locally provisioned and pinned by SHA-256; it is a real cryptographic trust anchor, not a third-party root."
+      "notes": "Ed25519 over canonical JSON, verified against the pinned release root (key id 387d837e\u2026). Locally provisioned root, not a third-party root; external countersignature required for third-party trust.",
+      "evidence": "detached attestation.json + attestation.sig + verify-attestation.log"
     },
     {
       "id": "G20-archive-tamper-rejection",
       "status": "PASS",
-      "notes": "Rejected: modified attestation (canonical mismatch), modified signature (Ed25519 verify failure), swapped inventory (hash mismatch), swapped archive (hash mismatch), wrong root (key id mismatch)."
+      "notes": "All five negative cases rejected: modified attestation, modified signature, swapped inventory, swapped archive, wrong root.",
+      "evidence": "detached verify-attestation-{modified,badsig,swapped,tampered,wrongroot}.log"
     },
     {
       "id": "G21-third-party-cleanroom",
@@ -212,13 +214,15 @@
       "command": "cleanroom-verify.sh source-a.zip source-inventory.txt /tmp/rc83-cleanroom",
       "exit_code": 0,
       "log": "rc8.3-integrity-release/cleanroom.log",
-      "notes": "Fresh extraction, 4376/4376 inventory match, fresh GOCACHE/GOMODCACHE, go mod download, build, vet, and targeted race suites. This is a local clean-room reproduction, not a third-party verifier."
+      "notes": "Local clean-room: fresh extraction, 4382/4382 inventory match, fresh GOCACHE/GOMODCACHE, go mod download, build, vet, targeted race suites. Not an independent third-party verifier.",
+      "evidence": "detached cleanroom.log"
     },
     {
       "id": "G22-evidence-bundle",
-      "status": "PENDING",
+      "status": "PASS",
       "command": "python3 qualification/rc8.3-integrity/tools/verify-evidence-bundle.py <bundle>",
-      "notes": "Checks every attached log against its recorded size/hash, every matrix lane log, full-race completeness (size and terminal EXIT line), absolute-path hygiene, artifact/inventory hashes, and the signed attestation."
+      "notes": "Self-contained bundle verifier: every attached log matches recorded size/hash, every matrix lane log present, full-race log complete with terminal EXIT line, no absolute source-host paths, artifact/inventory hashes match, signed attestation verifies.",
+      "evidence": "detached verify-bundle.log"
     },
     {
       "id": "G23-audit-closures",
