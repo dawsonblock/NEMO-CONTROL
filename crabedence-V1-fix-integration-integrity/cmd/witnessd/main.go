@@ -91,7 +91,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("witnessd: witness signing key: %v", err)
 	}
-	trust, err := custody.LoadTrustSet(*kernelTrust)
+	// The witness verifies kernel submissions and fence requests, so
+	// this file must pin kernel-relay keys only. A file that also pins
+	// custodian or repair keys is a role-separation fault, not a
+	// broader trust decision, and the witness refuses to start on it.
+	trust, err := custody.LoadTrustSetForRole(*kernelTrust, custody.RoleKernelRelay)
 	if err != nil {
 		log.Fatalf("witnessd: kernel trust set: %v", err)
 	}

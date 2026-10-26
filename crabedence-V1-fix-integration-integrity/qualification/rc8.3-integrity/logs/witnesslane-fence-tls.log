@@ -1,0 +1,24 @@
+PASS  mTLS transport established: kernel cf6558367512 ↔ witness b984c04a8c1a
+PASS  witness rejected unpinned client key: witness read: remote error: tls: bad certificate
+PASS  client rejected unpinned witness key: witness dial: custody witness authenticated as key b984c04a8c1acd12058ec1b9b2dd526ab9cb7298707cafaf73a8b8b391ea7cb0, expected pinned key cecebe50c504b779bc862e26d2912a95de929842469f67d818907bb1993c3933 — refusing unconfigured peer
+PASS  initial signed checkpoint verifies (seq=0)
+PASS  valid envelope custodied and ack verifies (seq=1)
+PASS  identical replay returned the stored ack
+PASS  conflicting envelope refused: witness: contradictory checkpoint — same index, different record: witness submit refused: witness: contradictory checkpoint — same index, different record: index 1 already custodies aa803f9e44cd6d438b70e8969d25fda2a8c2a8027dbb3848ea2d9ffb51ac0aae, submission presents 53256c17993cbcd8b9eeb069ac5aa1008b8c258e6be55afe1d21ea116afd132a
+PASS  forged kernel signature refused by signature verification: witness submit refused: witness: envelope rejected: custody envelope: signer key is not pinned in the trust set: no pinned kernel-relay key cecebe50c504b779bc862e26d2912a95de929842469f67d818907bb1993c3933 valid at index 2 for deployment "dep-independent-a"
+PASS  substituted checkpoint hash rejected: record signature invalid
+PASS  substituted witness identity rejected: custody envelope: signer key is not pinned in the trust set: no pinned custodian key cecebe50c504b779bc862e26d2912a95de929842469f67d818907bb1993c3933 for deployment "dep-independent-a"
+PASS  network partition refused custody: witness dial: dial tcp 127.0.0.1:64197: connect: connection refused
+PASS  crash/restart preserved the custody head (seq=1)
+PASS  post-restart replay returned the stored ack
+PASS  stale acknowledgement rejected for a later envelope: custody acknowledgement does not bind this envelope (hash, sequence, execution, deployment, or family differs)
+PASS  second valid envelope custodied and ack verifies (seq=2)
+PASS  migration epoch opened over mTLS at seq 2 (fence de0dd5fd1239)
+PASS  in-flight submission refused inside the epoch: witness: deployment is fenced for migration: witness submit refused: witness: deployment is fenced for migration: epoch 1 (fence de0dd5fd123934050d16b110d3bba857daddff1f5aba02490f50d5db0e07fa0c) is open at seq 2 — submissions are suspended until the migration closes it
+PASS  second epoch refused while one is live: witness: a migration fence is already open for this deployment: witness fence-begin refused: witness: a migration fence is already open for this deployment: fence de0dd5fd123934050d16b110d3bba857daddff1f5aba02490f50d5db0e07fa0c (epoch 1, grant abababababababababababababababababababababababababababababababab) is open
+PASS  fence receipt under an unpinned key rejected: fence receipt: custody envelope: signer key is not pinned in the trust set: no pinned custodian key cecebe50c504b779bc862e26d2912a95de929842469f67d818907bb1993c3933 for deployment "dep-independent-a"
+PASS  migration epoch closed over mTLS (result 111111111111)
+PASS  submission resumed after the epoch closed (seq=3)
+PASS  open epoch survived a witness restart: witness: deployment is fenced for migration: witness submit refused: witness: deployment is fenced for migration: epoch 2 (fence e96e64fe23d71a9fff59f9a1a888317c26a2a0337781ea09618b38c2d004d27a) is open at seq 3 — submissions are suspended until the migration closes it
+PASS  restarted epoch closed cleanly
+RESULT PASS: independent TLS witness lane

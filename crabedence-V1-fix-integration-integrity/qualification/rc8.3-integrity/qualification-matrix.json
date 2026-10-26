@@ -125,11 +125,11 @@
       "id": "G11-independent-witness-g8",
       "status": "PASS",
       "reason": "No separately administered witness host, independent custodian trust domain, or authenticated TLS witness transport is available. In-process witness tests are not a substitute for independent administration.",
-      "command": "GOTOOLCHAIN=go1.26.5 go run -tags witnesslane ./qualification/rc8.3-integrity/lanes/witnesslane /tmp/witnessd-rc83",
+      "command": "GOTOOLCHAIN=go1.26.5 go build -o /tmp/witnessd ./cmd/witnessd && GOTOOLCHAIN=go1.26.5 go run -tags witnesslane ./qualification/rc8.3-integrity/lanes/witnesslane /tmp/witnessd",
       "exit_code": 0,
-      "log": "qualification/rc8.3-integrity/logs/independent-witness-tls.log",
-      "notes": "Separately administered witnessd process with independent kernel/witness keys, deployment pin, kernel trust root, and mutual TLS pinning in both directions. Scenarios: valid custody, idempotent replay, conflicting replay, forged kernel signature (rejected by signature verification), stale ack, checkpoint hash/identity substitution, network partition, SIGKILL crash/restart persistence, post-restart replay. Same host, separate process/keys/trust domain; not a third-party host.",
-      "log_sha256": "4532302793f7a8e0540c1fb0717f097000db907dbdaeda9e421c426b3f6ae9e5"
+      "log": "qualification/rc8.3-integrity/logs/witnesslane-fence-tls.log",
+      "notes": "Separately administered witnessd process with independent kernel/witness keys, deployment pin, kernel trust root, and mutual TLS pinning in both directions. Scenarios: valid custody, idempotent replay, conflicting replay, forged kernel signature (rejected by signature verification), stale ack, checkpoint hash/identity substitution, network partition, SIGKILL crash/restart persistence, post-restart replay. Same host, separate process/keys/trust domain; not a third-party host. Extended on the witness-fence branch with the epoch handshake over mTLS: fence opens at the verified head, an in-flight submission is refused inside the epoch, a second epoch is refused while one is live, a fence receipt under an unpinned key is rejected, the epoch closes and submissions resume, and an open epoch survives a witness restart. This remains the same administrative domain, so it is evidence for the protocol, not for G32 independence.",
+      "log_sha256": "5a772496d6a615cdedecd354c61174c64ad16e092d24528c0e04df135ab8c52e"
     },
     {
       "id": "G12-abi-differential",

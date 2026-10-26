@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -158,7 +159,7 @@ func main() {
 	must(waitReady(client), "witness readiness")
 	pass("mTLS transport established: kernel %s ↔ witness %s", kernel.Fingerprint()[:12], witnessSigner.Fingerprint()[:12])
 
-	custodianTrust, err := custody.LoadTrustSet(filepath.Join(dir, "custodian-trust.json"))
+	custodianTrust, err := custody.LoadTrustSetForRole(filepath.Join(dir, "custodian-trust.json"), custody.RoleCustodian)
 	must(err, "custodian trust")
 
 	// Negative transport: the server must reject a client key it does
@@ -300,6 +301,101 @@ func main() {
 		os.Exit(2)
 	}
 	pass("second valid envelope custodied and ack verifies (seq=%d)", ack2.Seq)
+
+	// Migration epoch across the real mTLS boundary: the fence protocol
+	// is transport-agnostic, and an independently administered witness
+	// is expected to run it over exactly this channel.
+	fenceClient := &witness.FenceClient{
+		Client: client, Signer: kernel, DeploymentID: deployment,
+		GrantDigest: strings.Repeat("ab", 32),
+		KernelTrust: custody.NewTrustSet(custody.TrustedKey{
+			Role: custody.RoleKernelRelay, KeyID: kernel.Fingerprint(),
+			PublicKey: kernel.PublicKey(), DeploymentID: deployment,
+		}),
+		CustodianTrust: custodianTrust,
+	}
+	fence, err := fenceClient.Begin(context.Background())
+	if err != nil {
+		fail("migration epoch did not open over mTLS: %v", err)
+	} else if fence.BaseSeq != ack2.Seq || fence.BaseHash != ack2.EnvelopeHash {
+		fail("epoch froze seq %d (%s), the custody head was seq %d (%s)", fence.BaseSeq, fence.BaseHash, ack2.Seq, ack2.EnvelopeHash)
+	} else {
+		pass("migration epoch opened over mTLS at seq %d (fence %s)", fence.BaseSeq, fence.FenceID[:12])
+	}
+
+	// A submission already on the wire must be refused while the epoch
+	// is open — the defect this epoch exists to prevent.
+	inflight := envelope(deployment, 3, ack2.EnvelopeHash, "indep-inflight", []byte(`{"receipt":"three"}`), kernel)
+	if _, err := client.Submit(context.Background(), deployment, inflight); !errors.Is(err, witness.ErrFenced) {
+		fail("submission inside an open epoch was not fenced: %v", err)
+	} else {
+		pass("in-flight submission refused inside the epoch: %v", err)
+	}
+
+	// A second epoch cannot be opened while one is live.
+	second := &witness.FenceRequest{
+		Op: witness.OpFenceBegin, DeploymentID: deployment,
+		FenceID:     witness.FenceIDFor(deployment, strings.Repeat("cd", 32), fence.BaseSeq, fence.BaseHash),
+		GrantDigest: strings.Repeat("cd", 32), BaseSeq: fence.BaseSeq, BaseHash: fence.BaseHash,
+	}
+	must(witness.SignFenceRequest(kernel, second), "sign second fence")
+	if _, err := client.BeginFence(context.Background(), second); !errors.Is(err, witness.ErrFenceActive) {
+		fail("a second epoch opened while one was live: %v", err)
+	} else {
+		pass("second epoch refused while one is live: %v", err)
+	}
+
+	// A fence receipt minted by an unpinned key is not authority.
+	rogueReceipt := fence
+	rogueReceipt.Signature = ""
+	rogueReceipt.WitnessFP = rogue.Fingerprint()
+	if _, err := witness.SignFenceReceipt(rogue, 0, &rogueReceipt); err == nil {
+		if err := witness.VerifyFenceReceipt(&rogueReceipt, deployment, custodianTrust); err == nil {
+			fail("fence receipt signed by an unpinned key verified")
+		} else {
+			pass("fence receipt under an unpinned key rejected: %v", err)
+		}
+	}
+
+	// Closing the epoch resumes custody.
+	closed, err := fenceClient.End(context.Background(), fence, strings.Repeat("11", 32))
+	if err != nil {
+		fail("epoch close over mTLS: %v", err)
+	} else if closed.State != witness.FenceClosed {
+		fail("epoch close returned state %s", closed.State)
+	} else {
+		pass("migration epoch closed over mTLS (result %s)", closed.ResultDigest[:12])
+	}
+	ack3, err := client.Submit(context.Background(), deployment, inflight)
+	if err != nil {
+		fail("submission refused after the epoch closed: %v", err)
+	} else if err := witness.VerifyAck(ack3, inflight, custodianTrust); err != nil {
+		fail("post-epoch ack does not verify: %v", err)
+	} else {
+		pass("submission resumed after the epoch closed (seq=%d)", ack3.Seq)
+	}
+
+	// An epoch is durable: a restart must not silently release it.
+	fence2, err := fenceClient.Begin(context.Background())
+	if err != nil {
+		fail("second epoch did not open: %v", err)
+	} else {
+		stopWitness(cmd)
+		cmd = startWitness(bin, dir, addr, kernel)
+		defer stopWitness(cmd)
+		must(waitReady(client), "witness restart with an open epoch")
+		still := envelope(deployment, 5, ack3.EnvelopeHash, "indep-after-restart", []byte(`{"receipt":"five"}`), kernel)
+		if _, err := client.Submit(context.Background(), deployment, still); !errors.Is(err, witness.ErrFenced) {
+			fail("restart released an open epoch: %v", err)
+		} else {
+			pass("open epoch survived a witness restart: %v", err)
+		}
+		if _, err := fenceClient.End(context.Background(), fence2, strings.Repeat("22", 32)); err != nil {
+			fail("closing the restarted epoch: %v", err)
+		} else {
+			pass("restarted epoch closed cleanly")
+		}
+	}
 
 	if failures != 0 {
 		fmt.Printf("RESULT FAIL (%d failures)\n", failures)
