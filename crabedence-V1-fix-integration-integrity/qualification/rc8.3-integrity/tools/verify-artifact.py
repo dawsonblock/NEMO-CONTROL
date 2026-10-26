@@ -3,14 +3,18 @@
 
 Checks the artifact SHA-256 and, when present, the embedded source
 inventory SHA-256. A mismatch is a hard rejection (exit 1). This is the
-hash-binding half of tamper rejection; signature verification against an
-externally trusted release root is a separate, currently blocked step.
+hash-binding half of tamper rejection; detached signature verification is
+performed by verify-release-attestation.py in the release bundle.
+
+Relative inventory paths are resolved against the attestation's
+directory, so the bundle verifies from any extracted location.
 
 Usage: verify-artifact.py <attestation.json> <artifact>
 """
 
 import hashlib
 import json
+import os
 import sys
 
 
