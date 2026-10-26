@@ -235,9 +235,9 @@
   "generated_at": "2026-10-26T09:41:09Z",
   "local_extraction_check": {
     "performed": true,
-    "what": "extracted the archive into a fresh directory; built and tested internal/witness and cmd/custodyctl from the extracted tree; built the whole tree in the worktree at the same commit",
+    "what": "extracted the archive into a fresh directory; ran `go build ./...` and `go vet ./...` on the whole tree from the extracted bytes, then `go test` on internal/witness, internal/custody and cmd/custodyctl",
     "result": "PASS",
-    "caveat": "A full-tree build from the extracted tree could not complete in this run because the host filesystem was at 100% capacity while a duplicate module cache was being written. The failure was ENOSPC, not a compile error; the same commit builds ./... cleanly in the worktree. Recorded rather than omitted.",
+    "note": "An earlier run of the full-tree build from the extracted tree failed with ENOSPC on a host filesystem at 100% capacity. Re-run after freeing space: build, vet and the custody/operator suites all pass. The failure was disk exhaustion, not a compile error.",
     "not_a_third_party_cleanroom": "Same host, same toolchain installation, same operator. This is a packaging integrity check, not G33."
   },
   "source_commit_note": "source_commit is the commit whose tree was packaged. The packaging commit that carries this record adds only release-out/ and does not alter source, so the artifact and the record describe the same source tree."
