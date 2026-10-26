@@ -42,7 +42,7 @@
       "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 -timeout=20m ./internal/witness ./internal/execution ./internal/idempotency ./internal/custody ./internal/sandboxexecutor ./cmd/custodyctl",
       "exit_code": 0,
       "log": "qualification/rc8.3-integrity/logs/targeted-race-final.log",
-      "log_sha256": "d77dbd623b62ec637bf86865058896c6a740de5f114ffca65302a3fabda9766c",
+      "log_sha256": "d574a7bf169f70d22567e36a23ce749792ceef81aec3156b358bef05090d02f7",
       "notes": "Final-code targeted race suites: witness, execution, idempotency, custody, custodyctl."
     },
     {

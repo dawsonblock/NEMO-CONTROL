@@ -54,3 +54,39 @@ the stricter register in
   The exact 20m full-tree gate remains FAIL; the operator-directed
   requalification uses a 30m per-package budget with `GOFLAGS=-p=4`, recorded
   separately from the retained 20m failure.
+
+## Post-review closure addendum (RC83-IC-25..33)
+
+A review of this branch against `codex/rc8.3-custody-sandbox-qualification`
+found that the release-evidence gate was self-referential and that two
+authorization/upgrade paths were still open. Closures are recorded in
+`qualification/rc8.3-integrity/defect-closure.json`:
+
+- **RC83-IC-25 (critical).** `release-root.pem` — a live private key matching
+  the pinned public key — was committed to the repository, so the signature
+  gate attested nothing. The key is removed and gitignored, signing reads
+  `$RELEASE_ROOT_KEY` outside any git worktree, and the root was rotated. The
+  retired blob remains in history; purging it is a destructive rewrite left to
+  an explicit operator decision (RC83-IC-R4).
+- **RC83-IC-26/27.** The attestation verifier resolved its trust anchor from
+  the bundle it was verifying, and the bundle verifier executed a verifier
+  script taken from that same bundle. Both are now resolved from outside:
+  verification requires an externally supplied `--root-key-id`/`--root`, and
+  the attestation checker is located beside the bundle-verification tool.
+  `negative-tests.sh` reproduces every tamper case, including a coherent root
+  substitution that previously passed.
+- **RC83-IC-28.** Read-only `preflight` selected post-upgrade journal columns
+  on a database the additive ALTER never touched, so the mandatory first
+  migration step failed with `no such column` on exactly the outboxes this
+  release migrates. Journal readers now derive their select list from the
+  live schema and default absent columns.
+- **RC83-IC-29.** Compensated coverage accepted a journal row whose only
+  authorization was a consumed grant nonce — the grant is not bound to a row,
+  and the signed before/after proof was written but never verified. Coverage
+  now requires `VerifyMigrationProof` under a pinned kernel-relay set with the
+  proof's target sequence bound to the row.
+- **RC83-IC-30..33.** Migration refuses a suffix spanning a key rotation rather
+  than minting envelopes outside the pinned window; `migrate` no longer reads a
+  database failure as an authoritative not-found; a stale cleanup-intent temp
+  file no longer wedges later cleanups; and the qualification documents now
+  match `qualification-matrix.json` and the signed attestation.

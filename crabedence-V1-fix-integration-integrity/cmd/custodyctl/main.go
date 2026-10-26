@@ -23,7 +23,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -549,6 +551,7 @@ func runMutating(op string, args []string) {
 		DeploymentID:   f.deployment,
 		RepairTrust:    repairTrust,
 		CustodianTrust: trust,
+		ProofTrust:     trust,
 	}
 	var client *witness.Client
 	if f.tlsAddr != "" {
@@ -658,7 +661,12 @@ func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.E
 			}
 			processed++
 			rec, lerr := store.Lookup(ctx, r.ExecutionID)
-			if lerr != nil || rec == nil || rec.TerminalReceiptDigest == "" {
+			if lerr != nil && !errors.Is(lerr, sql.ErrNoRows) {
+				// A read failure is not "no authoritative record": it
+				// must never become a durable forensic quarantine.
+				fatalf("migrate seq %d: authoritative record read: %v", r.Seq, lerr)
+			}
+			if rec == nil || rec.TerminalReceiptDigest == "" {
 				if !f.dryRun {
 					if err := outbox.JournalUnverifiable(ctx, r.Seq, r.ExecutionID,
 						fmt.Sprintf("operator %s: no authoritative terminal record — quarantined pending forensic escalation", grant.Subject), auth); err != nil {

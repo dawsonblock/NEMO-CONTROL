@@ -65,16 +65,18 @@ protocol; it does not implement the forensic recovery automation.
 
 ## R7. Qualification infrastructure gaps
 
-The following could not be executed in this workspace and are recorded as
-BLOCKED, not PASS:
+The lanes that were unavailable when the RC8.3-dev baseline was written are
+now executed and recorded as PASS in `qualification-matrix.json`: live
+PostgreSQL 16 (G8), the independent TLS witness (G11), Apple Silicon/HVF
+microVMs (G9), the Rust/Python/Worker/Node/ABI suites (G12–G17), and the
+local clean-room reproduction (G21). Their raw logs are attached to the
+release bundle and hash-bound by the attestation.
 
-- independent witness over authenticated transport (G8);
-- live PostgreSQL durability suites (no database service/credentials);
-- Apple Silicon/HVF and Linux/KVM sandbox fault-injection lanes (no pinned
-  microsandbox runtime or capable Linux host);
-- Rust, Python, Worker/Node, and ABI differential suites (toolchains/pinned
-  environments not provisioned here);
-- externally trusted release-root signing (no release key material).
+Still BLOCKED, and never reported as PASS:
+
+- Linux/KVM fault-injection (G10) — excluded by operator direction.
+- Third-party clean-room (G21 is a *local* reproduction) and third-party
+  trust of the release root — both require an external party.
 
 ## R8. Race-suite timing
 
@@ -90,3 +92,31 @@ cannot observe an external checkpoint. The tool reports `checkpoint_verified:
 false` and still refuses any suffix it can prove is witnessed locally. Operators
 must not run offline migration against a deployment whose witness may hold a
 newer checkpoint; the runbook makes this a precondition.
+
+## R10. Kernel-relay pinning is required for compensated coverage
+
+A `payload-compensated` journal entry covers a legacy row only when its
+signed before/after proof verifies under the pinned kernel-relay keys in the
+trust-roots set. A deployment that pins only custodians has no way to
+attribute that proof, so compensated coverage stays UNRESOLVED and
+REPAIR_REQUIRED remains open — fail-closed, but it must be resolved by
+pinning the kernel-relay key before running `custodyctl migrate`.
+
+## R11. A suffix that spans a key rotation is refused
+
+Migration re-signs every rewritten row with the deployment's current
+kernel-relay key. If any row in the suffix was signed by a different key, the
+rewritten row would sit at a sequence index outside that key's pinned
+`ValidFromIndex` window and would no longer verify. `MigrateLegacySuffix`
+therefore refuses the whole operation and names the row; recovery is the
+manual witness-coordinated protocol in R6, not an automatic rewrite.
+
+## R12. Release root is pinned locally
+
+The attestation is signed under a release root held outside the repository
+and pinned by SHA-256 key id
+(`c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5`).
+Verification requires that fingerprint from outside the bundle; the copy
+inside the bundle is a distribution convenience only. This is a real
+cryptographic anchor for local qualification, not a third-party root: an
+external countersignature is still required before anyone else may rely on it.

@@ -11,7 +11,11 @@
       "title": "Any non-empty legacy journal action bypassed a missing canonical receipt",
       "root_cause": "custody_reconcile.go accepted action != \"\" as coverage, including unverifiable-legacy and unknown dispositions",
       "fix": "Typed LegacyDisposition state machine (COVERED_VERIFIED / UNRESOLVED / CONTRADICTION) with independent binding checks",
-      "tests": ["TestUnverifiableLegacyJournalCannotAdvanceHWM", "TestTerminalArrivesAfterQuarantine", "TestMalformedLegacyJournalFailsClosed"],
+      "tests": [
+        "TestUnverifiableLegacyJournalCannotAdvanceHWM",
+        "TestTerminalArrivesAfterQuarantine",
+        "TestMalformedLegacyJournalFailsClosed"
+      ],
       "status": "CLOSED"
     },
     {
@@ -21,7 +25,9 @@
       "title": "LegacyJournalAction swallowed every database error as 'no classification'",
       "root_cause": "migration.go returned (\"\", nil) for any Scan error instead of distinguishing sql.ErrNoRows",
       "fix": "sql.ErrNoRows is the only not-found result; all other errors propagate with context",
-      "tests": ["TestJournalDBErrorNotSwallowed"],
+      "tests": [
+        "TestJournalDBErrorNotSwallowed"
+      ],
       "status": "CLOSED"
     },
     {
@@ -31,7 +37,10 @@
       "title": "Quarantined unverifiable-legacy rows were treated as covered and advanced the high-water mark",
       "root_cause": "reconcile skipped every journaled row before verifying the disposition",
       "fix": "UNRESOLVED/CONTRADICTION preserve REPAIR_REQUIRED and return before AdvanceObligationHWM",
-      "tests": ["TestUnverifiableLegacyJournalCannotAdvanceHWM", "TestTerminalArrivesAfterQuarantine"],
+      "tests": [
+        "TestUnverifiableLegacyJournalCannotAdvanceHWM",
+        "TestTerminalArrivesAfterQuarantine"
+      ],
       "status": "CLOSED"
     },
     {
@@ -41,7 +50,10 @@
       "title": "Witnessed-legacy classification was coverage without a verified acknowledgement",
       "root_cause": "coverage verification never re-verified the recorded ack against the custodian trust set",
       "fix": "ResolveLegacyCoverage requires a custodian-signed ack binding the unchanged envelope, sequence, execution, deployment, and family",
-      "tests": ["TestLegacyWitnessedWithoutVerifiedAckIsNotCovered", "TestLegacyWitnessedWithVerifiedAckIsCovered"],
+      "tests": [
+        "TestLegacyWitnessedWithoutVerifiedAckIsNotCovered",
+        "TestLegacyWitnessedWithVerifiedAckIsCovered"
+      ],
       "status": "CLOSED"
     },
     {
@@ -51,7 +63,10 @@
       "title": "Compensating a legacy row changed its envelope hash without updating successor links",
       "root_cause": "CompensateLegacyRow updated one row's envelope_hash/envelope_json and re-signed only that row",
       "fix": "MigrateLegacySuffix rewrites the target and every successor's previous_checkpoint_hash and signature in one transaction; VerifyChain proves the result",
-      "tests": ["TestLegacyTwoRowSuffixRehash", "TestLegacyThreeRowMixedPayloads"],
+      "tests": [
+        "TestLegacyTwoRowSuffixRehash",
+        "TestLegacyThreeRowMixedPayloads"
+      ],
       "status": "CLOSED"
     },
     {
@@ -61,7 +76,10 @@
       "title": "Migration had no preflight for witnessed or checkpointed suffixes",
       "root_cause": "No successor/ack/checkpoint examination before rewriting",
       "fix": "MigrationPreflight refuses a witnessed target, any witnessed successor, a checkpoint covering the suffix, a missing checkpoint row, or a contradictory checkpoint head; refusal quarantines the chain",
-      "tests": ["TestLegacyMixedWitnessedSuffixRefusal", "TestMigrationRefusesCheckpointedSuffix"],
+      "tests": [
+        "TestLegacyMixedWitnessedSuffixRefusal",
+        "TestMigrationRefusesCheckpointedSuffix"
+      ],
       "status": "CLOSED"
     },
     {
@@ -71,7 +89,12 @@
       "title": "Migration was not crash-safe, fenced, or replayable, and preserved no before/after proof",
       "root_cause": "No transaction-wide preflight, no migration hook coverage, no signed proof record",
       "fix": "Single immediate transaction, in-transaction preflight, signed custody-migration-proof-v1 before/after evidence, idempotent replay, and fault-injection seams",
-      "tests": ["TestMigrationCrashBeforeCommit", "TestMigrationCrashAfterCommitBeforeAck", "TestConcurrentEnqueueFenced", "TestMigrationReplayIdempotent"],
+      "tests": [
+        "TestMigrationCrashBeforeCommit",
+        "TestMigrationCrashAfterCommitBeforeAck",
+        "TestConcurrentEnqueueFenced",
+        "TestMigrationReplayIdempotent"
+      ],
       "status": "CLOSED"
     },
     {
@@ -81,7 +104,9 @@
       "title": "OperatorRepair succeeded with no full-history scanner installed",
       "root_cause": "the scanner was invoked only when present (`if ok && fn != nil`) and absence was treated as success",
       "fix": "OperatorRepair returns ErrRepairScannerUnavailable when no scanner is installed",
-      "tests": ["TestOperatorRepairWithoutFullScannerFailsClosed"],
+      "tests": [
+        "TestOperatorRepairWithoutFullScannerFailsClosed"
+      ],
       "status": "CLOSED"
     },
     {
@@ -91,7 +116,11 @@
       "title": "A caller-supplied actor name plus the ordinary evidence signer authorized repair",
       "root_cause": "OperatorRepair took actor string and required only non-empty; custodyctl used -signer-key as authority",
       "fix": "Detached OperatorGrant signed by a separately pinned repair-authority key; subject is signature-bound; deployment, role, operation, window, and nonce are verified",
-      "tests": ["TestUnauthorizedEvidenceSignerDeniedRepair", "TestCallerSuppliedActorSpoofRejected", "TestRepairGrantDeploymentScopeRejected"],
+      "tests": [
+        "TestUnauthorizedEvidenceSignerDeniedRepair",
+        "TestCallerSuppliedActorSpoofRejected",
+        "TestRepairGrantDeploymentScopeRejected"
+      ],
       "status": "CLOSED"
     },
     {
@@ -101,7 +130,9 @@
       "title": "Repair marker clear was not transactional and could erase a newer contradiction",
       "root_cause": "ClearRepairRequired read status, then unconditionally set the marker empty",
       "fix": "ClearRepairRequiredIfUnchanged compares the exact reason the scan observed inside the write transaction and returns ErrStaleRepairVerification on change",
-      "tests": ["TestConcurrentContradictionPreventsClear"],
+      "tests": [
+        "TestConcurrentContradictionPreventsClear"
+      ],
       "status": "CLOSED"
     },
     {
@@ -111,7 +142,10 @@
       "title": "No grant expiry, single-use nonce, or durable replay fence",
       "root_cause": "authorization was a static key possession with no per-operation grant",
       "fix": "RFC3339 not_before/expires_at, >=16-byte nonce consumed in operator_nonce_ledger, grant digest bound into journal and audit evidence",
-      "tests": ["TestExpiredOperatorApprovalRejected", "TestRepairGrantNonceReplayRejected"],
+      "tests": [
+        "TestExpiredOperatorApprovalRejected",
+        "TestRepairGrantNonceReplayRejected"
+      ],
       "status": "CLOSED"
     },
     {
@@ -121,7 +155,10 @@
       "title": "Documented subcommand-first custodyctl syntax failed",
       "root_cause": "global flag.Parse stopped at the subcommand; trailing flags became positional arguments",
       "fix": "Per-subcommand flag.FlagSet parsing; status/inspect/preflight/migrate/rescan/repair accept flags after the subcommand",
-      "tests": ["TestPreflightSubcommandFlagsAndJSON", "TestRepairAuthorityRequired"],
+      "tests": [
+        "TestPreflightSubcommandFlagsAndJSON",
+        "TestRepairAuthorityRequired"
+      ],
       "status": "CLOSED"
     },
     {
@@ -131,7 +168,9 @@
       "title": "Inspection materialized the entire outbox and journal",
       "root_cause": "Pending() and MigrationJournal() were unbounded",
       "fix": "PendingPage / LegacyRowsPage / MigrationJournalPage use SQL cursor pagination with bounded page sizes; text mode streams pages; JSON output is capped by -limit/-page-size",
-      "tests": ["TestInspectPaginationBounded"],
+      "tests": [
+        "TestInspectPaginationBounded"
+      ],
       "status": "CLOSED"
     },
     {
@@ -141,7 +180,11 @@
       "title": "Sandbox catalog verification followed symlinks and ignored unsafe ancestors",
       "root_cause": "DeploymentPosture used os.Stat and checked only the final directory",
       "fix": "Lstat refuses a symlink catalog; ancestor walk refuses non-root symlinks, group/other-writable non-sticky directories, and foreign-owned directories; canonical path is used for the runtime",
-      "tests": ["TestHighAssuranceRejectsSymlinkCatalog", "TestHighAssuranceRejectsNonRootAncestorSymlink", "TestHighAssuranceRejectsGroupWritableAncestor"],
+      "tests": [
+        "TestHighAssuranceRejectsSymlinkCatalog",
+        "TestHighAssuranceRejectsNonRootAncestorSymlink",
+        "TestHighAssuranceRejectsGroupWritableAncestor"
+      ],
       "status": "CLOSED"
     },
     {
@@ -151,7 +194,10 @@
       "title": "Same-UID catalog replacement was invisible",
       "root_cause": "Posture re-check accepted whatever directory sat at the path",
       "fix": "Catalog dev/inode/uid identity is captured and re-checked at posture time and immediately before deletion; replacement is IDENTITY_UNVERIFIABLE",
-      "tests": ["TestCleanupRejectsCatalogReplacementBeforePosture", "TestCleanupRejectsCatalogReplacementInsideWindow"],
+      "tests": [
+        "TestCleanupRejectsCatalogReplacementBeforePosture",
+        "TestCleanupRejectsCatalogReplacementInsideWindow"
+      ],
       "status": "CLOSED"
     },
     {
@@ -161,7 +207,9 @@
       "title": "Inspect-then-delete race had no second identity check",
       "root_cause": "Cleanup classified the occupant once, then issued rm",
       "fix": "A second bounded inspection plus catalog re-check runs immediately before delete; substitution is IDENTITY_MISMATCH and no rm is issued",
-      "tests": ["TestCleanupReinspectCatchesSubstitution"],
+      "tests": [
+        "TestCleanupReinspectCatchesSubstitution"
+      ],
       "status": "CLOSED"
     },
     {
@@ -171,7 +219,10 @@
       "title": "Cleanup had no crash-recovery record for an in-flight destructive step",
       "root_cause": "The removal obligation existed only in caller memory",
       "fix": "Durable cleanup intent is written before rm and cleared only on an obligation-resolving outcome; PendingCleanupObligations exposes unresolved intents",
-      "tests": ["TestCleanupIntentSurvivesUncertainOutcome", "TestCleanupVerifiedRemovalLeavesNoIntent"],
+      "tests": [
+        "TestCleanupIntentSurvivesUncertainOutcome",
+        "TestCleanupVerifiedRemovalLeavesNoIntent"
+      ],
       "status": "CLOSED"
     },
     {
@@ -181,7 +232,9 @@
       "title": "Sync heartbeat raced the exec stderr copier on the same bytes.Buffer",
       "root_cause": "startSyncHeartbeat wrote to the same io.Writer that exec.Cmd copied child stderr into, and stop only closed a channel without waiting for the goroutine",
       "fix": "lockedWriter serializes both writers; stop waits for the heartbeat goroutine before returning",
-      "tests": ["TestSyncLocalActionsWorkspaceIsolatesNonForwardableOrigin (race)"],
+      "tests": [
+        "TestSyncLocalActionsWorkspaceIsolatesNonForwardableOrigin (race)"
+      ],
       "status": "CLOSED"
     },
     {
@@ -191,7 +244,10 @@
       "title": "Outbox database and WAL/SHM siblings were created with the process umask (0644)",
       "root_cause": "SQLite creates its files with the process umask; the new read-only inspection correctly refused group/other-readable evidence but valid outboxes were not tightened at open",
       "fix": "OpenOutbox chmods the database and its WAL/SHM siblings to 0600; read-only inspection still refuses accessible files",
-      "tests": ["TestOutboxFileModeOwnerOnly", "TestReadOnlyCommandsRefuseMissingOutbox"],
+      "tests": [
+        "TestOutboxFileModeOwnerOnly",
+        "TestReadOnlyCommandsRefuseMissingOutbox"
+      ],
       "status": "CLOSED"
     },
     {
@@ -201,7 +257,11 @@
       "title": "Offline migration could rewrite a suffix the witness may already hold",
       "root_cause": "runMigrate defaulted checkpointSeq to zero when no witness transport was configured and still proceeded",
       "fix": "migrate requires a live witness checkpoint; the checkpoint sequence, hash, and witness fingerprint are verified under the pinned custodian set, bound into the signed migration proof, and recorded in the journal. A zero-value checkpoint is refused.",
-      "tests": ["TestMigrationWithoutWitnessCheckpointFailsClosed", "TestLostLocalAckWithRemoteCheckpointRefusesRewrite", "TestMigrationRequiresVerifiedCheckpoint"],
+      "tests": [
+        "TestMigrationWithoutWitnessCheckpointFailsClosed",
+        "TestLostLocalAckWithRemoteCheckpointRefusesRewrite",
+        "TestMigrationRequiresVerifiedCheckpoint"
+      ],
       "status": "CLOSED"
     },
     {
@@ -211,7 +271,11 @@
       "title": "Repair marker ABA: a same-reason contradiction during repair could be cleared",
       "root_cause": "ClearRepairRequiredIfUnchanged compared only the reason string; MarkRepairRequired did not advance a monotonic revision",
       "fix": "Every contradiction assertion advances repair_generation transactionally with the reason. Repair captures the generation before scanning and the CAS clears only when both reason and generation are unchanged.",
-      "tests": ["TestRepairNewContradictionWithSameReasonRejectsCAS", "TestRepairMarkerABACycleRejectsOldGeneration", "TestRepairGenerationIncrementsOnSameReason"],
+      "tests": [
+        "TestRepairNewContradictionWithSameReasonRejectsCAS",
+        "TestRepairMarkerABACycleRejectsOldGeneration",
+        "TestRepairGenerationIncrementsOnSameReason"
+      ],
       "status": "CLOSED"
     },
     {
@@ -221,7 +285,11 @@
       "title": "Cleanup intent was not demonstrably power-loss durable and could be skipped with no state directory",
       "root_cause": "recordCleanupIntent used WriteFile+Rename without file/parent fsync, returned nil for an empty StateDir, and finishCleanup ignored clear failures",
       "fix": "A durable state directory is mandatory; the intent is written with O_EXCL, fsynced, atomically renamed, and the parent directory is fsynced. Clear failures are surfaced in the result and leave the intent visible to PendingCleanupObligations.",
-      "tests": ["TestCleanupIntentRequiresDurableStateDirectory", "TestCleanupIntentSyncFailureFailsClosed", "TestCleanupIntentClearFailureSurfaced"],
+      "tests": [
+        "TestCleanupIntentRequiresDurableStateDirectory",
+        "TestCleanupIntentSyncFailureFailsClosed",
+        "TestCleanupIntentClearFailureSurfaced"
+      ],
       "status": "CLOSED"
     },
     {
@@ -231,7 +299,11 @@
       "title": "Release evidence bundle was not self-contained or portable",
       "root_cause": "Attestation/SHA256SUMS used absolute source-host paths; the full-race log shipped in one package was truncated and did not match its recorded hash",
       "fix": "Release paths are relative to the bundle; the attestation is signed over canonical JSON with a pinned Ed25519 root; a bundle verifier checks every attached log hash and rejects a truncated full-race log; the full-race log is copied into the bundle.",
-      "tests": ["verify-evidence-bundle.py", "verify-release-attestation.py", "cleanroom-verify.sh"],
+      "tests": [
+        "verify-evidence-bundle.py",
+        "verify-release-attestation.py",
+        "cleanroom-verify.sh"
+      ],
       "status": "CLOSED"
     },
     {
@@ -241,8 +313,123 @@
       "title": "The exact 20m full-tree race gate cannot pass: internal/cli alone exceeds 20m under -race",
       "root_cause": "The internal/cli package has grown beyond the per-package budget; isolated profiling exceeded 20m before completion, and full-tree parallelism adds starvation",
       "fix": "Per operator direction, the requalification gate raises the per-package budget to 30m and limits package parallelism (GOFLAGS=-p=4). The original 20m FAIL is retained in evidence; this is a budget/parallelism change, not a security waiver.",
-      "tests": ["full-tree race with -timeout=30m and GOFLAGS=-p=4"],
+      "tests": [
+        "full-tree race with -timeout=30m and GOFLAGS=-p=4"
+      ],
       "status": "QUALIFIED-WITH-BUDGET-CHANGE"
+    },
+    {
+      "id": "RC83-IC-25",
+      "pr": "PR-07",
+      "severity": "critical",
+      "title": "The release-root private key was committed to the repository",
+      "root_cause": "sign-release-attestation.py read release-root.pem from inside the bundle, so the key material had to live in the tree; the committed key derived the pinned public key and could sign any attestation",
+      "fix": "The key is removed from the tree and gitignored; signing reads $RELEASE_ROOT_KEY outside the repository and refuses a key inside the bundle or any git worktree. The root was rotated and the attestation re-signed.",
+      "tests": [
+        "sign-release-attestation.py refuses a key inside the bundle or a git worktree",
+        "git ls-files no longer lists any private key"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-26",
+      "pr": "PR-07",
+      "severity": "high",
+      "title": "The attestation trust anchor was resolved from inside the bundle",
+      "root_cause": "verify-release-attestation.py loaded release-root.pub from the bundle and derived the expected key id from that same file, so a coherent substitution of key, attestation, canonical bytes and signature verified",
+      "fix": "Verification requires an externally supplied --root-key-id or --root and refuses without one; the bundled public key is a distribution copy checked against that pinned identity, never a source of it.",
+      "tests": [
+        "negative-tests.sh forged-root case (new key + rewritten verdict + re-signed + replaced public key) is rejected"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-27",
+      "pr": "PR-07",
+      "severity": "high",
+      "title": "The bundle verifier executed a verifier script taken from the bundle",
+      "root_cause": "verify-evidence-bundle.py ran <bundle>/verify-release-attestation.py, so replacing that file with a stub made the whole bundle report PASS",
+      "fix": "The verifier is resolved beside the bundle-verification tool and the anchor is passed through; the in-bundle copy is deleted.",
+      "tests": [
+        "verify-evidence-bundle.py resolves its sibling verifier",
+        "a stubbed in-bundle verifier is never executed"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-28",
+      "pr": "PR-07",
+      "severity": "high",
+      "title": "Read-only preflight failed on a pre-upgrade journal schema",
+      "root_cause": "MigrationJournalPage selected every post-upgrade column while the additive ALTER only ran from writable OpenOutbox, so the mandatory preflight step failed with 'no such column' on exactly the databases the release migrates",
+      "fix": "Journal readers render their select list from PRAGMA table_info and substitute a typed default for an absent column; the upgrade still happens only on a writable open.",
+      "tests": [
+        "TestJournalReadsPreUpgradeSchema",
+        "TestPreflightReadsPreUpgradeJournalSchema"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-29",
+      "pr": "PR-07",
+      "severity": "high",
+      "title": "Compensated coverage accepted a journal row without a verified signed transition",
+      "root_cause": "ResolveLegacyCoverage treated a consumed grant nonce as authorization but never verified the signed before/after proof, and the grant is not bound to a row, so a local database writer could copy a consumed grant and mint coverage",
+      "fix": "Compensated coverage requires VerifyMigrationProof under a pinned kernel-relay set and binds the proof's target sequence to the journal row; an unpinned or unverifiable proof stays UNRESOLVED.",
+      "tests": [
+        "TestCompensatedCoverageRequiresSignedProof",
+        "TestCopiedMigrationProofDoesNotTransferCoverage"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-30",
+      "pr": "PR-07",
+      "severity": "medium",
+      "title": "Migration could mint envelopes outside the pinned key-rotation window",
+      "root_cause": "Every rewritten row is re-signed with the current kernel-relay key; a suffix written under a retired key would be re-signed at indices before that key's ValidFromIndex, where Envelope.Verify refuses it",
+      "fix": "MigrateLegacySuffix refuses a suffix whose rows were signed by a different kernel-relay key and names the row, instead of producing history that cannot verify.",
+      "tests": [
+        "TestMigrationRefusesSuffixAcrossKeyRotation"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-31",
+      "pr": "PR-07",
+      "severity": "medium",
+      "title": "custodyctl migrate read a database failure as an authoritative not-found",
+      "root_cause": "runMigrate quarantined on any Lookup error, turning a transient read failure into a durable unverifiable-legacy classification",
+      "fix": "Only sql.ErrNoRows means not-found; every other read error aborts the run.",
+      "tests": [
+        "custodyctl migrate propagates a non-ErrNoRows lookup failure"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-32",
+      "pr": "PR-07",
+      "severity": "medium",
+      "title": "A stale cleanup-intent temp file wedged every later cleanup of the handle",
+      "root_cause": "recordCleanupIntent used O_EXCL on a deterministic temp path and never recovered a leftover from a crash between create and rename; PendingCleanupObligations ignored non-.json files",
+      "fix": "An existing temp file is removed and the create retried once, since the name is derived from this deployment's own handle.",
+      "tests": [
+        "TestCleanupIntentRecoversStaleTemp"
+      ],
+      "status": "CLOSED"
+    },
+    {
+      "id": "RC83-IC-33",
+      "pr": "PR-07",
+      "severity": "low",
+      "title": "Qualification documents contradicted the matrix and the signed bundle",
+      "root_cause": "RESIDUAL-LIMITATIONS R7 still described lanes as BLOCKED after they ran, and the bundle README still reported UNSIGNED/NO-GO with a superseded archive hash",
+      "fix": "R7 now matches qualification-matrix.json; the README is regenerated from the signed attestation and states the pinned anchor and the exact verification command.",
+      "tests": [
+        "README archive hash matches attestation.artifact.sha256",
+        "R7 lane list matches qualification-matrix.json"
+      ],
+      "status": "CLOSED"
     }
   ],
   "open_items": [
@@ -273,6 +460,13 @@
       "status": "RESIDUAL",
       "owner": "operator",
       "mitigation": "separate key class, short grant windows, single-use nonces, pinned trust set, rotation authorization"
+    },
+    {
+      "id": "RC83-IC-R4",
+      "title": "The retired release-root private key remains in git history",
+      "status": "RESIDUAL",
+      "owner": "release engineering",
+      "mitigation": "rotated to a new root held outside the repository; signatures under key id 387d837e\u2026 must be rejected. Purging the old blob from history requires a destructive rewrite and an explicit operator decision."
     }
   ]
 }

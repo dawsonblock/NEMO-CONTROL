@@ -7,11 +7,18 @@ Checks:
   - the full-race log is complete (not truncated) and ends with EXIT=<code>;
   - metadata files contain no absolute /Users/ source-host paths;
   - the artifact and inventory hashes match;
-  - the signed attestation verifies under the pinned root.
+  - the signed attestation verifies under the EXTERNALLY supplied anchor.
 
-Usage: verify-evidence-bundle.py <bundle-dir>
+The attestation verifier is resolved beside this script, never from the
+bundle: a bundle that supplies its own verifier can replace it with a
+stub and "pass". The pinned key identity is likewise supplied by the
+reviewer.
+
+Usage:
+  verify-evidence-bundle.py <bundle-dir> --root-key-id <sha256> [--root <pem>]
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -29,7 +36,19 @@ def sha256_file(path: str) -> str:
 
 
 def main() -> int:
-    base = os.path.abspath(sys.argv[1])
+    ap = argparse.ArgumentParser(description="verify an RC8.3 evidence bundle")
+    ap.add_argument("bundle")
+    ap.add_argument("--root", help="release-root public key held outside the bundle")
+    ap.add_argument("--root-key-id", help="pinned sha256 fingerprint of the release root")
+    args = ap.parse_args()
+    if not args.root and not args.root_key_id:
+        print(
+            "REJECT: no external trust anchor supplied — pass --root-key-id or --root",
+            file=sys.stderr,
+        )
+        return 1
+
+    base = os.path.abspath(args.bundle)
     bad = 0
 
     att_path = os.path.join(base, "attestation.json")
@@ -91,20 +110,24 @@ def main() -> int:
             print(f"REJECT: {name} contains an absolute /Users/ source-host path", file=sys.stderr)
             bad += 1
 
-    verifier = os.path.join(base, "verify-release-attestation.py")
-    if os.path.exists(verifier):
-        proc = subprocess.run([sys.executable, verifier, base], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        sys.stdout.write(proc.stdout.decode())
-        if proc.returncode != 0:
-            bad += 1
-    else:
-        print("REJECT: verify-release-attestation.py missing", file=sys.stderr)
+    verifier = os.path.join(os.path.dirname(os.path.abspath(__file__)), "verify-release-attestation.py")
+    if not os.path.exists(verifier):
+        print(f"REJECT: attestation verifier not found beside this script: {verifier}", file=sys.stderr)
+        return 1
+    cmd = [sys.executable, verifier, base]
+    if args.root:
+        cmd += ["--root", args.root]
+    if args.root_key_id:
+        cmd += ["--root-key-id", args.root_key_id]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    sys.stdout.write(proc.stdout.decode())
+    if proc.returncode != 0:
         bad += 1
 
     if bad:
         print(f"RESULT FAIL ({bad} findings)")
         return 1
-    print("RESULT PASS: evidence bundle is self-contained, hash-bound, and signed")
+    print("RESULT PASS: evidence bundle is self-contained, hash-bound, and signed under an external anchor")
     return 0
 
 

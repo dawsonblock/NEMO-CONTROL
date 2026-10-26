@@ -337,3 +337,34 @@ func TestCleanupIntentClearFailureSurfaced(t *testing.T) {
 		t.Fatalf("cleared intent still listed: %+v", pending)
 	}
 }
+
+// TestCleanupIntentRecoversStaleTemp: a crash between intent create and
+// rename leaves the O_EXCL temp behind. The name is derived from the
+// handle, so the leftover is this deployment's own half-write and must
+// be cleared instead of wedging every future cleanup of that handle.
+func TestCleanupIntentRecoversStaleTemp(t *testing.T) {
+	bin, _ := fakeMSB(t, nil)
+	backend := testBackend(t, bin, filepath.Join(t.TempDir(), "artifacts"))
+	req := CleanupRequest{Handle: "sb-stale-temp", DispatchNonce: "n-stale-temp", JobID: "job-stale-temp"}
+
+	if err := os.MkdirAll(backend.cleanupIntentDir(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tmp := backend.cleanupIntentPath(req.Handle) + ".tmp"
+	if err := os.WriteFile(tmp, []byte(`{"half":"written"`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.recordCleanupIntent(req); err != nil {
+		t.Fatalf("stale temp wedged the cleanup intent: %v", err)
+	}
+	if _, err := os.Stat(tmp); !os.IsNotExist(err) {
+		t.Fatalf("stale temp survived: %v", err)
+	}
+	pending, err := backend.PendingCleanupObligations(testContext(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pending) != 1 || pending[0].Handle != req.Handle {
+		t.Fatalf("pending intents = %+v, want one for %s", pending, req.Handle)
+	}
+}

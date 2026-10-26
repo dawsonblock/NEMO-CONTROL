@@ -1,6 +1,6 @@
-ok  	github.com/openclaw/crabbox/internal/witness	3.964s
-ok  	github.com/openclaw/crabbox/internal/execution	52.313s
-ok  	github.com/openclaw/crabbox/internal/idempotency	30.427s
-ok  	github.com/openclaw/crabbox/internal/custody	2.181s
-ok  	github.com/openclaw/crabbox/cmd/custodyctl	9.447s
+ok  	github.com/openclaw/crabbox/internal/witness	4.670s
+ok  	github.com/openclaw/crabbox/internal/execution	53.300s
+ok  	github.com/openclaw/crabbox/internal/idempotency	31.077s
+ok  	github.com/openclaw/crabbox/internal/custody	3.052s
+ok  	github.com/openclaw/crabbox/cmd/custodyctl	11.405s
 EXIT=0

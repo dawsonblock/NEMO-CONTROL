@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -1825,6 +1826,16 @@ func (b *MSBBackend) recordCleanupIntent(req CleanupRequest) error {
 	path := b.cleanupIntentPath(req.Handle)
 	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if errors.Is(err, os.ErrExist) {
+		// A previous attempt died between create and rename. The name
+		// is derived from the handle, so the leftover is this
+		// deployment's own half-write: clear it and retry once rather
+		// than wedging every future cleanup of this handle.
+		if rerr := os.Remove(tmp); rerr != nil {
+			return fmt.Errorf("cleanup intent stale temp %s: %w", tmp, rerr)
+		}
+		f, err = os.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	}
 	if err != nil {
 		return err
 	}

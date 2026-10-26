@@ -296,14 +296,89 @@ func (o *Outbox) MigrationJournal(ctx context.Context) ([]MigrationJournalEntry,
 // MigrationJournalPage lists transitions strictly after afterSeq, capped
 // at limit rows (0 = unbounded). Operator surfaces use the bounded form
 // so a large forensic journal never materializes at once.
+// journalFields is the full post-upgrade journal shape in scan order.
+// The default literal is selected in place of a column a pre-upgrade
+// database does not have yet.
+var journalFields = []struct{ name, dflt string }{
+	{"seq", "0"},
+	{"row_seq", "0"},
+	{"execution_id", "''"},
+	{"action", "''"},
+	{"detail", "''"},
+	{"created_at", "''"},
+	{"original_envelope_hash", "''"},
+	{"result_envelope_hash", "''"},
+	{"terminal_receipt_digest", "''"},
+	{"terminal_seq", "0"},
+	{"checkpoint_seq", "0"},
+	{"checkpoint_hash", "''"},
+	{"checkpoint_witness_fp", "''"},
+	{"authorization_json", "''"},
+	{"authorization_digest", "''"},
+	{"authorized_by", "''"},
+	{"nonce", "''"},
+	{"before_digest", "''"},
+	{"after_digest", "''"},
+	{"proof_json", "''"},
+	{"proof_signature", "''"},
+}
+
+// journalSelectList renders the scan list for the journal's actual
+// shape. Only writable OpenOutbox runs the additive upgrade, so a
+// read-only inspector can meet the six-column RC8.3-dev table. Selecting
+// a literal default for an absent column keeps preflight working on
+// exactly the databases this release exists to migrate; a present
+// column is always read from the row.
+func journalSelectList(ctx context.Context, q interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}) (string, error) {
+	rows, err := q.QueryContext(ctx, `PRAGMA table_info(custody_migration_journal)`)
+	if err != nil {
+		return "", fmt.Errorf("custody journal schema: %w", err)
+	}
+	defer rows.Close()
+	have := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull, pk int
+		var dflt any
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk); err != nil {
+			return "", fmt.Errorf("custody journal schema: %w", err)
+		}
+		have[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("custody journal schema: %w", err)
+	}
+	parts := make([]string, 0, len(journalFields))
+	for _, f := range journalFields {
+		if have[f.name] {
+			parts = append(parts, f.name)
+			continue
+		}
+		parts = append(parts, f.dflt+` AS `+f.name)
+	}
+	return strings.Join(parts, ", "), nil
+}
+
+func scanJournalEntry(rows *sql.Rows) (MigrationJournalEntry, error) {
+	var e MigrationJournalEntry
+	err := rows.Scan(&e.Seq, &e.RowSeq, &e.ExecutionID, &e.Action, &e.Detail, &e.CreatedAt,
+		&e.OriginalEnvelopeHash, &e.ResultEnvelopeHash,
+		&e.TerminalReceiptDigest, &e.TerminalSeq,
+		&e.CheckpointSeq, &e.CheckpointHash, &e.CheckpointWitnessFP,
+		&e.AuthorizationJSON, &e.AuthorizationDigest, &e.AuthorizedBy, &e.Nonce,
+		&e.BeforeDigest, &e.AfterDigest, &e.ProofJSON, &e.ProofSignature)
+	return e, err
+}
+
 func (o *Outbox) MigrationJournalPage(ctx context.Context, afterSeq int64, limit int) ([]MigrationJournalEntry, error) {
-	q := `SELECT seq, row_seq, execution_id, action, detail, created_at,
-		        original_envelope_hash, result_envelope_hash,
-		        terminal_receipt_digest, terminal_seq,
-		        checkpoint_seq, checkpoint_hash, checkpoint_witness_fp,
-		        authorization_json, authorization_digest, authorized_by, nonce,
-		        before_digest, after_digest, proof_json, proof_signature
-		 FROM custody_migration_journal WHERE seq > $1 ORDER BY seq`
+	sel, err := journalSelectList(ctx, o.db)
+	if err != nil {
+		return nil, err
+	}
+	q := `SELECT ` + sel + ` FROM custody_migration_journal WHERE seq > $1 ORDER BY seq`
 	args := []any{afterSeq}
 	if limit > 0 {
 		q += ` LIMIT $2`
@@ -316,13 +391,8 @@ func (o *Outbox) MigrationJournalPage(ctx context.Context, afterSeq int64, limit
 	defer rows.Close()
 	var out []MigrationJournalEntry
 	for rows.Next() {
-		var e MigrationJournalEntry
-		if err := rows.Scan(&e.Seq, &e.RowSeq, &e.ExecutionID, &e.Action, &e.Detail, &e.CreatedAt,
-			&e.OriginalEnvelopeHash, &e.ResultEnvelopeHash,
-			&e.TerminalReceiptDigest, &e.TerminalSeq,
-			&e.CheckpointSeq, &e.CheckpointHash, &e.CheckpointWitnessFP,
-			&e.AuthorizationJSON, &e.AuthorizationDigest, &e.AuthorizedBy, &e.Nonce,
-			&e.BeforeDigest, &e.AfterDigest, &e.ProofJSON, &e.ProofSignature); err != nil {
+		e, err := scanJournalEntry(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, e)
@@ -352,14 +422,12 @@ func (o *Outbox) LegacyJournalAction(ctx context.Context, executionID string) (s
 func latestJournalEntry(ctx context.Context, q interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }, executionID string) (MigrationJournalEntry, bool, error) {
+	sel, err := journalSelectList(ctx, q)
+	if err != nil {
+		return MigrationJournalEntry{}, false, err
+	}
 	rows, err := q.QueryContext(ctx,
-		`SELECT seq, row_seq, execution_id, action, detail, created_at,
-		        original_envelope_hash, result_envelope_hash,
-		        terminal_receipt_digest, terminal_seq,
-		        checkpoint_seq, checkpoint_hash, checkpoint_witness_fp,
-		        authorization_json, authorization_digest, authorized_by, nonce,
-		        before_digest, after_digest, proof_json, proof_signature
-		 FROM custody_migration_journal WHERE execution_id = $1
+		`SELECT `+sel+` FROM custody_migration_journal WHERE execution_id = $1
 		 ORDER BY seq DESC LIMIT 1`, executionID)
 	if err != nil {
 		return MigrationJournalEntry{}, false, err
@@ -368,13 +436,8 @@ func latestJournalEntry(ctx context.Context, q interface {
 	if !rows.Next() {
 		return MigrationJournalEntry{}, false, rows.Err()
 	}
-	var e MigrationJournalEntry
-	if err := rows.Scan(&e.Seq, &e.RowSeq, &e.ExecutionID, &e.Action, &e.Detail, &e.CreatedAt,
-		&e.OriginalEnvelopeHash, &e.ResultEnvelopeHash,
-		&e.TerminalReceiptDigest, &e.TerminalSeq,
-		&e.CheckpointSeq, &e.CheckpointHash, &e.CheckpointWitnessFP,
-		&e.AuthorizationJSON, &e.AuthorizationDigest, &e.AuthorizedBy, &e.Nonce,
-		&e.BeforeDigest, &e.AfterDigest, &e.ProofJSON, &e.ProofSignature); err != nil {
+	e, err := scanJournalEntry(rows)
+	if err != nil {
 		return MigrationJournalEntry{}, false, err
 	}
 	return e, true, rows.Err()
@@ -404,7 +467,11 @@ type LegacyCoverageRequest struct {
 	DeploymentID          string
 	RepairTrust           *custody.TrustSet
 	CustodianTrust        *custody.TrustSet
-	Now                   time.Time
+	// ProofTrust pins the kernel-relay keys that sign migration
+	// proofs. Without it a compensated entry cannot be distinguished
+	// from a copied one, so compensated coverage fails closed.
+	ProofTrust *custody.TrustSet
+	Now        time.Time
 }
 
 // LegacyCoverage is the typed verdict.
@@ -553,6 +620,14 @@ func (o *Outbox) ResolveLegacyCoverage(ctx context.Context, req LegacyCoverageRe
 			base.Reason = "compensated row no longer holds the journaled result envelope"
 			return base, nil
 		}
+		// The rewrite itself must be the one the kernel-relay key
+		// signed. Without this, a journal row carrying a copied grant
+		// would be indistinguishable from an authorized rewrite.
+		if perr := VerifyMigrationProof(entry, req.DeploymentID, req.ProofTrust); perr != nil {
+			base.Disposition = LegacyCoverageUnresolved
+			base.Reason = fmt.Sprintf("compensated journal entry carries no verifiable signed rewrite proof: %v", perr)
+			return base, nil
+		}
 		content, cerr := env.ContentBytes()
 		if cerr != nil || len(content) == 0 {
 			base.Disposition = LegacyCoverageUnresolved
@@ -617,7 +692,16 @@ type ChainState struct {
 // It is the structural check migration and repair rely on; signature
 // verification is a separate trust-scoped act.
 func (o *Outbox) VerifyChain(ctx context.Context) (ChainState, error) {
-	rows, err := o.db.QueryContext(ctx,
+	return verifyChainState(ctx, o.db)
+}
+
+// verifyChainState runs the structural check on an explicit queryer so
+// a caller inside a write transaction proves the chain it is about to
+// read, not a second connection's view of it.
+func verifyChainState(ctx context.Context, q interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}) (ChainState, error) {
+	rows, err := q.QueryContext(ctx,
 		`SELECT seq, execution_id, envelope_hash, envelope_json
 		 FROM custody_outbox ORDER BY seq`)
 	if err != nil {
@@ -931,7 +1015,7 @@ func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int
 		if found && entry.Action == JournalCompensated &&
 			entry.TerminalReceiptDigest == receiptDigest &&
 			entry.ResultEnvelopeHash == curHash {
-			if _, err := o.VerifyChain(ctx); err != nil {
+			if _, err := verifyChainState(ctx, tx); err != nil {
 				return res, fmt.Errorf("migration replay: chain is not intact: %w", err)
 			}
 			res.AlreadyMigrated = true
@@ -999,6 +1083,15 @@ func (o *Outbox) MigrateLegacySuffix(ctx context.Context, p Producer, rowSeq int
 		pr := migrationProofRow{
 			Seq: c.seq, BeforeHash: c.envelopeHash,
 			BeforePrev: c.envelope.Sequence.PreviousCheckpointHash,
+		}
+		// Every rewritten row is re-signed with this deployment's
+		// current kernel-relay key. A row that was signed by a
+		// different key means the suffix spans a rotation: re-signing
+		// it would place the row at an index outside the signer's
+		// pinned window, so the result would not verify. Refuse
+		// instead of minting unverifiable history.
+		if c.envelope.Signer.KeyID != p.Signer.Fingerprint() {
+			return res, fmt.Errorf("%w: seq %d was signed by kernel-relay key %s, not this deployment's %s — the suffix spans a key rotation and cannot be re-signed inside the pinned window; witness-coordinated recovery is required", ErrEvidenceContradiction, c.seq, c.envelope.Signer.KeyID, p.Signer.Fingerprint())
 		}
 		env := c.envelope
 		env.Signature = ""
@@ -1135,6 +1228,9 @@ func VerifyMigrationProof(entry MigrationJournalEntry, deploymentID string, trus
 	}
 	if proof.BeforeDigest != entry.BeforeDigest || proof.AfterDigest != entry.AfterDigest {
 		return fmt.Errorf("migration proof %d digests do not bind the journal entry", entry.Seq)
+	}
+	if proof.TargetSeq != entry.RowSeq {
+		return fmt.Errorf("migration proof %d targets seq %d, journal entry records seq %d", entry.Seq, proof.TargetSeq, entry.RowSeq)
 	}
 	canon, err := canonicalJSON(proof)
 	if err != nil {

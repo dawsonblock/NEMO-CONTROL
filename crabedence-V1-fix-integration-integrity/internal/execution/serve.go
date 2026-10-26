@@ -923,6 +923,7 @@ func wireCustodyBoundary(ctx context.Context, cfg *ServiceConfig, store idempote
 		DeploymentID:   wc.Deployment,
 		RepairTrust:    repairTrust,
 		CustodianTrust: trust,
+		ProofTrust:     trust,
 	}
 	outbox, err := witness.OpenOutbox(wc.OutboxPath)
 	if err != nil {

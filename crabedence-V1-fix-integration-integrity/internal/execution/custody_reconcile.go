@@ -43,6 +43,9 @@ type CustodyCoveragePolicy struct {
 	DeploymentID   string
 	RepairTrust    *custody.TrustSet
 	CustodianTrust *custody.TrustSet
+	// ProofTrust pins the kernel-relay keys that sign migration
+	// proofs; compensated legacy coverage verifies against it.
+	ProofTrust *custody.TrustSet
 }
 
 // custodyReconcilePageSize bounds the terminal-evidence rows one
@@ -145,6 +148,7 @@ func reconcileCustodyPage(ctx context.Context, store idempotency.EffectStore, ou
 					DeploymentID:          policy.DeploymentID,
 					RepairTrust:           policy.RepairTrust,
 					CustodianTrust:        policy.CustodianTrust,
+					ProofTrust:            policy.ProofTrust,
 					Now:                   time.Now(),
 				})
 				if cerr != nil {

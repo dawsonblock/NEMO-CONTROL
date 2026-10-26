@@ -13,6 +13,16 @@
 > remains UNSUPPORTED; third-party trust requires an external
 > countersignature. See `qualification/rc8.3-integrity/FINAL-REPORT.md` and
 > `qualification/rc8.3-integrity/qualification-matrix.json`.
+>
+> **Release-root pin.** The attestation is signed under the release root whose
+> SHA-256 key id is
+> `c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5`. That
+> fingerprint is the anchor: it is supplied from outside the bundle to
+> `verify-release-attestation.py` / `verify-evidence-bundle.py`, and the
+> private key is held outside the repository (`$RELEASE_ROOT_KEY`). The
+> previous root and its private key were committed to the tree by mistake;
+> both are retired, and any signature under key id `387d837e…` must be
+> rejected.
 
 Gate statuses are only PASS / FAIL / NOT_RUN / BLOCKED. Results bind to
 the frozen signed candidate `NEMO-CONTROL-v0.55.0-rc8.3-development.zip`

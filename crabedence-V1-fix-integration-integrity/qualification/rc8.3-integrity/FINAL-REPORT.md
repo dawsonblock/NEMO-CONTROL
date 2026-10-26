@@ -78,6 +78,28 @@ Full register: `defect-closure.json` (RC83-IC-01..24 plus residuals).
 
 Machine-readable matrix: `qualification-matrix.json`.
 
+## 3b. Post-review corrections (RC83-IC-25..33)
+
+A branch review against `codex/rc8.3-custody-sandbox-qualification` found the
+release-evidence gate self-referential and two authorization/upgrade paths
+still open. All are closed in this tree; the register is
+`defect-closure.json`:
+
+| Finding | Disposition | Evidence |
+|---|---|---|
+| Release-root **private** key committed to the repo | **CLOSED** — removed, gitignored, rotated; signing reads `$RELEASE_ROOT_KEY` outside any worktree | no private key in `git ls-files`; key id `c1fc3765…` |
+| Attestation anchor resolved from inside the bundle | **CLOSED** — external `--root-key-id`/`--root` required; a coherent root substitution is rejected | `verify-attestation-forgedroot.log` |
+| Bundle verifier executed an in-bundle script | **CLOSED** — verifier resolved beside the tool; in-bundle copy deleted | `verify-bundle.log` |
+| `preflight` failed on pre-upgrade journal schema | **CLOSED** — select list derived from the live schema | `TestJournalReadsPreUpgradeSchema`, `TestPreflightReadsPreUpgradeJournalSchema` |
+| Compensated coverage unbound to the signed rewrite | **CLOSED** — proof verified under a pinned kernel-relay set, target sequence bound | `TestCompensatedCoverageRequiresSignedProof`, `TestCopiedMigrationProofDoesNotTransferCoverage` |
+| Migration could mint envelopes outside a rotation window | **CLOSED** — suffix spanning a rotation is refused | `TestMigrationRefusesSuffixAcrossKeyRotation` |
+
+The retired root (`387d837e…`) must be rejected; the pinned root is
+`c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5`. The old
+private key is still present in git history — purging it is a destructive
+rewrite that needs an explicit operator decision (RC83-IC-R4), so it is
+carried as a residual rather than performed here.
+
 ## 4. Residual limitations
 
 See `RESIDUAL-LIMITATIONS.md`. Material residuals:

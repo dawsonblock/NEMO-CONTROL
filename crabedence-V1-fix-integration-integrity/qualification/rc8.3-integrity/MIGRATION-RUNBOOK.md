@@ -182,3 +182,22 @@ Retain: the grant file and digest, the `custody_migration_journal` rows, the
 signed migration proofs, the pre/post `preflight` JSON, the witness checkpoint
 readback, and the `custody_events` audit log. Bind them to the release artifact
 SHA-256 in the qualification matrix.
+
+## 9. Post-review corrections
+
+- **Preflight works on a pre-upgrade journal.** The six-column RC8.3-dev
+  journal is read with typed defaults; the additive upgrade still happens only
+  on a writable open, so `status`/`inspect`/`preflight` remain read-only.
+- **Pin the kernel-relay key.** Compensated coverage verifies the signed
+  before/after proof under the trust-roots set. A trust file that pins only
+  custodians leaves every compensated row UNRESOLVED and REPAIR_REQUIRED open.
+- **A rotation-spanning suffix is refused.** If any row in the suffix was
+  signed by a kernel-relay key other than the deployment's current one, the
+  rewrite is refused by name; use the §7 witness-coordinated recovery path.
+- **Release evidence is anchored outside the bundle.** Verify with the pinned
+  key id, never with the key the bundle happens to carry:
+
+  ```sh
+  python3 qualification/rc8.3-integrity/tools/verify-evidence-bundle.py <bundle> \
+    --root-key-id c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5
+  ```

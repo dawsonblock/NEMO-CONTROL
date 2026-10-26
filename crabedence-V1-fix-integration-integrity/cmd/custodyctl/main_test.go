@@ -209,6 +209,49 @@ func TestPreflightSubcommandFlagsAndJSON(t *testing.T) {
 	}
 }
 
+func TestPreflightReadsPreUpgradeJournalSchema(t *testing.T) {
+	bin := buildCLI(t)
+	path := filepath.Join(t.TempDir(), "outbox.db")
+	seedLegacyOutbox(t, path, 2)
+	// Downgrade the journal to the six-column RC8.3-dev shape: the
+	// additive upgrade only runs from writable OpenOutbox, so the
+	// mandatory preflight step must read this database as it is.
+	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE custody_migration_journal RENAME TO custody_migration_journal_upgraded`,
+		`CREATE TABLE custody_migration_journal (
+			seq INTEGER PRIMARY KEY AUTOINCREMENT,
+			row_seq INTEGER NOT NULL,
+			execution_id TEXT NOT NULL,
+			action TEXT NOT NULL,
+			detail TEXT NOT NULL,
+			created_at TEXT NOT NULL
+		)`,
+		`DROP TABLE custody_migration_journal_upgraded`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			db.Close()
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+
+	stdout, stderr, code := runCLI(t, bin, "preflight", "-outbox", path, "-json")
+	if code != 3 {
+		t.Fatalf("preflight on a pre-upgrade journal exit = %d, want 3\nstdout=%s\nstderr=%s", code, stdout, stderr)
+	}
+	var out preflightOutput
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+		t.Fatalf("preflight JSON: %v\n%s", err, stdout)
+	}
+	if out.LegacyCount != 2 || !out.MigrationPending {
+		t.Fatalf("preflight summary = %+v", out)
+	}
+}
+
 func TestInspectPaginationBounded(t *testing.T) {
 	bin := buildCLI(t)
 	path := filepath.Join(t.TempDir(), "outbox.db")

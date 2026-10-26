@@ -9,3 +9,8 @@
 
 # OS state
 .DS_Store
+
+# Release signing keys never live in the tree — a committed private key
+# cannot be a trust anchor. Signing reads $RELEASE_ROOT_KEY instead.
+rc8.3-integrity-release/release-root/*.pem
+!rc8.3-integrity-release/release-root/release-root.pub

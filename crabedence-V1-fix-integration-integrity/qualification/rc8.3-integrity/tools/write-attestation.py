@@ -2,10 +2,11 @@
 """Write the detached RC8.3 integrity-closure attestation draft.
 
 The attestation lives OUTSIDE the source tree so it can bind the exact
-final commit and artifact without creating a hash circularity. It is
-deliberately unsigned: no externally trusted release root is available in
-this environment, so `signature.status` is BLOCKED and the release
-decision remains NO-GO.
+final commit and artifact without creating a hash circularity. This script
+writes the unsigned draft; sign-release-attestation.py then replaces the
+`signature` block with a real Ed25519 signature from a release root held
+outside the repository. Until that runs, the draft is BLOCKED and carries
+no verdict of its own.
 
 Usage: write-attestation.py <source-commit> <inventory> <artifact>
                              <logs-dir> <output.json> <verdict>
