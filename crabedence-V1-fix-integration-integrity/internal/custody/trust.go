@@ -71,6 +71,107 @@ func (t *TrustSet) Keys() []TrustedKey {
 	return out
 }
 
+// Roles returns the distinct roles the set pins, sorted.
+func (t *TrustSet) Roles() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, k := range t.keys {
+		if !seen[k.Role] {
+			seen[k.Role] = true
+			out = append(out, k.Role)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// RequireRole refuses a set that pins any key outside role. Custodian,
+// kernel-relay, and repair-authority keys are three authorities; a set
+// that mixes them lets one administrative file authorize three
+// different acts, which is exactly the confusion role separation
+// exists to prevent.
+func (t *TrustSet) RequireRole(role string) error {
+	if t.Empty() {
+		return fmt.Errorf("trust set pins no key — an empty set verifies nothing")
+	}
+	for _, k := range t.keys {
+		if k.Role != role {
+			return fmt.Errorf("trust set pins a %s key (%s) but is configured as the %s set — role-separated configuration requires one role per trust root", k.Role, k.KeyID, role)
+		}
+	}
+	return nil
+}
+
+// ValidateRoleSeparation refuses a set that pins one key under more
+// than one role. A single key trusted for two roles collapses the
+// distinction between "the custodian attests" and "the kernel attests".
+func (t *TrustSet) ValidateRoleSeparation() error {
+	roles := map[string][]string{}
+	for _, k := range t.keys {
+		roles[k.KeyID] = append(roles[k.KeyID], k.Role)
+	}
+	for keyID, rs := range roles {
+		if len(rs) < 2 {
+			continue
+		}
+		sort.Strings(rs)
+		distinct := rs[0]
+		for _, r := range rs[1:] {
+			if r != distinct {
+				return fmt.Errorf("key %s is pinned under %v — one key cannot hold two authorities", keyID, rs)
+			}
+		}
+	}
+	return nil
+}
+
+// CheckDisjointRoles refuses trust sets that share a key across roles.
+// Role separation is a property of the whole custody configuration, not
+// of one file: pinning the same key as custodian in one file and
+// repair authority in another is the same collapse.
+func CheckDisjointRoles(sets map[string]*TrustSet) error {
+	owners := map[string][]string{}
+	for name, set := range sets {
+		if set == nil {
+			continue
+		}
+		for _, k := range set.keys {
+			owners[k.KeyID] = append(owners[k.KeyID], name+"/"+k.Role)
+		}
+	}
+	for keyID, names := range owners {
+		if len(names) < 2 {
+			continue
+		}
+		sort.Strings(names)
+		return fmt.Errorf("key %s is pinned for %v — kernel-relay, custodian, and repair authorities must be distinct keys in distinct trust roots", keyID, names)
+	}
+	return nil
+}
+
+// LoadTrustSetForRole loads a trust file and enforces that it pins only
+// keys of the expected role. This is the role-separated loader: the
+// custodian set, the kernel-relay set, and the repair-authority set are
+// three files, each of which may only name its own authority.
+func LoadTrustSetForRole(path, role string) (*TrustSet, error) {
+	switch role {
+	case RoleCustodian, RoleKernelRelay, RoleRepairAuthority:
+	default:
+		return nil, fmt.Errorf("unknown trust role %q", role)
+	}
+	set, err := LoadTrustSet(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := set.RequireRole(role); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	if err := set.ValidateRoleSeparation(); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return set, nil
+}
+
 // Resolve returns the pinned public key for (role, key_id) valid at the
 // record's sequence index and scoped to the deployment. Deployment-
 // scoped keys never resolve for another deployment; exactly one key may

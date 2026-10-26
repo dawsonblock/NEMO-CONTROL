@@ -177,16 +177,26 @@ func TestCustodyEndToEndProviderTerminalVsVerified(t *testing.T) {
 	if err := os.WriteFile(trustPath, []byte(trustJSON), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// The kernel-relay authority is pinned in its own file: the
+	// authority that attests custody is never the authority whose
+	// records it attests.
+	kernelTrustPath := filepath.Join(dir, "kernel-trust.json")
+	kernelTrustJSON := fmt.Sprintf(`{"version":1,"keys":[{"role":"kernel-relay","key_id":"%s","public_key":"%s","deployment_id":"%s","valid_from_index":0,"valid_until_index":0}]}`,
+		kernel.Fingerprint(), b64pub(kernel), dep)
+	if err := os.WriteFile(kernelTrustPath, []byte(kernelTrustJSON), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	outboxPath := filepath.Join(dir, "outbox.db")
 	// Outbox dir must be 0700 for the custody-storage rule.
 	if err := os.Chmod(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	wc := WitnessConfig{
-		Socket:         sock,
-		OutboxPath:     outboxPath,
-		TrustRootsPath: trustPath,
-		Deployment:     dep,
+		Socket:               sock,
+		OutboxPath:           outboxPath,
+		TrustRootsPath:       trustPath,
+		KernelTrustRootsPath: kernelTrustPath,
+		Deployment:           dep,
 		// Long interval: drains happen only when the sink wakes the
 		// sender — the test controls custody timing deterministically.
 		DrainInterval: time.Hour,
@@ -341,7 +351,7 @@ func TestWitnessConfigFromEnv(t *testing.T) {
 	keys := []string{
 		"CRABEDENCE_WITNESS_SOCKET", "CRABEDENCE_WITNESS_TLS",
 		"CRABEDENCE_WITNESS_TLS_KEY", "CRABEDENCE_WITNESS_OUTBOX",
-		"CRABEDENCE_WITNESS_TRUST_ROOTS", "CRABEDENCE_POLICY_DIGEST",
+		"CRABEDENCE_WITNESS_TRUST_ROOTS", "CRABEDENCE_WITNESS_KERNEL_TRUST_ROOTS", "CRABEDENCE_POLICY_DIGEST",
 		"CRABEDENCE_WITNESS_DRAIN_INTERVAL",
 	}
 	clear := func() {
@@ -353,6 +363,7 @@ func TestWitnessConfigFromEnv(t *testing.T) {
 		t.Setenv("CRABEDENCE_WITNESS_SOCKET", "/run/custody/w.sock")
 		t.Setenv("CRABEDENCE_WITNESS_OUTBOX", "/var/lib/custody/outbox.db")
 		t.Setenv("CRABEDENCE_WITNESS_TRUST_ROOTS", "/etc/custody/roots.json")
+		t.Setenv("CRABEDENCE_WITNESS_KERNEL_TRUST_ROOTS", "/etc/custody/kernel-roots.json")
 	}
 
 	t.Run("absent is disabled", func(t *testing.T) {

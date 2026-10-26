@@ -452,8 +452,13 @@ type WitnessConfig struct {
 	OutboxPath string
 	// TrustRootsPath is the externally maintained custodian trust set
 	// (custody.LoadTrustSet file) — the only authority on which
-	// witness keys may vouch.
+	// witness keys may vouch. It may pin custodian keys only.
 	TrustRootsPath string
+	// KernelTrustRootsPath is the separately pinned kernel-relay trust
+	// set that signs custody envelopes and migration proofs. It is a
+	// distinct file from the custodian set: the authority that attests
+	// custody must never be the authority whose records it attests.
+	KernelTrustRootsPath string
 	// RepairTrustRootsPath is the separately pinned repair-authority
 	// trust set. It is deliberately distinct from the custodian and
 	// kernel-relay sets: an ordinary evidence signer can never
@@ -487,7 +492,11 @@ func (c WitnessConfig) Enabled() bool { return c.Socket != "" || c.TLSAddr != ""
 //	CRABEDENCE_WITNESS_OUTBOX — kernel custody outbox path (sqlite).
 //	CRABEDENCE_WITNESS_TRUST_ROOTS — custodian trust set file
 //	  (custody-envelope trust format); the only authority on which
-//	  witness keys may vouch.
+//	  witness keys may vouch. It may pin custodian keys only.
+//	CRABEDENCE_WITNESS_KERNEL_TRUST_ROOTS — kernel-relay trust set file
+//	  that signs custody envelopes and migration proofs. Required
+//	  whenever custody is configured, and never the same file as the
+//	  custodian set.
 //	CRABEDENCE_DEPLOYMENT — shared deployment identity (required when
 //	  custody is configured).
 //	CRABEDENCE_POLICY_DIGEST — optional envelope policy binding.
@@ -504,6 +513,7 @@ func witnessConfigFromEnv(production bool, deployment string) (WitnessConfig, er
 		TLSKeyFP:             strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TLS_KEY")),
 		OutboxPath:           strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_OUTBOX")),
 		TrustRootsPath:       strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_TRUST_ROOTS")),
+		KernelTrustRootsPath: strings.TrimSpace(os.Getenv("CRABEDENCE_WITNESS_KERNEL_TRUST_ROOTS")),
 		RepairTrustRootsPath: strings.TrimSpace(os.Getenv("CRABEDENCE_REPAIR_TRUST_ROOTS")),
 		Deployment:           deployment,
 		PolicyDigest:         strings.TrimSpace(os.Getenv("CRABEDENCE_POLICY_DIGEST")),
@@ -547,6 +557,9 @@ func witnessConfigFromEnv(production bool, deployment string) (WitnessConfig, er
 	}
 	if cfg.TrustRootsPath == "" {
 		missing = append(missing, "CRABEDENCE_WITNESS_TRUST_ROOTS")
+	}
+	if cfg.KernelTrustRootsPath == "" {
+		missing = append(missing, "CRABEDENCE_WITNESS_KERNEL_TRUST_ROOTS")
 	}
 	if cfg.Deployment == "" {
 		missing = append(missing, "CRABEDENCE_DEPLOYMENT")

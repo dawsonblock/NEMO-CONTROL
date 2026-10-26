@@ -908,22 +908,35 @@ type custodyHooks struct {
 // from the configured trust set, never from anything it sends.
 func wireCustodyBoundary(ctx context.Context, cfg *ServiceConfig, store idempotency.EffectStore, signer *evidence.Signer, release string) (*custodyHooks, error) {
 	wc := cfg.Witness
-	trust, err := custody.LoadTrustSet(wc.TrustRootsPath)
+	// Each authority resolves from its own role-pinned file: the
+	// custodian set may pin custodian keys only, the kernel set
+	// kernel-relay keys only. A mixed file is a configuration fault,
+	// not a broader trust decision.
+	trust, err := custody.LoadTrustSetForRole(wc.TrustRootsPath, custody.RoleCustodian)
 	if err != nil {
 		return nil, fmt.Errorf("custodian trust set: %w", err)
 	}
+	kernelTrust, err := custody.LoadTrustSetForRole(wc.KernelTrustRootsPath, custody.RoleKernelRelay)
+	if err != nil {
+		return nil, fmt.Errorf("kernel-relay trust set: %w", err)
+	}
 	repairTrust := custody.NewTrustSet()
 	if wc.RepairTrustRootsPath != "" {
-		repairTrust, err = custody.LoadTrustSet(wc.RepairTrustRootsPath)
+		repairTrust, err = custody.LoadTrustSetForRole(wc.RepairTrustRootsPath, custody.RoleRepairAuthority)
 		if err != nil {
 			return nil, fmt.Errorf("repair-authority trust set: %w", err)
 		}
+	}
+	if err := custody.CheckDisjointRoles(map[string]*custody.TrustSet{
+		"custodian": trust, "kernel-relay": kernelTrust, "repair-authority": repairTrust,
+	}); err != nil {
+		return nil, fmt.Errorf("custody trust configuration: %w", err)
 	}
 	coveragePolicy := CustodyCoveragePolicy{
 		DeploymentID:   wc.Deployment,
 		RepairTrust:    repairTrust,
 		CustodianTrust: trust,
-		ProofTrust:     trust,
+		ProofTrust:     kernelTrust,
 	}
 	outbox, err := witness.OpenOutbox(wc.OutboxPath)
 	if err != nil {
