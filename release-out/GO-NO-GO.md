@@ -2,18 +2,18 @@
 
 Release: `0.55.0-rc8.3-witness-fence`
 Branch: `codex/rc8.3-witness-fence-proof-qualification`
-Source commit: `fd94a57ec0407533368b040f32dcc8be93ac480b` (the commit whose tree
+Source commit: `de71093469f7cd669cb3b67ac88b88ad2cd31d76` (the commit whose tree
 was packaged; the packaging commit adds only `release-out/` and does not
 alter source)
 Artifact: `NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.zip`
-SHA-256: `6fe82917aee5a95578a9742166f88b3c9a304a0a5bf8131c1f107f1f44c1f240`
-Source inventory SHA-256: `b5bbc913a21524d04b2053ae5a33b13aff7c5fd066dad9b2959a6a8d33e63821`
+SHA-256: `b263a853090d96c646785f10906c1880e3e34c86c2f6b88318d963a78794f514`
+Source inventory SHA-256: `750ffcf16c44a8f86b9af29f0d7bacd99b92e5d01b91fc587bf25092880f3b22`
 
 ## Decision by deployment profile
 
 | Profile | Decision | Basis |
 |---|---|---|
-| macOS arm64 / Apple Silicon HVF, exclusive runtime | **NO-GO** | Local gates pass (G1–G3, G5–G9, G12–G30). G31 external trust-root authorization, G32 independently administered witness, G33 third-party clean-room and G34 restricted-deployment certification are unexecuted; the attestation for this run is unsigned. |
+| macOS arm64 / Apple Silicon HVF, exclusive runtime | **NO-GO** | Local gates pass (G1–G3, G5–G9, G12–G30) and the artifact is signed under the pinned local root. G31 external trust-root authorization, G32 independently administered witness, G33 third-party clean-room and G34 restricted-deployment certification are unexecuted. |
 | Linux / KVM | **NO-GO** | `linux-amd64-kvm` lane not executed (no KVM host). Outside the release claim by operator direction. |
 | Shared-runtime high assurance | **UNSUPPORTED** | No atomic identity-conditioned delete in msb 0.7.8. Only the exclusive-catalog posture carries a claim, and that claim is unqualified. |
 | Any deployment relying on third-party trust | **NO-GO** | The release root is locally provisioned and self-pinned; an external countersignature is required first. |
@@ -45,21 +45,31 @@ branch replaced with a signed witness epoch.
   file or a shared key is refused.
 - **The operator path works end to end** through the shipped binary
   against a real witness, outbox and effect store.
-- **The artifact is reproducible.** Two independent packaging runs over
-  the same HEAD produced byte-identical archives, and the extracted
-  archive builds and passes its custody and witness tests.
+- **The artifact is reproducible and signed.** Two independent packaging
+  runs over the same HEAD produced byte-identical archives; the extracted
+  archive verifies against all 4413 inventory records, builds, vets and
+  passes its custody race suites; and the attestation verifies under the
+  pinned release root with tamper rejection.
 
 ## What this run does not establish
 
-- **No external authorization.** The attestation is **unsigned**: the
-  release root private key is held outside this environment and is not
-  available here. No signature was fabricated. Any claim of third-party
-  trust would be false.
+- **No external authorization.** The attestation is **signed** under the
+  locally provisioned release root `c1fc3765…` — private key outside the
+  repository and outside the bundle, public key pinned by SHA-256, and
+  verification rejects a wrong root, a wrong pin, a tampered artifact and
+  a tampered signature. That makes the artifact verifiable and
+  tamper-evident. It does **not** make it externally authorized: the
+  party that holds the key and the party that relies on it are the same
+  party. G31 stays BLOCKED and any claim of third-party trust would be
+  false.
 - **No independent witness.** The fence lane runs a second key in the
   same administrative domain, which the plan explicitly calls
   insufficient.
-- **No third-party clean-room.** The extraction check above ran on the
-  same host under the same operator.
+- **No third-party clean-room.** `cleanroom-verify.sh` now verifies all
+  4413 inventory records, builds and vets the tree, and runs the custody
+  race suites from the extracted bytes with fresh caches — but on the same
+  host under the same operator. It is a packaging integrity check, not
+  G33.
 - **No restricted-deployment certification.**
 - **No Linux/KVM qualification.**
 
@@ -77,7 +87,7 @@ python3 crabedence-V1-fix-integration-integrity/qualification/rc8.3-integrity/to
 shasum -a 256 release-out/NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.zip
 ```
 
-The rebuild must equal `6fe82917…`. A different hash on the same commit
+The rebuild must equal `b263a853…`. A different hash on the same commit
 means the worktree bytes differ from the tree the inventory describes —
 investigate before relying on either.
 

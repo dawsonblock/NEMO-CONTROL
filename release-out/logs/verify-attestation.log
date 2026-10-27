@@ -1,0 +1,4 @@
+OK: artifact NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.zip sha256=b263a853090d96c646785f10906c1880e3e34c86c2f6b88318d963a78794f514
+OK: inventory NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.source-inventory.txt sha256=750ffcf16c44a8f86b9af29f0d7bacd99b92e5d01b91fc587bf25092880f3b22
+OK: signature verified under pinned key c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5
+verdict=NO-GO (all deployment profiles)

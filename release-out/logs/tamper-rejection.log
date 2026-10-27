@@ -1,0 +1,22 @@
+# RC8.3 tamper-rejection transcript
+# artifact b263a853  root c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5
+
+## missing root key file
+REJECT: root public key /tmp/missing.pub does not exist
+exit=1
+
+## wrong root key file
+REJECT: --root key id cad969930580172d1e67aa6f9eed2ecd60519789bc240b1f2cbcd1898ad679e2 != --root-key-id c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5
+exit=1
+
+## wrong pinned key id (the retired root 387d837e must never verify)
+REJECT: --root key id c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5 != --root-key-id 387d837e0000000000000000000000000000000000000000000000000000000000
+exit=1
+
+## tampered artifact (one byte appended)
+REJECT: artifact sha256 b6b06baf5d1483aa982e1792ad4235e5270ed53086bbc7b447b944ce69898394 != attested b263a853090d96c646785f10906c1880e3e34c86c2f6b88318d963a78794f514
+exit=1
+
+## tampered signature (first byte flipped)
+REJECT: signature verification failed: 402C7FF601000000:error:030000EA:digital envelope routines:EVP_DigestVerify:provider signature failure:crypto/evp/m_sigver.c:785:ED25519 digest_verify:
+exit=1
