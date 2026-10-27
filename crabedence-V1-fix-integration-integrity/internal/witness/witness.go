@@ -50,8 +50,11 @@ type Request struct {
 	// A submission without an envelope is refused: capability
 	// negotiation is explicit, never a silent downgrade.
 	Envelope *custody.Envelope `json:"envelope,omitempty"`
-	// Fence is the signed migration-epoch request for the fence ops.
+	// Fence is the signed migration-epoch request for the v1 fence ops.
 	Fence *FenceRequest `json:"fence,omitempty"`
+	// Prepare and Finalize are the v2 transactional-fence messages.
+	Prepare  *PrepareRequest  `json:"prepare,omitempty"`
+	Finalize *FinalizeRequest `json:"finalize,omitempty"`
 }
 
 // Response codes let the kernel distinguish a refusal it must escalate
@@ -62,6 +65,11 @@ const (
 	CodeStaleFence    = "stale-fence-base"
 	CodeFenceState    = "fence-state"
 	CodeContradiction = "contradiction"
+	CodePermitMissing = "permit-missing"
+	CodePermitUsed    = "permit-consumed"
+	CodeOutcomeUnknown = "migration-outcome-unknown"
+	CodeRecoveryNeeded = "fence-recovery-required"
+	CodeWrongTerminal  = "wrong-terminal-receipt"
 )
 
 // Response carries the operation result: a signed acknowledgement on
@@ -84,6 +92,9 @@ type Response struct {
 
 	// Fence fields — the signed migration epoch.
 	Fence *FenceReceipt `json:"fence,omitempty"`
+	// v2 transactional-fence fields.
+	Permit *FencePermit `json:"permit,omitempty"`
+	Result *FenceResult `json:"result,omitempty"`
 
 	// Status fields.
 	WitnessFP    string `json:"witness_fp,omitempty"`
@@ -208,7 +219,13 @@ func VerifyCheckpoint(h *CheckpointHead, deploymentID string, trust *custody.Tru
 	if trust.Empty() {
 		return fmt.Errorf("no custodian trust set declared — a self-declared checkpoint is not evidence")
 	}
-	pub, err := trust.ResolveAny(custody.RoleCustodian, deploymentID, h.WitnessFP)
+	// A checkpoint is a live statement about the head right now: it
+	// authorizes submissions from the next index, so the signing key
+	// must be valid there. A key whose window closed before that point
+	// cannot sign the checkpoint that picks a migration base, while the
+	// incumbent that is still current (and the successor that starts
+	// exactly at the next index) both can.
+	pub, err := trust.Resolve(custody.RoleCustodian, deploymentID, h.WitnessFP, h.Seq+1)
 	if err != nil {
 		return err
 	}

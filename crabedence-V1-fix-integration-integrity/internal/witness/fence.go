@@ -51,6 +51,8 @@ const (
 	OpFenceEnd    = "fence-end"
 	OpFenceAbort  = "fence-abort"
 	OpFenceStatus = "fence-status"
+	// OpFenceAbortTx releases one admitted v2 transaction.
+	OpFenceAbortTx = "fence-abort-tx"
 )
 
 // Fence record schemas.
@@ -67,12 +69,25 @@ const (
 	FenceReceiptDomain = "custody-witness-fence-receipt-v1\x00"
 )
 
-// Fence states.
+// Fence states. OPEN is the v1 epoch a fence-begin creates; PREPARED
+// and FINALIZING are the v2 states an admitted transaction passes
+// through; RECOVERY_REQUIRED is the quarantined state an unreconciled
+// outcome lands in. CLOSED and ABORTED are terminal and immutable.
 const (
-	FenceOpen    = "OPEN"
-	FenceClosed  = "CLOSED"
-	FenceAborted = "ABORTED"
+	FenceOpen             = "OPEN"
+	FencePrepared         = "PREPARED"
+	FenceFinalizing       = "FINALIZING"
+	FenceClosed           = "CLOSED"
+	FenceAborted          = "ABORTED"
+	FenceRecoveryRequired = "RECOVERY_REQUIRED"
 )
+
+// terminalFenceState reports whether an epoch admits no further work.
+// Every barrier and transition consults this rather than an allowlist
+// of live states, so a state added later is non-terminal by default.
+func terminalFenceState(state string) bool {
+	return state == FenceClosed || state == FenceAborted
+}
 
 // Typed fence refusals. Callers must treat each as a refusal, never as
 // a retryable transport failure.
@@ -175,7 +190,7 @@ func VerifyFenceRequest(r *FenceRequest, deploymentID string, kernelTrust *custo
 	if kernelTrust.Empty() {
 		return fmt.Errorf("fence request: no pinned kernel-relay trust set — a self-declared kernel is not evidence")
 	}
-	pub, err := kernelTrust.ResolveAny(custody.RoleKernelRelay, deploymentID, r.KernelFP)
+	pub, err := kernelTrust.Resolve(custody.RoleKernelRelay, deploymentID, r.KernelFP, r.BaseSeq+1)
 	if err != nil {
 		return fmt.Errorf("fence request: %w", err)
 	}
@@ -267,6 +282,30 @@ func VerifyFenceReceipt(r *FenceReceipt, deploymentID string, custodianTrust *cu
 	}
 	if custodianTrust.Empty() {
 		return fmt.Errorf("fence receipt: no pinned custodian trust set — a self-declared fence is not evidence")
+	}
+	pub, err := custodianTrust.Resolve(custody.RoleCustodian, deploymentID, r.WitnessFP, r.BaseSeq+1)
+	if err != nil {
+		return fmt.Errorf("fence receipt: %w", err)
+	}
+	return evidence.VerifyRecordSignature(pub, FenceReceiptDomain, r.Signature, fenceReceiptFields(r)...)
+}
+
+// VerifyFenceReceiptHistorical verifies a fence receipt as stored
+// evidence: the key must have been pinned and authentic, and the record
+// must verify, but the key's validity window is not re-imposed on
+// history. Live acceptance must use VerifyFenceReceipt.
+func VerifyFenceReceiptHistorical(r *FenceReceipt, deploymentID string, custodianTrust *custody.TrustSet) error {
+	if r == nil {
+		return fmt.Errorf("fence receipt: none supplied")
+	}
+	if r.Schema != FenceReceiptSchema {
+		return fmt.Errorf("fence receipt: unsupported schema %q", r.Schema)
+	}
+	if r.DeploymentID != deploymentID {
+		return fmt.Errorf("fence receipt: bound to deployment %q, this kernel serves %q", r.DeploymentID, deploymentID)
+	}
+	if custodianTrust.Empty() {
+		return fmt.Errorf("fence receipt: no pinned custodian trust set")
 	}
 	pub, err := custodianTrust.ResolveAny(custody.RoleCustodian, deploymentID, r.WitnessFP)
 	if err != nil {
@@ -380,8 +419,8 @@ func activeFenceFrom(ctx context.Context, q fenceQueryer, deploymentID string) (
 	err := q.QueryRowContext(ctx,
 		`SELECT deployment_id, fence_id, epoch, base_seq, base_hash, grant_digest,
 		        kernel_fp, state, result_digest, opened_at, closed_at
-		 FROM custody_fence WHERE deployment_id = $1 AND state = $2
-		 ORDER BY epoch DESC LIMIT 1`, deploymentID, FenceOpen).
+		 FROM custody_fence WHERE deployment_id = $1 AND state NOT IN ($2, $3)
+		 ORDER BY epoch DESC LIMIT 1`, deploymentID, FenceClosed, FenceAborted).
 		Scan(&r.DeploymentID, &r.FenceID, &r.Epoch, &r.BaseSeq, &r.BaseHash, &r.GrantDigest,
 			&r.KernelFP, &r.State, &r.ResultDigest, &r.OpenedAt, &r.ClosedAt)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -509,6 +548,19 @@ func (l *Ledger) CloseFence(ctx context.Context, req *FenceRequest) (FenceRecord
 		return rec, tx.Commit()
 	case FenceAborted:
 		return FenceRecord{}, fmt.Errorf("%w: fence %s was aborted", ErrFenceState, req.FenceID)
+	case FenceOpen, FencePrepared, FenceFinalizing:
+	default:
+		return FenceRecord{}, fmt.Errorf("%w: fence %s is %s — close is not a transition from this state",
+			ErrFenceState, req.FenceID, rec.State)
+	}
+	// An admitted transaction has an unresolved local outcome. Releasing
+	// the epoch now would resume submissions against a suffix that may
+	// already be rewritten.
+	if live, ok, err := liveFenceTxFrom(ctx, tx, req.DeploymentID); err != nil {
+		return FenceRecord{}, err
+	} else if ok {
+		return FenceRecord{}, fmt.Errorf("%w: transaction %s is still admitted — finalize or abort it before closing the epoch",
+			ErrMigrationOutcomeUnknown, live.TxID)
 	}
 	if req.ResultDigest == "" {
 		return FenceRecord{}, fmt.Errorf("%w: closing a fence requires the migration result digest", ErrFenceState)
@@ -547,11 +599,35 @@ func (l *Ledger) AbortFence(ctx context.Context, req *FenceRequest) (FenceRecord
 	if rec.GrantDigest != req.GrantDigest {
 		return FenceRecord{}, fmt.Errorf("%w: fence %s was opened under a different grant", ErrFenceState, req.FenceID)
 	}
-	if rec.State == FenceAborted {
+	switch rec.State {
+	case FenceAborted:
 		return rec, tx.Commit()
-	}
-	if rec.State == FenceClosed {
+	case FenceClosed:
 		return FenceRecord{}, fmt.Errorf("%w: fence %s already closed a migration", ErrFenceState, req.FenceID)
+	case FenceOpen, FencePrepared, FenceFinalizing:
+	default:
+		return FenceRecord{}, fmt.Errorf("%w: fence %s is %s — abort is not a transition from this state",
+			ErrFenceState, req.FenceID, rec.State)
+	}
+	// Any transaction with a committed local outcome blocks the abort:
+	// releasing the epoch would resume submissions against a rewritten
+	// suffix. An admitted transaction must be aborted through
+	// AbortMigration, which carries the kernel's no-commit attestation.
+	var committed int64
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM custody_fence_tx WHERE deployment_id = $1 AND fence_id = $2 AND state = $3`,
+		req.DeploymentID, req.FenceID, MigrationTxCommitted).Scan(&committed); err != nil {
+		return FenceRecord{}, err
+	}
+	if committed > 0 {
+		return FenceRecord{}, fmt.Errorf("%w: epoch %d carries %d committed migration(s) — close it, never abort it",
+			ErrMigrationOutcomeUnknown, rec.Epoch, committed)
+	}
+	if live, ok, err := liveFenceTxFrom(ctx, tx, req.DeploymentID); err != nil {
+		return FenceRecord{}, err
+	} else if ok {
+		return FenceRecord{}, fmt.Errorf("%w: transaction %s is still admitted — abort it through AbortMigration",
+			ErrMigrationOutcomeUnknown, live.TxID)
 	}
 	head, headHash, _, err := headFrom(ctx, tx, req.DeploymentID)
 	if err != nil {
@@ -721,11 +797,26 @@ func (f *FenceClient) finish(ctx context.Context, op string, fence FenceReceipt,
 	if f.Client == nil || f.Signer == nil {
 		return FenceReceipt{}, fmt.Errorf("fence: client and kernel signer are required")
 	}
+	// The epoch this run holds is the authority for which grant to act
+	// under. A receipt presented by a caller names a grant, but it is an
+	// untrusted document: taking its grant digest would let any receipt
+	// close any epoch under a grant this run does not hold.
+	if fence.GrantDigest != f.GrantDigest {
+		return FenceReceipt{}, fmt.Errorf("%w: receipt binds grant %s, this run holds %s",
+			ErrWrongTerminalReceipt, fence.GrantDigest, f.GrantDigest)
+	}
+	want := FenceClosed
+	if op == OpFenceAbort {
+		want = FenceAborted
+	}
+	if op == OpFenceEnd && resultDigest == "" {
+		return FenceReceipt{}, fmt.Errorf("%w: closing an epoch requires the migration result digest", ErrWrongTerminalReceipt)
+	}
 	req := &FenceRequest{
 		Op:           op,
 		DeploymentID: f.DeploymentID,
 		FenceID:      fence.FenceID,
-		GrantDigest:  fence.GrantDigest,
+		GrantDigest:  f.GrantDigest,
 		BaseSeq:      fence.BaseSeq,
 		BaseHash:     fence.BaseHash,
 		ResultDigest: resultDigest,
@@ -739,6 +830,20 @@ func (f *FenceClient) finish(ctx context.Context, op string, fence FenceReceipt,
 	}
 	if err := VerifyFenceReceipt(receipt, f.DeploymentID, f.CustodianTrust); err != nil {
 		return FenceReceipt{}, fmt.Errorf("fence: receipt unverifiable: %w", err)
+	}
+	if receipt.State != want {
+		return FenceReceipt{}, fmt.Errorf("%w: %s returned state %q, want %q",
+			ErrWrongTerminalReceipt, op, receipt.State, want)
+	}
+	if receipt.FenceID != fence.FenceID || receipt.GrantDigest != f.GrantDigest {
+		return FenceReceipt{}, fmt.Errorf("%w: terminal receipt does not bind this epoch and grant", ErrWrongTerminalReceipt)
+	}
+	if op == OpFenceEnd && receipt.ResultDigest != resultDigest {
+		return FenceReceipt{}, fmt.Errorf("%w: terminal receipt binds result %s, the request carried %s",
+			ErrWrongTerminalReceipt, receipt.ResultDigest, resultDigest)
+	}
+	if op == OpFenceAbort && receipt.ResultDigest != "" {
+		return FenceReceipt{}, fmt.Errorf("%w: an abort receipt must not carry a result digest", ErrWrongTerminalReceipt)
 	}
 	return *receipt, nil
 }
@@ -781,7 +886,7 @@ func (o *Outbox) RecordFenceIntent(ctx context.Context, in FenceIntent) error {
 	if in.FenceID == "" || in.GrantDigest == "" {
 		return fmt.Errorf("fence intent: identity and grant digest are mandatory")
 	}
-	_, err := o.db.ExecContext(ctx,
+	res, err := o.db.ExecContext(ctx,
 		`INSERT INTO custody_fence_intent (fence_id, deployment_id, grant_digest, base_seq, base_hash, state, result_digest, opened_at, closed_at)
 		 VALUES ($1,$2,$3,$4,$5,$6,'',$7,'')
 		 ON CONFLICT(fence_id) DO NOTHING`,
@@ -789,7 +894,39 @@ func (o *Outbox) RecordFenceIntent(ctx context.Context, in FenceIntent) error {
 	if err != nil {
 		return fmt.Errorf("fence intent: %w", err)
 	}
+	if n, _ := res.RowsAffected(); n == 1 {
+		return nil
+	}
+	// The identity already exists. Re-recording the same commitments is
+	// idempotent; recording different ones is a contradiction, never a
+	// silent no-op.
+	existing, err := o.FenceIntent(ctx, in.FenceID)
+	if err != nil {
+		return err
+	}
+	if existing.DeploymentID != in.DeploymentID || existing.GrantDigest != in.GrantDigest ||
+		existing.BaseSeq != in.BaseSeq || existing.BaseHash != in.BaseHash {
+		return fmt.Errorf("%w: fence intent %s exists with different commitments (base %d/%s, this record names %d/%s)",
+			ErrContradiction, in.FenceID, existing.BaseSeq, existing.BaseHash, in.BaseSeq, in.BaseHash)
+	}
 	return nil
+}
+
+// FenceIntent reads one recorded epoch intent.
+func (o *Outbox) FenceIntent(ctx context.Context, fenceID string) (FenceIntent, error) {
+	var in FenceIntent
+	err := o.db.QueryRowContext(ctx,
+		`SELECT fence_id, deployment_id, grant_digest, base_seq, base_hash, state, result_digest, opened_at, closed_at
+		 FROM custody_fence_intent WHERE fence_id = $1`, fenceID).
+		Scan(&in.FenceID, &in.DeploymentID, &in.GrantDigest, &in.BaseSeq, &in.BaseHash,
+			&in.State, &in.ResultDigest, &in.OpenedAt, &in.ClosedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return FenceIntent{}, fmt.Errorf("%w: no fence intent %s", ErrFenceState, fenceID)
+	}
+	if err != nil {
+		return FenceIntent{}, err
+	}
+	return in, nil
 }
 
 // PendingFenceIntent returns an epoch this grant opened and never

@@ -84,6 +84,9 @@ func OpenLedger(path string) (*Ledger, error) {
 			UNIQUE (deployment_id, execution_id)
 		)`,
 		fenceDDL,
+		fenceTxDDL,
+		fenceOneLiveIndex,
+		fenceTxLiveIndex,
 	} {
 		if _, err := db.Exec(stmt); err != nil {
 			db.Close()
@@ -95,12 +98,6 @@ func OpenLedger(path string) (*Ledger, error) {
 
 // Close releases the ledger.
 func (l *Ledger) Close() error { return l.db.Close() }
-
-func (l *Ledger) setMeta(ctx context.Context, key, value string) error {
-	_, err := l.db.ExecContext(ctx, `INSERT INTO witness_meta (key, value) VALUES ($1, $2)
-		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
-	return err
-}
 
 // SignerEpoch is the witness's current signing-key epoch — it bumps
 // exactly once per authorized key rotation, so acknowledgements record
@@ -129,12 +126,27 @@ func signerEpochFrom(ctx context.Context, q fenceQueryer) (int64, error) {
 // the old +1, never asserted. The accompanying signer key change is the
 // service's act; this ledger only numbers it.
 func (l *Ledger) AdvanceSignerEpoch(ctx context.Context) (int64, error) {
-	epoch, err := l.SignerEpoch(ctx)
+	// The read and the write share one immediate transaction. Without
+	// it two concurrent rotations both observe epoch N and both record
+	// N+1, so custody_log.signer_epoch stops identifying a key
+	// generation.
+	tx, err := l.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	epoch, err := signerEpochFrom(ctx, tx)
 	if err != nil {
 		return 0, err
 	}
 	epoch++
-	if err := l.setMeta(ctx, "signer_epoch", strconv.FormatInt(epoch, 10)); err != nil {
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO witness_meta (key, value) VALUES ($1, $2)
+		 ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+		"signer_epoch", strconv.FormatInt(epoch, 10)); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
 	return epoch, nil
@@ -220,7 +232,7 @@ func storedFrom(ctx context.Context, q fenceQueryer, deploymentID string, seq in
 // (and is therefore inside the head the fence freezes) or observes the
 // fence and is refused. There is no window in which a submission is
 // admitted against a head a migration has already frozen.
-func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, env *custody.Envelope, deploymentID string, kernelTrust *custody.TrustSet) (*Ack, error) {
+func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, signerEpoch int64, env *custody.Envelope, deploymentID string, kernelTrust *custody.TrustSet) (*Ack, error) {
 	if env == nil {
 		return nil, fmt.Errorf("%w: submission carries no custody-envelope-v1 record — capability negotiation is explicit", ErrEnvelope)
 	}
@@ -303,11 +315,10 @@ func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, env *custo
 		return nil, err
 	}
 
-	epoch, err := signerEpochFrom(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	ack, err := SignAck(signer, epoch, env, envHash)
+	// The epoch comes from the same immutable snapshot that supplies the
+	// signing key, so a record can never claim an epoch its signer does
+	// not belong to.
+	ack, err := SignAck(signer, signerEpoch, env, envHash)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +334,7 @@ func (l *Ledger) Submit(ctx context.Context, signer *evidence.Signer, env *custo
 		INSERT INTO custody_log (deployment_id, seq, execution_id, envelope_hash, envelope_json, ack, signer_epoch, received_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		deploymentID, env.Sequence.Index, env.Subject.ExecutionID, envHash,
-		string(envJSON), string(ackJSON), epoch,
+		string(envJSON), string(ackJSON), signerEpoch,
 		time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return nil, fmt.Errorf("witness custody insert: %w", err)

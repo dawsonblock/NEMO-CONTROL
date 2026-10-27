@@ -133,11 +133,29 @@ func TestFenceAbortRefusesEpochWithCommittedMigration(t *testing.T) {
 		Signer:       kernel,
 	}
 	auth := witness.OperatorAuthorization{Grant: grant, Trust: repairPathTrust(t, repairPath), DeploymentID: dep}
-	if _, err := o.MigrateLegacySuffix(ctx, producer, witness.MigrationRequest{
+	pf, err := o.MigrationPreflight(ctx, 1, witness.CheckpointRef{})
+	if err != nil {
+		t.Fatalf("preflight: %v", err)
+	}
+	permit, err := fc.Prepare(ctx, fence, 1, pf.EnvelopeHash)
+	if err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	if _, err := o.AdmitMigration(ctx, &permit); err != nil {
+		t.Fatalf("admit: %v", err)
+	}
+	res, err := o.MigrateLegacySuffix(ctx, producer, witness.MigrationRequest{
 		RowSeq: 1, TerminalReceiptDigest: "digest-1", Native: []byte(`{"canonical":"1"}`),
-		Fence: fence, Authorization: auth, CustodianTrust: ctrust,
-	}); err != nil {
+		Permit: permit, Authorization: auth, CustodianTrust: ctrust,
+	})
+	if err != nil {
 		t.Fatalf("migration: %v", err)
+	}
+	if _, err := fc.Finalize(ctx, permit, witness.FinalizeReport{
+		ProofDigest: res.ProofDigest, JournalSeq: res.JournalSeq,
+		BeforeDigest: res.BeforeDigest, AfterDigest: res.AfterDigest, ResultDigest: res.AfterDigest,
+	}); err != nil {
+		t.Fatalf("finalize: %v", err)
 	}
 
 	// Abort must now refuse: the epoch rewrote a row, so releasing it

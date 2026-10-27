@@ -97,21 +97,21 @@ func TestMigrationProofRejectsJournalIdentityMismatch(t *testing.T) {
 	}
 }
 
-func TestMigrationProofRejectsNonOpenEpoch(t *testing.T) {
+func TestMigrationProofRejectsForeignPermitTarget(t *testing.T) {
 	h := newHarness(t, true)
 	defer h.cancel()
 	base, proof := realProof(t, h)
-
-	// Re-sign a proof that claims the rewrite committed under a closed
-	// epoch: the custodian never authorized a rewrite there.
-	proof.Fence.State = FenceClosed
-	proof.Fence.Signature = ""
-	if _, err := SignFenceReceipt(h.wsigner, 0, &proof.Fence); err != nil {
-		t.Fatal(err)
+	if proof.Permit == nil {
+		t.Fatal("v2 proof carries no admission permit")
 	}
+
+	// Re-sign a proof whose admission names a different target than the
+	// journal row it claims to describe: the custodian never admitted a
+	// rewrite there.
+	proof.Permit.TargetSeq = base.RowSeq + 7
 	entry := signedProofEntry(t, h, base, proof)
 	if err := VerifyMigrationProof(entry, proofTrust(h)); err == nil {
-		t.Fatal("proof committed under a closed epoch verified")
+		t.Fatal("proof whose permit admits a foreign target verified")
 	}
 }
 
@@ -137,22 +137,21 @@ func TestMigrationProofRejectsCustodianSignedProof(t *testing.T) {
 	}
 }
 
-func TestMigrationProofRejectsFenceFromAnotherEpoch(t *testing.T) {
+func TestMigrationProofRejectsPermitFromAnotherGrant(t *testing.T) {
 	h := newHarness(t, true)
 	defer h.cancel()
 	base, proof := realProof(t, h)
-
-	// An epoch that verifies but was opened by a different grant is not
-	// this rewrite's authority: the journal still records the grant the
-	// rewrite actually ran under.
-	proof.Fence.GrantDigest = "different-grant"
-	proof.Fence.Signature = ""
-	if _, err := SignFenceReceipt(h.wsigner, 0, &proof.Fence); err != nil {
-		t.Fatal(err)
+	if proof.Permit == nil {
+		t.Fatal("v2 proof carries no admission permit")
 	}
+
+	// A permit that verifies but admits a different grant is not this
+	// rewrite's authority: the journal still records the grant the
+	// rewrite actually ran under.
+	proof.Permit.GrantDigest = "different-grant"
 	entry := signedProofEntry(t, h, base, proof)
 	if err := VerifyMigrationProof(entry, proofTrust(h)); err == nil {
-		t.Fatal("proof bound to another grant's epoch verified")
+		t.Fatal("proof bound to another grant's admission verified")
 	}
 }
 

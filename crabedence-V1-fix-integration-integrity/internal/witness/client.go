@@ -101,6 +101,16 @@ func refusal(err error, code string) error {
 		return fmt.Errorf("%w: %v", ErrFenceState, err)
 	case CodeContradiction:
 		return fmt.Errorf("%w: %v", ErrContradiction, err)
+	case CodePermitMissing:
+		return fmt.Errorf("%w: %v", ErrPermitMissing, err)
+	case CodePermitUsed:
+		return fmt.Errorf("%w: %v", ErrPermitConsumed, err)
+	case CodeOutcomeUnknown:
+		return fmt.Errorf("%w: %v", ErrMigrationOutcomeUnknown, err)
+	case CodeRecoveryNeeded:
+		return fmt.Errorf("%w: %v", ErrFenceRecoveryRequired, err)
+	case CodeWrongTerminal:
+		return fmt.Errorf("%w: %v", ErrWrongTerminalReceipt, err)
 	default:
 		return err
 	}
@@ -137,6 +147,54 @@ func (c *Client) BeginFence(ctx context.Context, req *FenceRequest) (*FenceRecei
 // EndFence closes a migration epoch with its result digest.
 func (c *Client) EndFence(ctx context.Context, req *FenceRequest) (*FenceReceipt, error) {
 	return c.fenceCall(ctx, req.Op, req)
+}
+
+// PrepareFence asks the witness to admit one migration transaction.
+// The returned permit is NOT verified here — VerifyFencePermit is the
+// boundary's obligation.
+func (c *Client) PrepareFence(ctx context.Context, req *PrepareRequest) (*FencePermit, error) {
+	resp, err := c.call(ctx, Request{Op: OpFencePrepare, DeploymentID: req.DeploymentID, Prepare: req})
+	if err != nil {
+		return nil, err
+	}
+	if !resp.OK {
+		return nil, refusal(fmt.Errorf("witness %s refused: %s", OpFencePrepare, resp.Error), resp.Code)
+	}
+	if resp.Permit == nil {
+		return nil, fmt.Errorf("witness %s returned no signed permit", OpFencePrepare)
+	}
+	return resp.Permit, nil
+}
+
+// FinalizeFence reports one transaction's committed local outcome.
+func (c *Client) FinalizeFence(ctx context.Context, req *FinalizeRequest) (*FenceResult, error) {
+	resp, err := c.call(ctx, Request{Op: OpFenceFinalize, DeploymentID: req.DeploymentID, Finalize: req})
+	if err != nil {
+		return nil, err
+	}
+	if !resp.OK {
+		return nil, refusal(fmt.Errorf("witness %s refused: %s", OpFenceFinalize, resp.Error), resp.Code)
+	}
+	if resp.Result == nil {
+		return nil, fmt.Errorf("witness %s returned no signed result", OpFenceFinalize)
+	}
+	return resp.Result, nil
+}
+
+// AbortMigrationFence asks the witness to release one admitted
+// transaction that never committed locally.
+func (c *Client) AbortMigrationFence(ctx context.Context, req *FinalizeRequest) (*FenceReceipt, error) {
+	resp, err := c.call(ctx, Request{Op: OpFenceAbortTx, DeploymentID: req.DeploymentID, Finalize: req})
+	if err != nil {
+		return nil, err
+	}
+	if !resp.OK {
+		return nil, refusal(fmt.Errorf("witness %s refused: %s", OpFenceAbortTx, resp.Error), resp.Code)
+	}
+	if resp.Fence == nil {
+		return nil, fmt.Errorf("witness %s returned no signed receipt", OpFenceAbortTx)
+	}
+	return resp.Fence, nil
 }
 
 func (c *Client) fenceCall(ctx context.Context, op string, req *FenceRequest) (*FenceReceipt, error) {

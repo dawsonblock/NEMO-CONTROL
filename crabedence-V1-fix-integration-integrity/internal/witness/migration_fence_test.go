@@ -75,11 +75,32 @@ func (h *harness) openFence(t *testing.T, auth MigrationAuthorization) FenceRece
 	return fence
 }
 
+// admit prepares one transaction against the epoch and records the
+// admission locally. A refused prepare leaves the request without a
+// permit, so the library boundary still sees the refusal.
+func (h *harness) admit(auth MigrationAuthorization, fence FenceReceipt, rowSeq int64) (FencePermit, bool) {
+	h.t.Helper()
+	fc, err := h.fenceClient(auth)
+	if err != nil {
+		h.t.Fatalf("fence client: %v", err)
+	}
+	preimage := h.row(h.t, rowSeq).EnvelopeHash
+	permit, perr := fc.Prepare(context.Background(), fence, rowSeq, preimage)
+	if perr != nil {
+		return FencePermit{}, false
+	}
+	if _, err := h.outbox.AdmitMigration(context.Background(), &permit); err != nil {
+		h.t.Fatalf("admit migration: %v", err)
+	}
+	return permit, true
+}
+
 // migrateRequest assembles the full library input for one rewrite.
 func (h *harness) migrateRequest(auth MigrationAuthorization, fence FenceReceipt, rowSeq int64, digest string, payload []byte) MigrationRequest {
+	permit, _ := h.admit(auth, fence, rowSeq)
 	return MigrationRequest{
 		RowSeq: rowSeq, TerminalReceiptDigest: digest, Native: payload,
-		Fence: fence, Authorization: auth, CustodianTrust: h.ctrust,
+		Permit: permit, Authorization: auth, CustodianTrust: h.ctrust,
 	}
 }
 
@@ -92,20 +113,61 @@ func (h *harness) migrate(t *testing.T, auth MigrationAuthorization, rowSeq int6
 	if err != nil {
 		t.Fatalf("fence client: %v", err)
 	}
-	fence, err := fc.Begin(context.Background())
+	ctx := context.Background()
+	fence, err := fc.Begin(ctx)
 	if err != nil {
 		t.Fatalf("open migration epoch: %v", err)
 	}
-	res, merr := h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
-		h.migrateRequest(auth, fence, rowSeq, digest, payload))
+	req := h.migrateRequest(auth, fence, rowSeq, digest, payload)
+	res, merr := h.outbox.MigrateLegacySuffix(ctx, h.prod, req)
 	if merr != nil {
-		_, _ = fc.Abort(context.Background(), fence)
+		if req.Permit.TxID != "" {
+			_ = h.outbox.RevokePermit(ctx, req.Permit.TxID, "migration failed")
+			_, _ = fc.AbortMigration(ctx, req.Permit, "migration failed")
+		}
+		_, _ = fc.Abort(ctx, fence)
 		return res, merr
 	}
-	if _, err := fc.End(context.Background(), fence, res.AfterDigest); err != nil {
+	if req.Permit.TxID != "" {
+		result, ferr := fc.Finalize(ctx, req.Permit, FinalizeReport{
+			ProofDigest: res.ProofDigest, JournalSeq: res.JournalSeq,
+			BeforeDigest: res.BeforeDigest, AfterDigest: res.AfterDigest,
+			ResultDigest: res.AfterDigest,
+		})
+		if ferr != nil {
+			t.Fatalf("finalize: %v", ferr)
+		}
+		if err := h.outbox.CompleteMigrationTx(ctx, &result); err != nil {
+			t.Fatalf("complete migration tx: %v", err)
+		}
+	}
+	if _, err := fc.End(ctx, fence, res.AfterDigest); err != nil {
 		t.Fatalf("close migration epoch: %v", err)
 	}
 	return res, nil
+}
+
+// closeEpoch finalizes any locally committed transaction of the epoch
+// and then closes it. A v2 epoch cannot close while a transaction is
+// still admitted, which is the property that keeps a committed rewrite
+// from being released unrecorded.
+func (h *harness) closeEpoch(t *testing.T, fc *FenceClient, fence FenceReceipt, resultDigest string) {
+	t.Helper()
+	ctx := context.Background()
+	if tx, ok, err := h.outbox.UnfinalizedMigrationTx(ctx, fence.FenceID); err != nil {
+		t.Fatalf("unfinalized tx: %v", err)
+	} else if ok {
+		res, ferr := fc.FinalizeLocal(ctx, tx)
+		if ferr != nil {
+			t.Fatalf("finalize local: %v", ferr)
+		}
+		if err := h.outbox.CompleteMigrationTx(ctx, &res); err != nil {
+			t.Fatalf("complete migration tx: %v", err)
+		}
+	}
+	if _, err := fc.End(ctx, fence, resultDigest); err != nil {
+		t.Fatalf("close epoch: %v", err)
+	}
 }
 
 // TestMigrationRequiresVerifiedFenceSignature: a fence receipt minted
@@ -126,19 +188,26 @@ func TestMigrationRequiresVerifiedFenceSignature(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	forged := &FenceReceipt{
-		State: FenceOpen, DeploymentID: h.dep, FenceID: FenceIDFor(h.dep, digest, 0, ""),
-		Epoch: 1, BaseSeq: 0, BaseHash: "", GrantDigest: digest,
-		OpenedAt: time.Now().UTC().Format(time.RFC3339Nano),
+	// A permit minted by a key outside the pinned custodian set, with
+	// every field internally consistent and the local admission row
+	// present: the only thing wrong with it is who signed it.
+	forged := &FencePermit{
+		DeploymentID: h.dep, FenceID: FenceIDFor(h.dep, digest, 0, ""),
+		Epoch: 1, TxID: "forged-tx", GrantDigest: digest, BaseSeq: 0, BaseHash: "",
+		TargetSeq: 1, PreimageDigest: h.row(t, 1).EnvelopeHash,
+		IssuedAt: time.Now().UTC().Format(time.RFC3339Nano),
 	}
-	if _, err := SignFenceReceipt(attacker, 0, forged); err != nil {
+	if _, err := SignFencePermit(attacker, 0, forged); err != nil {
 		t.Fatal(err)
 	}
-
-	_, err = h.outbox.MigrateLegacySuffix(context.Background(), h.prod,
-		h.migrateRequest(auth, *forged, 1, "digest", []byte(`{"x":1}`)))
+	req := h.migrateRequest(auth, FenceReceipt{}, 1, "digest", []byte(`{"x":1}`))
+	req.Permit = *forged
+	if _, err := h.outbox.AdmitMigration(context.Background(), forged); err != nil {
+		t.Fatalf("admit forged permit: %v", err)
+	}
+	_, err = h.outbox.MigrateLegacySuffix(context.Background(), h.prod, req)
 	if err == nil {
-		t.Fatal("migration accepted a fence signed by an unpinned key")
+		t.Fatal("migration accepted a permit signed by an unpinned key")
 	}
 	if !errors.Is(err, ErrEvidenceContradiction) {
 		t.Fatalf("refusal is not a typed contradiction: %v", err)
@@ -202,9 +271,7 @@ func TestFenceRefusesInFlightSubmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fc.End(context.Background(), fence, "result"); err != nil {
-		t.Fatalf("close epoch: %v", err)
-	}
+	h.closeEpoch(t, fc, fence, "result")
 	if !h.drain() {
 		t.Fatalf("drain after epoch close: %s", h.sender.LastError())
 	}
@@ -274,7 +341,7 @@ func TestFenceSurvivesWitnessRestart(t *testing.T) {
 	if active == nil || active.FenceID != fence.FenceID {
 		t.Fatalf("epoch did not survive the restart: %+v", active)
 	}
-	if _, err := reopened.Submit(context.Background(), h.wsigner, h.row(t, 1).Envelope, h.dep, h.ktrust); !errors.Is(err, ErrFenced) {
+	if _, err := reopened.Submit(context.Background(), h.wsigner, 0, h.row(t, 1).Envelope, h.dep, h.ktrust); !errors.Is(err, ErrFenced) {
 		t.Fatalf("restarted witness admitted a submission inside an open epoch: %v", err)
 	}
 }

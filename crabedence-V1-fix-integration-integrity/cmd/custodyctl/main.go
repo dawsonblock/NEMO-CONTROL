@@ -888,11 +888,25 @@ func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.E
 				out.Compensated++
 				continue
 			}
+			// Admit exactly one transaction for this target, bound to the
+			// bytes it holds right now, then record the admission
+			// locally before any mutation runs.
+			// Bind the admission to the bytes preflight just inspected.
+			// A successor's hash changes when its predecessor is
+			// rewritten, so the page-level hash is stale by the time a
+			// later row in the same suffix is admitted.
+			permit, perr := fenceClient.Prepare(ctx, fence, r.Seq, pf.EnvelopeHash)
+			if perr != nil {
+				fatalf("migrate seq %d: %v (epoch %s stays open)", r.Seq, perr, fence.FenceID)
+			}
+			if _, aerr := outbox.AdmitMigration(ctx, &permit); aerr != nil {
+				fatalf("migrate seq %d: %v", r.Seq, aerr)
+			}
 			res, err := outbox.MigrateLegacySuffix(ctx, producer, witness.MigrationRequest{
 				RowSeq:                r.Seq,
 				TerminalReceiptDigest: rec.TerminalReceiptDigest,
 				Native:                payload,
-				Fence:                 fence,
+				Permit:                permit,
 				Authorization:         auth,
 				CustodianTrust:        policy.CustodianTrust,
 			})
@@ -901,6 +915,19 @@ func runMigrate(ctx context.Context, outbox *witness.Outbox, store idempotency.E
 				// must not silently release custody, and the operator
 				// re-runs migrate with the same grant to resume it.
 				fatalf("migrate seq %d: %v (epoch %s stays open; re-run with the same grant to resume)", r.Seq, err, fence.FenceID)
+			}
+			terminal, ferr := fenceClient.Finalize(ctx, permit, witness.FinalizeReport{
+				ProofDigest:  res.ProofDigest,
+				JournalSeq:   res.JournalSeq,
+				BeforeDigest: res.BeforeDigest,
+				AfterDigest:  res.AfterDigest,
+				ResultDigest: result.sum(),
+			})
+			if ferr != nil {
+				fatalf("migrate seq %d: local rewrite committed but the witness did not record it: %v — the epoch stays open and must be finalized, never aborted", r.Seq, ferr)
+			}
+			if cerr := outbox.CompleteMigrationTx(ctx, &terminal); cerr != nil {
+				fatalf("migrate seq %d: local transaction: %v", r.Seq, cerr)
 			}
 			if res.AlreadyMigrated {
 				out.AlreadyDone++

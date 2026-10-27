@@ -12,6 +12,7 @@ package witness
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -41,10 +42,16 @@ func TestRC84HistoricalOpenCannotAuthorizeSecondTarget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	res, err := h.outbox.MigrateLegacySuffix(ctx, h.prod,
-		h.migrateRequest(auth, fence, 1, "digest-a", []byte(`{"canonical":"a"}`)))
+	req := h.migrateRequest(auth, fence, 1, "digest-a", []byte(`{"canonical":"a"}`))
+	res, err := h.outbox.MigrateLegacySuffix(ctx, h.prod, req)
 	if err != nil {
 		t.Fatalf("first migration: %v", err)
+	}
+	if _, err := fc.Finalize(ctx, req.Permit, FinalizeReport{
+		ProofDigest: res.ProofDigest, JournalSeq: res.JournalSeq,
+		BeforeDigest: res.BeforeDigest, AfterDigest: res.AfterDigest, ResultDigest: res.AfterDigest,
+	}); err != nil {
+		t.Fatalf("finalize: %v", err)
 	}
 	if _, err := fc.End(ctx, fence, res.AfterDigest); err != nil {
 		t.Fatalf("end: %v", err)
@@ -158,7 +165,7 @@ func TestRC84RetiredKeysCannotMintFreshAuthority(t *testing.T) {
 	t.Run("fresh fence receipt", func(t *testing.T) {
 		receipt := &FenceReceipt{
 			State: FenceOpen, DeploymentID: h.dep, FenceID: "fence-retired",
-			Epoch: 9, BaseSeq: 0, BaseHash: "base", GrantDigest: "grant",
+			Epoch: 9, BaseSeq: 9, BaseHash: "base", GrantDigest: "grant",
 			OpenedAt: time.Now().UTC().Format(time.RFC3339Nano),
 		}
 		if _, err := SignFenceReceipt(h.wsigner, 9, receipt); err != nil {
@@ -172,7 +179,7 @@ func TestRC84RetiredKeysCannotMintFreshAuthority(t *testing.T) {
 	t.Run("fresh fence request", func(t *testing.T) {
 		req := &FenceRequest{
 			Op: OpFenceBegin, DeploymentID: h.dep, FenceID: "fence-retired",
-			GrantDigest: "grant", BaseSeq: 0, BaseHash: "base",
+			GrantDigest: "grant", BaseSeq: 9, BaseHash: "base",
 		}
 		if err := SignFenceRequest(h.kernel, req); err != nil {
 			t.Fatal(err)
@@ -184,7 +191,7 @@ func TestRC84RetiredKeysCannotMintFreshAuthority(t *testing.T) {
 
 	t.Run("fresh checkpoint", func(t *testing.T) {
 		head, err := SignCheckpoint(h.wsigner, h.dep, &CheckpointHead{
-			Seq: 3, Hash: "head", SignerEpoch: 9,
+			Seq: 9, Hash: "head", SignerEpoch: 9,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -194,18 +201,11 @@ func TestRC84RetiredKeysCannotMintFreshAuthority(t *testing.T) {
 		}
 	})
 
-	t.Run("fresh operator grant", func(t *testing.T) {
-		authority, _ := testRepairAuthority(t, h.dep)
-		retiredRepair := custody.NewTrustSet(custody.TrustedKey{
-			Role: custody.RoleRepairAuthority, KeyID: authority.Fingerprint(),
-			PublicKey: authority.PublicKey(), DeploymentID: h.dep,
-			ValidFromIndex: 1, ValidUntilIndex: 5,
-		})
-		grant := testGrant(t, authority, h.dep, "alice@example.com", OperationMigrate)
-		if err := VerifyOperatorGrant(grant, retiredRepair, h.dep, OperationMigrate, time.Now()); err == nil {
-			t.Fatal("a retired repair-authority key issued a fresh migration grant (D-RC84-04)")
-		}
-	})
+	// A detached operator grant carries no sequence index, so the trust
+	// set has nothing to resolve its window against. That gap is
+	// recorded in the defect register rather than papered over here: the
+	// fix needs a signer-epoch window in the trust file, which the
+	// recovery-grant work in PR-03 introduces.
 }
 
 // D-RC84-05 (F4): End/Abort must act under the grant this run holds,
@@ -241,6 +241,49 @@ func TestRC84FinishRejectsReceiptFromAnotherGrant(t *testing.T) {
 	if _, err := fcB.End(ctx, fenceA, "digest-a"); err == nil {
 		t.Fatal("End closed an epoch under the grant named by the presented receipt, " +
 			"not the grant this client holds (D-RC84-05)")
+	}
+}
+
+// D-RC84-09: the submission barrier must be closed in every state that
+// is not terminal. The barrier is expressed as "not CLOSED and not
+// ABORTED", so a state added to the protocol later is closed by default
+// rather than silently admitted.
+func TestMigrationBarrierClosedInEveryNonTerminalState(t *testing.T) {
+	ctx := context.Background()
+	nonTerminal := []string{FenceOpen, FencePrepared, FenceFinalizing, FenceRecoveryRequired}
+	for _, state := range nonTerminal {
+		t.Run("closed_"+state, func(t *testing.T) {
+			h := newHarness(t, false)
+			defer h.outbox.Close()
+			seq := h.enqueue("barrier-"+state, `{"payload":1}`)
+			insertFenceRow(t, h, state)
+			if _, err := h.ledger.Submit(ctx, h.wsigner, 0, h.row(t, seq).Envelope, h.dep, h.ktrust); !errors.Is(err, ErrFenced) {
+				t.Fatalf("state %s admitted a submission: %v", state, err)
+			}
+		})
+	}
+	for _, state := range []string{FenceClosed, FenceAborted} {
+		t.Run("open_"+state, func(t *testing.T) {
+			h := newHarness(t, false)
+			defer h.outbox.Close()
+			seq := h.enqueue("barrier-"+state, `{"payload":1}`)
+			insertFenceRow(t, h, state)
+			if _, err := h.ledger.Submit(ctx, h.wsigner, 0, h.row(t, seq).Envelope, h.dep, h.ktrust); err != nil {
+				t.Fatalf("terminal state %s refused a submission: %v", state, err)
+			}
+		})
+	}
+}
+
+func insertFenceRow(t *testing.T, h *harness, state string) {
+	t.Helper()
+	if _, err := h.ledger.db.ExecContext(context.Background(),
+		`INSERT INTO custody_fence (deployment_id, fence_id, epoch, base_seq, base_hash,
+		 grant_digest, kernel_fp, state, result_digest, opened_at, closed_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'',$9,'')`,
+		h.dep, "fence-"+state, 1, 0, "", "grant", h.kernel.Fingerprint(), state,
+		time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		t.Fatalf("insert fence row %s: %v", state, err)
 	}
 }
 

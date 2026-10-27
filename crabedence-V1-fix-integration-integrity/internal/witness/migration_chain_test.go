@@ -205,9 +205,7 @@ func TestMigrationCrashAfterCommitBeforeAck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fc.End(context.Background(), fence, "result"); err != nil {
-		t.Fatalf("close epoch: %v", err)
-	}
+	h.closeEpoch(t, fc, fence, "result")
 	if !h.drain() {
 		t.Fatalf("drain after recovered migration: %s", h.sender.LastError())
 	}
