@@ -198,17 +198,17 @@
       "reason": "No externally trusted release root or release signing key material is available. A locally generated key would not satisfy independent root validation.",
       "command": "RC83_RELEASE=0.55.0-rc8.3-witness-fence python3 qualification/rc8.3-integrity/tools/write-attestation.py <commit> <inventory> <artifact> <logs> <out> <verdict>; python3 sign-release-attestation.py release-out; python3 qualification/rc8.3-integrity/tools/verify-release-attestation.py release-out --root <external.pub> --root-key-id c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5",
       "exit_code": 0,
-      "notes": "Ed25519 over canonical JSON, verified against the pinned release root c1fc3765\u2026 supplied from outside the bundle. The private key lives outside the repository and outside the bundle. Locally provisioned root, not a third-party root: external countersignature is still required for third-party trust (G31). The superseded root 387d837e\u2026 must be rejected.",
-      "evidence": "detached attestation.json + attestation.sig + verify-attestation.log",
-      "log": "qualification/rc8.3-integrity/logs/verify-attestation-fence.log",
-      "log_sha256": "83311b686405130347028e3fdb181ae1afaf79e572e601e8b9d980d334101b81"
+      "notes": "Ed25519 over canonical JSON, verified against the pinned release root c1fc3765\u2026 supplied from outside the bundle. The private key lives outside the repository and outside the bundle; the verification transcript is release-out/logs/verify-attestation.log, kept outside the packaged tree because it verifies the artifact that tree produces. Locally provisioned root, not a third-party root: external countersignature is still required for third-party trust (G31). The superseded root 387d837e\u2026 must be rejected.",
+      "evidence": "detached attestation.json + attestation.sig + verify-attestation.log"
     },
     {
       "id": "G20-archive-tamper-rejection",
       "status": "PASS",
-      "notes": "Four negative cases rejected on this candidate: wrong root key file (key id mismatch), wrong pinned key id, tampered artifact (sha256 mismatch), tampered signature (Ed25519 verify failure). The earlier candidate additionally covered swapped inventory and swapped archive.",
+      "notes": "Five negative cases rejected on this candidate: missing root key file, wrong root key file (key id mismatch), wrong pinned key id (the retired root 387d837e is refused), tampered artifact (sha256 mismatch), tampered signature (Ed25519 verify failure). An unreadable trust root now reads as a REJECT rather than a Python traceback.",
       "evidence": "detached verify-attestation-{modified,badsig,swapped,tampered,wrongroot}.log",
-      "command": "verify-release-attestation.py against a tampered bundle copy for each case"
+      "command": "verify-release-attestation.py against a tampered bundle copy for each case",
+      "log": "release-out/logs/tamper-rejection.log",
+      "log_sha256": "b78314726bbdcdec9fe1e964c1afb07a9d8783a54bacc8c394ce56761a7ab702"
     },
     {
       "id": "G21-third-party-cleanroom",
@@ -216,10 +216,10 @@
       "reason": "No independent clean-room verifier or separate trust domain is available.",
       "command": "sh qualification/rc8.3-integrity/tools/cleanroom-verify.sh <archive> <inventory> /tmp/rc83-cleanroom",
       "exit_code": 0,
-      "log": "qualification/rc8.3-integrity/logs/cleanroom-fence.log",
-      "notes": "Local clean-room: fresh extraction, 4411/4411 inventory match, fresh GOCACHE/GOMODCACHE, go mod download, build, vet, custody/operator race suites. The script ships in the tree and discovers the archive root rather than guessing it. Still one host and one operator \u2014 this is NOT G33, which remains BLOCKED.",
+      "log": "release-out/logs/cleanroom.log",
+      "notes": "Local clean-room: fresh extraction, 4411/4411 inventory match, fresh GOCACHE/GOMODCACHE, go mod download, build, vet, custody/operator race suites. The script ships in the tree and discovers the archive root rather than guessing it. The transcript lives in release-out/logs/ because it verifies the artifact that the tree produces and cannot be inside it. Still one host and one operator \u2014 this is NOT G33, which remains BLOCKED.",
       "evidence": "detached cleanroom.log",
-      "log_sha256": "559c5ad8b91b1f6a5fe3315a47dee850abc9683693d3bde59bfdc9aa3f824ef4"
+      "log_sha256": "45b47d7d21ebbbb1c06095074a4d416178b6026a422b9f9ba189098949bb7c8b"
     },
     {
       "id": "G22-evidence-bundle",

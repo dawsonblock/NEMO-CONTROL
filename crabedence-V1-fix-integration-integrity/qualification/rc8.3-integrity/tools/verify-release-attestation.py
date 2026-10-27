@@ -46,7 +46,21 @@ def sha256_file(path: str) -> str:
 
 
 def key_id_of(pub_path: str) -> str:
-    der = subprocess.check_output(["openssl", "pkey", "-pubin", "-in", pub_path, "-outform", "DER"])
+    """Key id of a public key file, or a clean failure.
+
+    A verifier that raises a traceback on an unreadable trust root has
+    told the operator nothing and looks like a crash rather than a
+    rejection. Both are refusals, and both must read as one.
+    """
+    if not os.path.isfile(pub_path):
+        raise SystemExit(f"REJECT: root public key {pub_path} does not exist")
+    try:
+        der = subprocess.check_output(
+            ["openssl", "pkey", "-pubin", "-in", pub_path, "-outform", "DER"],
+            stderr=subprocess.DEVNULL,
+        )
+    except subprocess.CalledProcessError:
+        raise SystemExit(f"REJECT: root public key {pub_path} is not a readable public key")
     return hashlib.sha256(der).hexdigest()
 
 
