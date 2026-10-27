@@ -204,11 +204,10 @@
     {
       "id": "G20-archive-tamper-rejection",
       "status": "PASS",
-      "notes": "Five negative cases rejected on this candidate: missing root key file, wrong root key file (key id mismatch), wrong pinned key id (the retired root 387d837e is refused), tampered artifact (sha256 mismatch), tampered signature (Ed25519 verify failure). An unreadable trust root now reads as a REJECT rather than a Python traceback.",
+      "notes": "Five negative cases rejected on this candidate: missing root key file, wrong root key file (key id mismatch), wrong pinned key id (the retired root 387d837e is refused), tampered artifact (sha256 mismatch), tampered signature (Ed25519 verify failure). An unreadable trust root now reads as a REJECT rather than a Python traceback. Transcript hashes are bound by release-out/SHA256SUMS rather than by this file: the matrix ships inside the archive these transcripts verify, so a hash recorded here would invalidate the artifact on every regeneration.",
       "evidence": "detached verify-attestation-{modified,badsig,swapped,tampered,wrongroot}.log",
       "command": "verify-release-attestation.py against a tampered bundle copy for each case",
-      "log": "release-out/logs/tamper-rejection.log",
-      "log_sha256": "b78314726bbdcdec9fe1e964c1afb07a9d8783a54bacc8c394ce56761a7ab702"
+      "log": "release-out/logs/tamper-rejection.log"
     },
     {
       "id": "G21-third-party-cleanroom",
@@ -217,9 +216,8 @@
       "command": "sh qualification/rc8.3-integrity/tools/cleanroom-verify.sh <archive> <inventory> /tmp/rc83-cleanroom",
       "exit_code": 0,
       "log": "release-out/logs/cleanroom.log",
-      "notes": "Local clean-room: fresh extraction, 4411/4411 inventory match, fresh GOCACHE/GOMODCACHE, go mod download, build, vet, custody/operator race suites. The script ships in the tree and discovers the archive root rather than guessing it. The transcript lives in release-out/logs/ because it verifies the artifact that the tree produces and cannot be inside it. Still one host and one operator \u2014 this is NOT G33, which remains BLOCKED.",
-      "evidence": "detached cleanroom.log",
-      "log_sha256": "45b47d7d21ebbbb1c06095074a4d416178b6026a422b9f9ba189098949bb7c8b"
+      "notes": "Local clean-room: fresh extraction, 4411/4411 inventory match, fresh GOCACHE/GOMODCACHE, go mod download, build, vet, custody/operator race suites. The script ships in the tree and discovers the archive root rather than guessing it. The transcript lives in release-out/logs/ because it verifies the artifact that the tree produces and cannot be inside it. Still one host and one operator \u2014 this is NOT G33, which remains BLOCKED. Transcript hashes are bound by release-out/SHA256SUMS rather than by this file: the matrix ships inside the archive these transcripts verify, so a hash recorded here would invalidate the artifact on every regeneration.",
+      "evidence": "detached cleanroom.log"
     },
     {
       "id": "G22-evidence-bundle",
