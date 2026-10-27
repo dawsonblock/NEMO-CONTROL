@@ -1,0 +1,14 @@
+clean-room root: /tmp/rc83-cleanroom/NEMO-CONTROL
+== inventory ==
+inventory_entries=4411 verified=4411 mismatches=0
+== go mod download ==
+go: downloading go1.26.5 (darwin/arm64)
+== go build ./... ==
+== go vet ./... ==
+== custody and operator race suites ==
+ok  	github.com/openclaw/crabbox/internal/witness	4.852s
+ok  	github.com/openclaw/crabbox/internal/custody	1.044s
+ok  	github.com/openclaw/crabbox/internal/execution	50.965s
+ok  	github.com/openclaw/crabbox/internal/idempotency	30.052s
+ok  	github.com/openclaw/crabbox/cmd/custodyctl	8.112s
+CLEAN-ROOM PASS

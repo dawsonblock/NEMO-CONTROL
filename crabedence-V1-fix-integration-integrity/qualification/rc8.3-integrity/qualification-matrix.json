@@ -188,34 +188,38 @@
     {
       "id": "G18-deterministic-packaging",
       "status": "PASS",
-      "command": "python3 qualification/rc8.3-integrity/tools/deterministic-package.py ... source-a.zip; ... source-b.zip",
+      "command": "python3 qualification/rc8.3-integrity/tools/deterministic-package.py . crabedence-V1-fix-integration-integrity NEMO-CONTROL <out>.zip  (run twice)",
       "evidence": "detached rc8.3-integrity-release/packaging.json (two byte-identical archives, 4382 entries)",
-      "notes": "Fixed timestamp, modes, LC_ALL=C order, symlinks preserved. The artifact SHA-256 is bound in the detached signed attestation, not embedded in the source tree."
+      "notes": "Fixed timestamp, modes, LC_ALL=C order, symlinks preserved. Two runs over the same HEAD produced byte-identical archives: 4411 entries, sha256 6fe82917\u2026. The artifact SHA-256 is bound in the detached signed attestation, not embedded in the source tree."
     },
     {
       "id": "G19-signed-attestation",
       "status": "PASS",
       "reason": "No externally trusted release root or release signing key material is available. A locally generated key would not satisfy independent root validation.",
-      "command": "python3 sign-release-attestation.py <release-dir>; python3 verify-release-attestation.py <release-dir>",
+      "command": "RC83_RELEASE=0.55.0-rc8.3-witness-fence python3 qualification/rc8.3-integrity/tools/write-attestation.py <commit> <inventory> <artifact> <logs> <out> <verdict>; python3 sign-release-attestation.py release-out; python3 qualification/rc8.3-integrity/tools/verify-release-attestation.py release-out --root <external.pub> --root-key-id c1fc37659b9b8f4f41b30bc89288c7334b7eea0628a17eb2897b34236a1379b5",
       "exit_code": 0,
-      "notes": "Ed25519 over canonical JSON, verified against the pinned release root (key id 387d837e\u2026). Locally provisioned root, not a third-party root; external countersignature required for third-party trust.",
-      "evidence": "detached attestation.json + attestation.sig + verify-attestation.log"
+      "notes": "Ed25519 over canonical JSON, verified against the pinned release root c1fc3765\u2026 supplied from outside the bundle. The private key lives outside the repository and outside the bundle. Locally provisioned root, not a third-party root: external countersignature is still required for third-party trust (G31). The superseded root 387d837e\u2026 must be rejected.",
+      "evidence": "detached attestation.json + attestation.sig + verify-attestation.log",
+      "log": "qualification/rc8.3-integrity/logs/verify-attestation-fence.log",
+      "log_sha256": "83311b686405130347028e3fdb181ae1afaf79e572e601e8b9d980d334101b81"
     },
     {
       "id": "G20-archive-tamper-rejection",
       "status": "PASS",
-      "notes": "All five negative cases rejected: modified attestation, modified signature, swapped inventory, swapped archive, wrong root.",
-      "evidence": "detached verify-attestation-{modified,badsig,swapped,tampered,wrongroot}.log"
+      "notes": "Four negative cases rejected on this candidate: wrong root key file (key id mismatch), wrong pinned key id, tampered artifact (sha256 mismatch), tampered signature (Ed25519 verify failure). The earlier candidate additionally covered swapped inventory and swapped archive.",
+      "evidence": "detached verify-attestation-{modified,badsig,swapped,tampered,wrongroot}.log",
+      "command": "verify-release-attestation.py against a tampered bundle copy for each case"
     },
     {
       "id": "G21-third-party-cleanroom",
       "status": "PASS",
       "reason": "No independent clean-room verifier or separate trust domain is available.",
-      "command": "cleanroom-verify.sh source-a.zip source-inventory.txt /tmp/rc83-cleanroom",
+      "command": "sh qualification/rc8.3-integrity/tools/cleanroom-verify.sh <archive> <inventory> /tmp/rc83-cleanroom",
       "exit_code": 0,
-      "log": "rc8.3-integrity-release/cleanroom.log",
-      "notes": "Local clean-room: fresh extraction, 4382/4382 inventory match, fresh GOCACHE/GOMODCACHE, go mod download, build, vet, targeted race suites. Not an independent third-party verifier.",
-      "evidence": "detached cleanroom.log"
+      "log": "qualification/rc8.3-integrity/logs/cleanroom-fence.log",
+      "notes": "Local clean-room: fresh extraction, 4411/4411 inventory match, fresh GOCACHE/GOMODCACHE, go mod download, build, vet, custody/operator race suites. The script ships in the tree and discovers the archive root rather than guessing it. Still one host and one operator \u2014 this is NOT G33, which remains BLOCKED.",
+      "evidence": "detached cleanroom.log",
+      "log_sha256": "559c5ad8b91b1f6a5fe3315a47dee850abc9683693d3bde59bfdc9aa3f824ef4"
     },
     {
       "id": "G22-evidence-bundle",

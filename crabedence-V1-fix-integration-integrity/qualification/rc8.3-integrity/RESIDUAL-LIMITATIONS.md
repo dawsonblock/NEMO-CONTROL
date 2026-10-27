@@ -172,3 +172,22 @@ The check is local: it reads the outbox journal, which is the same
 store the migration wrote. A second host that shares the witness but not
 the outbox is outside this check, and would have to be prevented
 operationally by scoping a deployment to one outbox.
+
+## R18. CI's deadcode gate is red at baseline, independently of this branch
+
+`ci.yml` runs `deadcode -test ./...` and fails on any output. The frozen
+baseline commit already reports 16 unreachable symbols across eight
+packages, so the step cannot pass on the tree this branch started from.
+
+This branch is neutral on that set: after the fence work the report is
+byte-identical to the baseline report (`diff` of the sorted lists is
+empty). Five symbols the fence work initially orphaned —
+`Client.ActiveFence`, `Ledger.meta`, `Ledger.MaxEnvelopeEpoch`,
+`Ledger.Stored` and `Outbox.CompensateLegacyRow` — were removed rather
+than left to enlarge the list.
+
+Resolving the remaining 16 is a separate change. Several are plausibly
+reachable only under build tags (`windows`, `smoke`, `witnesslane`) that
+`deadcode` does not analyse by default, so each deletion needs checking
+against every configuration before it is safe. Doing that inside a
+security release would mix unrelated risk into the reviewed diff.
