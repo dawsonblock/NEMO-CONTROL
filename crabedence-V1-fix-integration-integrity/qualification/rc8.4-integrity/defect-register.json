@@ -1,0 +1,267 @@
+{
+  "schema": "rc84-defect-register-v1",
+  "release": "0.55.0-rc8.4-dev",
+  "baseline_release": "0.55.0-rc8.3-witness-fence",
+  "baseline_source_commit": "de71093469f7cd669cb3b67ac88b88ad2cd31d76",
+  "id_namespace": "D-RC84-NN",
+  "supersedes_namespace": "D-RC75-NN and D-RC74-NN are the prior registers and remain authoritative for their own releases. Every D-RC84 entry cites the plan's F/E identifier where one exists so the two registers can be reconciled without renumbering history.",
+  "status_enum": ["OPEN", "RED", "GREEN", "DEFERRED", "ACCEPTED"],
+  "severity_enum": ["P0", "P1", "P2", "P3"],
+  "defects": [
+    {
+      "id": "D-RC84-01",
+      "plan_id": "F1",
+      "severity": "P0",
+      "status": "RED",
+      "title": "A historical OPEN receipt authorizes unlimited local rewrites, including after the epoch closed",
+      "invariant": "I-01, I-02, I-03",
+      "detail": "The fence receipt is verified locally by MigrateLegacySuffix and never checked against the witness. There is no local record of permit consumption: the only durable consumption check is the operator grant nonce, which is scoped to the grant, not to the fence or the target. The same signed OPEN receipt therefore rewrites any number of distinct targets, and continues to do so after the witness has recorded CLOSED and resumed admitting submissions.",
+      "evidence": [
+        "internal/witness/migration.go:842 verifyFence is a purely local check",
+        "internal/witness/migration.go:1030 verifyFence is called once, before BeginTx at :1056",
+        "internal/witness/migration.go:1045 the only durable consumption check is the grant nonce",
+        "probe: stale OPEN receipt rewrote seq 2 after the witness closed the epoch (rehashed=1, journal=2)"
+      ],
+      "plan_understates": "The plan describes F1 as authority surviving after a terminal state. The reachable defect is broader: authority is unbounded within the epoch and across targets.",
+      "red_test": "TestRC84HistoricalOpenCannotAuthorizeSecondTarget",
+      "planned_pr": "PR-02"
+    },
+    {
+      "id": "D-RC84-02",
+      "plan_id": null,
+      "severity": "P0",
+      "status": "RED",
+      "title": "The witness aborts an epoch over a locally committed rewrite, releasing custody over a rewritten suffix",
+      "invariant": "I-04, I-05",
+      "detail": "AbortFence refuses only when the custody head moved. A local rewrite never moves the witness head, so the guard is unreachable through any supported path: Submit refuses while the epoch is open, and INSERT INTO custody_log exists only in Ledger.Submit. The only guard is custodyctl's JournalSince count, performed client-side outside any transaction before the abort RPC.",
+      "evidence": [
+        "internal/witness/fence.go:556 head-unchanged guard",
+        "internal/witness/fence.go:242 the barrier makes head movement inside an epoch unreachable",
+        "internal/witness/ledger.go:323 the only custody_log insert",
+        "cmd/custodyctl/main.go:753 JournalSince timestamp count before the RPC",
+        "probe: fc.Abort succeeded over a committed rewrite; witness state ABORTED, no active fence"
+      ],
+      "false_confidence": "TestFenceAbortRefusedAfterCustodyAdvanced covers a condition the barrier makes unreachable and must be annotated as such.",
+      "red_test": "TestRC84AbortRefusedOverCommittedRewrite",
+      "planned_pr": "PR-03"
+    },
+    {
+      "id": "D-RC84-03",
+      "plan_id": "F3",
+      "severity": "P0",
+      "status": "RED",
+      "title": "The signer epoch allocator is non-atomic; concurrent rotations share epoch numbers",
+      "invariant": "I-09",
+      "detail": "AdvanceSignerEpoch reads the epoch and writes epoch+1 in two separate autocommit statements with no transaction. Concurrent rotations collide, so custody_log.signer_epoch no longer identifies a key generation. Handle also reads the signer once and the epoch later from a second query, so a rotation in between durably records the new epoch against a row signed by the old key.",
+      "evidence": [
+        "internal/witness/ledger.go:131 AdvanceSignerEpoch read-then-write outside a transaction",
+        "internal/witness/service.go:73 signer snapshot at entry, epoch read at :81/:153",
+        "probe: 20 concurrent rotations produced 6 distinct epochs and a final durable epoch of 5"
+      ],
+      "plan_understates": "The plan's test says many concurrent rotations without asserting that distinct epochs equal rotations.",
+      "red_test": "TestRC84RotationEpochIsUniquePerRotation",
+      "planned_pr": "PR-04"
+    },
+    {
+      "id": "D-RC84-04",
+      "plan_id": "F5",
+      "severity": "P0",
+      "status": "RED",
+      "title": "Retired keys still authorize fresh fence, checkpoint and operator-grant authority",
+      "invariant": "I-08, I-09",
+      "detail": "VerifyFenceReceipt, VerifyFenceRequest, VerifyCheckpoint and VerifyOperatorGrant all resolve through ResolveAny, which ignores ValidFromIndex/ValidUntilIndex entirely. A key whose window has closed can mint a fresh OPEN receipt, open a new fence, sign the checkpoint that picks the fence base, and issue a new operator grant. VerifyFenceReceipt also never checks SignerEpoch against the key window.",
+      "evidence": [
+        "internal/custody/trust.go:222 ResolveAny ignores the validity window",
+        "internal/witness/fence.go:178 kernel request resolves ResolveAny",
+        "internal/witness/fence.go:271 fence receipt resolves ResolveAny",
+        "internal/witness/witness.go:211 checkpoint resolves ResolveAny",
+        "internal/witness/operator_auth.go:176 grant issuer resolves ResolveAny"
+      ],
+      "plan_understates": "The plan names fence and trust.go but not VerifyCheckpoint or VerifyOperatorGrant, both of which grant fresh authority today.",
+      "red_test": "TestRC84RetiredKeysCannotMintFreshAuthority",
+      "planned_pr": "PR-04"
+    },
+    {
+      "id": "D-RC84-05",
+      "plan_id": "F4",
+      "severity": "P1",
+      "status": "RED",
+      "title": "Terminal reply is not bound: finish() accepts a non-terminal state and sources the grant from the untrusted receipt",
+      "invariant": "I-08",
+      "detail": "FenceClient.finish verifies the receipt signature but not the terminal state, the result digest, or the configured grant. It builds the request with GrantDigest taken from the caller-supplied receipt rather than the client's own grant, so End/Abort act under whatever grant the receipt names. accept() performs this check for OPEN; finish() does not.",
+      "evidence": [
+        "internal/witness/fence.go:720 finish builds req.GrantDigest from fence.GrantDigest",
+        "internal/witness/fence.go:740 finish verifies only the signature",
+        "internal/witness/fence.go:657 accept checks the configured grant; finish does not"
+      ],
+      "severity_note": "Downgraded from the plan's P0. A correct witness never returns a non-terminal receipt for End, so the terminal-state gap is robustness against a misbehaving witness. The grant-sourcing defect is reachable today and is the reason this stays P1.",
+      "red_test": "TestRC84FinishRejectsReceiptFromAnotherGrant",
+      "planned_pr": "PR-04"
+    },
+    {
+      "id": "D-RC84-06",
+      "plan_id": "F2",
+      "severity": "P0",
+      "status": "DEFERRED",
+      "title": "An expired grant strands an open epoch; there is no recovery grant type",
+      "invariant": "I-06, I-07",
+      "detail": "Resume re-verifies the initiating grant against time.Now() on every call, and PendingFenceIntent filters on grant_digest, so a replacement grant cannot even find the epoch. No recovery authorization type exists. Note that the witness itself does not verify any grant: FenceClient.Abort needs only the kernel-relay key, so the stranding is enforced by the CLI's grant policy rather than by the custodian.",
+      "evidence": [
+        "internal/witness/migration.go:1033 Authorization.verify with time.Now()",
+        "internal/witness/fence.go:803 PendingFenceIntent filters grant_digest",
+        "cmd/custodyctl/main.go:671 resume skips nonce consumption but not grant verification"
+      ],
+      "red_test": "TestRC84ExpiredGrantRecoveryAfterWitnessRestart",
+      "red_test_status": "requires the Phase 2 recovery API; recorded as a red test in the PR-03 commit that introduces it, not in PR-00",
+      "planned_pr": "PR-03"
+    },
+    {
+      "id": "D-RC84-07",
+      "plan_id": null,
+      "severity": "P0",
+      "status": "OPEN",
+      "title": "Abort has no enforceable no-commit proof and no local permit-revocation ordering",
+      "invariant": "I-05",
+      "detail": "The witness cannot inspect the local database, so 'no local commit occurred' is a kernel attestation, not a verified fact. The plan states this as an invariant while conceding the equivalent limit for finalize. A resumed kernel can also commit between the recovery inspection and the abort RPC unless the permit is durably revoked locally first.",
+      "evidence": [
+        "plan section C3 concedes the trust boundary for finalize only",
+        "plan section D5 derives an authenticated abort from local state without a revocation step"
+      ],
+      "resolution": "Demote I-05 to a trust assumption plus a mandatory durable local permit revocation that precedes every abort RPC.",
+      "planned_pr": "PR-03"
+    },
+    {
+      "id": "D-RC84-08",
+      "plan_id": null,
+      "severity": "P1",
+      "status": "OPEN",
+      "title": "Custody release requires only the kernel-relay key; the operator grant is never verified at the witness",
+      "invariant": "I-02",
+      "detail": "CloseFence and AbortFence compare req.GrantDigest to the recorded digest. They never verify that the caller holds a signed grant for that digest. Any holder of the kernel-relay key can therefore close or abort any epoch by copying the digest out of the fence receipt, which makes the operator grant decorative at the custodian.",
+      "evidence": [
+        "internal/witness/fence.go:500 grant digest equality only",
+        "internal/witness/fence.go:547 grant digest equality only"
+      ],
+      "planned_pr": "PR-02"
+    },
+    {
+      "id": "D-RC84-09",
+      "plan_id": null,
+      "severity": "P1",
+      "status": "OPEN",
+      "title": "The submission barrier and every transition are positive-state; adding v2 states silently widens them",
+      "invariant": "I-04",
+      "detail": "activeFenceFrom filters state = OPEN. CloseFence and AbortFence switch on CLOSED and ABORTED and fall through for anything else. Introducing PREPARED, FINALIZING or RECOVERY_REQUIRED without changing all three admits submissions during the prepared interval and lets Close succeed while a migration is prepared.",
+      "evidence": [
+        "internal/witness/fence.go:383 state = OPEN",
+        "internal/witness/fence.go:503 switch falls through for unknown states",
+        "internal/witness/fence.go:550 switch falls through for unknown states"
+      ],
+      "resolution": "Barrier becomes state NOT IN (CLOSED, ABORTED); every transition becomes an exhaustive switch with a default refusal; a table test enumerates all declared states.",
+      "planned_pr": "PR-01"
+    },
+    {
+      "id": "D-RC84-10",
+      "plan_id": null,
+      "severity": "P2",
+      "status": "RED",
+      "title": "The local fence intent silently ignores a conflicting base and accumulates phantom OPEN epochs",
+      "invariant": "I-02",
+      "detail": "RecordFenceIntent uses ON CONFLICT(fence_id) DO NOTHING, so re-recording the same fence identity with different commitments is ignored instead of refused. openMigrationEpoch inserts a new intent on every stale-base retry and never retires the abandoned ones, and there is no uniqueness constraint on nonterminal epochs.",
+      "evidence": [
+        "internal/witness/fence.go:784 ON CONFLICT DO NOTHING",
+        "cmd/custodyctl/main.go:971 a new intent per stale-base attempt",
+        "internal/witness/fence.go:753 no unique index on nonterminal state"
+      ],
+      "red_test": "TestRC84FenceIntentConflictRefused",
+      "planned_pr": "PR-01"
+    },
+    {
+      "id": "D-RC84-11",
+      "plan_id": null,
+      "severity": "P2",
+      "status": "OPEN",
+      "title": "Crash between witness close and CompleteFenceIntent leaves an unrecoverable local/witness disagreement",
+      "invariant": "I-06",
+      "detail": "The local intent stays OPEN while the witness is CLOSED. Reenter fails with ErrFenceState, Plan recomputes the same fence identity because the grant and base are unchanged, and OpenFence refuses a CLOSED fence. Re-enter, open and abort are all refused, and no supported CLI path reconciles the local record.",
+      "evidence": [
+        "cmd/custodyctl/main.go:924 CompleteFenceIntent after End",
+        "internal/witness/fence.go:433 OpenFence refuses a non-OPEN existing fence",
+        "internal/witness/fence.go:131 FenceIDFor is deterministic on grant and base"
+      ],
+      "planned_pr": "PR-03"
+    },
+    {
+      "id": "D-RC84-12",
+      "plan_id": null,
+      "severity": "P2",
+      "status": "OPEN",
+      "title": "fence abort relies on a client-side timestamp count outside any transaction",
+      "invariant": "I-04",
+      "detail": "JournalSince compares created_at strings against the fence intent's opened_at and is read before the abort RPC with no transaction spanning the two. A concurrent migrate can commit in that window. The check is also the only thing standing between an operator and the defect in D-RC84-02.",
+      "evidence": [
+        "internal/witness/migration.go:1549 JournalSince",
+        "cmd/custodyctl/main.go:753 call site before fc.Abort"
+      ],
+      "resolution": "Superseded by the witness-side prepared/committing guard; retain as a defence-in-depth report only.",
+      "planned_pr": "PR-03"
+    },
+    {
+      "id": "D-RC84-13",
+      "plan_id": "F6",
+      "severity": "P2",
+      "status": "RED",
+      "title": "The qualification matrix uses PARTIAL outside the declared status enum",
+      "invariant": "I-10",
+      "detail": "qualification-matrix.json declares PASS/FAIL/NOT_RUN/BLOCKED in the release record, but gate G0-source-identity carries status PARTIAL. A verifier that only allows the declared enum would reject the baseline; one that allows PARTIAL silently accepts an undeclared status.",
+      "evidence": [
+        "qualification/rc8.3-integrity/qualification-matrix.json:21",
+        "release-out/GO-NO-GO.md states gate statuses are only PASS / FAIL / NOT_RUN / BLOCKED"
+      ],
+      "red_test": "qualification/rc8.4-integrity/tools/test-qualification-schema.py",
+      "planned_pr": "PR-06"
+    },
+    {
+      "id": "D-RC84-14",
+      "plan_id": "E1",
+      "severity": "P2",
+      "status": "DEFERRED",
+      "title": "The detached evidence bundle has no verifier that runs from shipped files only",
+      "invariant": "I-10",
+      "detail": "cleanroom-verify.sh builds and vets the tree but is executed on the same host under the same operator, and it does not assert that every declared gate belongs to the candidate digest. There is no negative test that a bundle missing a referenced log, carrying a foreign-commit log, or containing an unallowlisted status fails.",
+      "evidence": [
+        "release-out/logs/cleanroom.log",
+        "qualification/rc8.3-integrity/tools/verify-evidence-bundle.py"
+      ],
+      "planned_pr": "PR-06"
+    },
+    {
+      "id": "D-RC84-15",
+      "plan_id": null,
+      "severity": "P3",
+      "status": "OPEN",
+      "title": "verifyFence's comment claims an in-transaction re-check that does not exist",
+      "invariant": "none",
+      "detail": "The doc comment says the check runs before any mutation and again inside the write transaction. grep finds exactly one call site, before BeginTx. A false safety claim in the code is how the next reader concludes the race is already closed.",
+      "evidence": [
+        "internal/witness/migration.go:838-841 comment",
+        "internal/witness/migration.go:1030 the only call site"
+      ],
+      "planned_pr": "PR-02"
+    },
+    {
+      "id": "D-RC84-16",
+      "plan_id": null,
+      "severity": "P3",
+      "status": "OPEN",
+      "title": "The v2 transaction model contradicts the shipped batch epoch granularity",
+      "invariant": "I-02",
+      "detail": "One epoch currently covers N rewrites of N targets with one close digest. A per-target transaction identity changes the CLI paging loop, adds two RPCs per row inside the frozen window, and changes the close-digest semantics. The plan does not scope this.",
+      "evidence": [
+        "cmd/custodyctl/main.go:829 paging loop inside one epoch",
+        "cmd/custodyctl/main.go:920 single End with the folded digest"
+      ],
+      "planned_pr": "PR-01"
+    }
+  ]
+}

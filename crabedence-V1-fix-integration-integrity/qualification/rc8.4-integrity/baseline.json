@@ -1,0 +1,39 @@
+{
+  "schema": "rc84-baseline-v1",
+  "release": "0.55.0-rc8.4-dev",
+  "branch": "codex/rc8.4-transactional-fence-security-closure",
+  "branch_point": "af14d85",
+  "baseline": {
+    "release": "0.55.0-rc8.3-witness-fence",
+    "source_commit": "de71093469f7cd669cb3b67ac88b88ad2cd31d76",
+    "packaging_commit": "af14d85",
+    "packaging_note": "af14d85 touches only release-out/. The source tree the RC8.4 branch starts from is byte-identical to the signed RC8.3 source commit de71093.",
+    "artifact": "release-out/NEMO-CONTROL-v0.55.0-rc8.3-witness-fence.zip",
+    "artifact_sha256": "b263a853090d96c646785f10906c1880e3e34c86c2f6b88318d963a78794f514",
+    "source_inventory_sha256": "750ffcf16c44a8f86b9af29f0d7bacd99b92e5d01b91fc587bf25092880f3b22",
+    "attestation_sha256": "f5d717bbc5883c824685e09b4ca15b98eb6661b03c9bb5f98aa07ae8da30c5f0",
+    "release_root_key_id": "c1fc3765",
+    "decision": "NO-GO",
+    "decision_record": "release-out/GO-NO-GO.md"
+  },
+  "toolchain": {
+    "go": "go1.26.5",
+    "rust": "1.96.1",
+    "node": "v24.16.0",
+    "python": "3.12.0",
+    "msb": "0.7.8",
+    "postgres": "postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94"
+  },
+  "host": {
+    "os": "Darwin 25.2.0",
+    "arch": "arm64",
+    "assurance_scope": "macOS arm64/HVF exclusive catalog only; Linux/KVM and shared-runtime high assurance remain out of scope"
+  },
+  "baseline_disposition": {
+    "preserved_decision": "NO-GO",
+    "instruction": "This file records the RC8.3 baseline. It is not a promotion and must not be rewritten to imply the RC8.4 fixes were present in RC8.3.",
+    "unchanged_blockers": ["G31", "G32", "G33", "G34", "G10"]
+  },
+  "red_run_evidence": "qualification/rc8.4-integrity/logs/",
+  "defect_register": "qualification/rc8.4-integrity/defect-register.json"
+}

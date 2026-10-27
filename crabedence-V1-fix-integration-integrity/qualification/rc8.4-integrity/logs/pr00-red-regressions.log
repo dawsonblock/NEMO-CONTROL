@@ -1,0 +1,40 @@
+# RC8.4 PR-00 red run
+# generated: 2026-10-27T08:24:02Z
+# source commit: af14d854cd4f2ea8a56bb91d36dfd38e87a7fcd8
+# branch: codex/rc8.4-transactional-fence-security-closure
+# go: go version go1.26.5 darwin/arm64
+# platform: darwin/arm64
+# command: GOTOOLCHAIN=go1.26.5 go test -count=1 -run 'TestRC84' ./internal/witness/
+
+=== RUN   TestRC84HistoricalOpenCannotAuthorizeSecondTarget
+    rc84_regression_test.go:62: a saved OPEN receipt rewrote a second target after the witness closed the epoch: the receipt is being treated as standing mutation authority (D-RC84-01)
+--- FAIL: TestRC84HistoricalOpenCannotAuthorizeSecondTarget (0.03s)
+=== RUN   TestRC84AbortRefusedOverCommittedRewrite
+    rc84_regression_test.go:95: the witness aborted an epoch after a local rewrite committed: releasing custody over a rewritten suffix is the fork the epoch exists to prevent (D-RC84-02)
+--- FAIL: TestRC84AbortRefusedOverCommittedRewrite (0.03s)
+=== RUN   TestRC84RotationEpochIsUniquePerRotation
+    rc84_regression_test.go:132: round 0: two rotations share signer epoch 4 — custody_log.signer_epoch no longer identifies a key generation (D-RC84-03)
+--- FAIL: TestRC84RotationEpochIsUniquePerRotation (0.07s)
+=== RUN   TestRC84RetiredKeysCannotMintFreshAuthority
+=== RUN   TestRC84RetiredKeysCannotMintFreshAuthority/fresh_fence_receipt
+    rc84_regression_test.go:168: a retired custodian key minted a fresh OPEN receipt that verified (D-RC84-04)
+=== RUN   TestRC84RetiredKeysCannotMintFreshAuthority/fresh_fence_request
+    rc84_regression_test.go:181: a retired kernel-relay key opened a fresh migration epoch (D-RC84-04)
+=== RUN   TestRC84RetiredKeysCannotMintFreshAuthority/fresh_checkpoint
+    rc84_regression_test.go:193: a retired custodian key signed the checkpoint that picks a fence base (D-RC84-04)
+=== RUN   TestRC84RetiredKeysCannotMintFreshAuthority/fresh_operator_grant
+    rc84_regression_test.go:206: a retired repair-authority key issued a fresh migration grant (D-RC84-04)
+--- FAIL: TestRC84RetiredKeysCannotMintFreshAuthority (0.01s)
+    --- FAIL: TestRC84RetiredKeysCannotMintFreshAuthority/fresh_fence_receipt (0.00s)
+    --- FAIL: TestRC84RetiredKeysCannotMintFreshAuthority/fresh_fence_request (0.00s)
+    --- FAIL: TestRC84RetiredKeysCannotMintFreshAuthority/fresh_checkpoint (0.00s)
+    --- FAIL: TestRC84RetiredKeysCannotMintFreshAuthority/fresh_operator_grant (0.00s)
+=== RUN   TestRC84FinishRejectsReceiptFromAnotherGrant
+    rc84_regression_test.go:242: End closed an epoch under the grant named by the presented receipt, not the grant this client holds (D-RC84-05)
+--- FAIL: TestRC84FinishRejectsReceiptFromAnotherGrant (0.03s)
+=== RUN   TestRC84FenceIntentConflictRefused
+    rc84_regression_test.go:267: the same fence identity was recorded against two different bases without a contradiction (D-RC84-10)
+--- FAIL: TestRC84FenceIntentConflictRefused (0.01s)
+FAIL
+FAIL	github.com/openclaw/crabbox/internal/witness	0.238s
+FAIL
