@@ -1,0 +1,9 @@
+# RC8.4 build + vet
+# generated: 2026-10-27T08:49:09Z
+# go: go version go1.26.5 darwin/arm64
+
+$ GOTOOLCHAIN=go1.26.5 go build ./...
+exit=0
+
+$ GOTOOLCHAIN=go1.26.5 go vet ./...
+exit=0

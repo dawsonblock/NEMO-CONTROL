@@ -1,0 +1,101 @@
+{
+  "schema": "rc84-qualification-matrix-v1",
+  "release": "0.55.0-rc8.4-dev",
+  "branch": "codex/rc8.4-transactional-fence-security-closure",
+  "baseline_source_commit": "de71093469f7cd669cb3b67ac88b88ad2cd31d76",
+  "candidate_artifact": null,
+  "candidate_note": "No RC8.4 artifact has been packaged. This matrix covers source-level gates only; artifact identity, reproducibility and attestation are NOT_RUN until a candidate is frozen and built. It is not a release qualification.",
+  "toolchain": {
+    "go": "go1.26.5",
+    "python": "3.12.0",
+    "msb": "0.7.8"
+  },
+  "host": {
+    "os": "Darwin 25.2.0",
+    "arch": "arm64"
+  },
+  "lanes": [
+    {
+      "id": "G1-go-build",
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go build ./...",
+      "exit_code": 0,
+      "evidence": "qualification/rc8.4-integrity/logs/build-vet.log"
+    },
+    {
+      "id": "G2-go-vet",
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go vet ./...",
+      "exit_code": 0,
+      "evidence": "qualification/rc8.4-integrity/logs/build-vet.log"
+    },
+    {
+      "id": "G3-rc84-red-regressions",
+      "status": "PASS",
+      "command": "sh -c 'grep -q D-RC84-01 qualification/rc8.4-integrity/logs/pr00-red-regressions.log && grep -q D-RC84-02 qualification/rc8.4-integrity/logs/pr00-red-regressions.log'",
+      "exit_code": 0,
+      "evidence": "qualification/rc8.4-integrity/logs/pr00-red-regressions.log",
+      "notes": "Asserts the preserved red-run evidence for the two P0 defects. The red invocation itself exited non-zero by design; this lane checks that the transcript exists and names the defects it reproduced."
+    },
+    {
+      "id": "G4-rc84-witness-race",
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 ./internal/witness/ ./internal/custody/ ./cmd/custodyctl/",
+      "exit_code": 0,
+      "evidence": "qualification/rc8.4-integrity/logs/pr0102-green-race.log"
+    },
+    {
+      "id": "G5-rc84-recovery-race",
+      "status": "PASS",
+      "command": "GOTOOLCHAIN=go1.26.5 go test -race -count=1 ./internal/witness/ ./internal/custody/ ./cmd/custodyctl/",
+      "exit_code": 0,
+      "evidence": "qualification/rc8.4-integrity/logs/pr03-green-race.log"
+    },
+    {
+      "id": "G6-qualification-validator",
+      "status": "PASS",
+      "command": "python3 qualification/rc8.4-integrity/tools/test-verify-qualification.py -v",
+      "exit_code": 0,
+      "evidence": "qualification/rc8.4-integrity/logs/pr06-qualification-validator.log"
+    },
+    {
+      "id": "G7-bundle-verifier",
+      "status": "PASS",
+      "command": "python3 qualification/rc8.4-integrity/tools/test-verify-bundle.py -v",
+      "exit_code": 0,
+      "evidence": "qualification/rc8.4-integrity/logs/pr06-bundle-verifier.log"
+    },
+    {
+      "id": "G0-candidate-identity",
+      "status": "NOT_RUN",
+      "notes": "No RC8.4 artifact exists yet. Source-level gates only; a candidate must be frozen, packaged and hashed before this lane can run."
+    },
+    {
+      "id": "G10-linux-kvm",
+      "status": "NOT_RUN",
+      "notes": "No KVM host available. Linux/KVM is outside the release claim by operator direction and must stay explicitly prohibited rather than reported as passing."
+    },
+    {
+      "id": "G31-external-release-root",
+      "status": "BLOCKED",
+      "notes": "Requires an external authorized party to attest the release-root fingerprint. The RC8.3 root is locally provisioned and self-pinned; nothing in this branch changes that."
+    },
+    {
+      "id": "G32-independent-witness",
+      "status": "BLOCKED",
+      "notes": "Requires a witness administered outside the kernel's administrative domain plus two-host fault injection. The fence lane runs a second key in the same administrative domain."
+    },
+    {
+      "id": "G33-third-party-clean-room",
+      "status": "BLOCKED",
+      "notes": "Requires an independent party to reproduce artifact identity and selected suites from shipped data and pinned roots."
+    },
+    {
+      "id": "G34-restricted-deployment-certification",
+      "status": "BLOCKED",
+      "notes": "Requires scoped certification against a declared threat model and concrete deployment configuration."
+    }
+  ],
+  "decision": "NO-GO",
+  "decision_note": "This branch closes source-level P0/P1 defects and adds evidence tooling. It does not qualify a release: there is no candidate artifact, no external root, no independent witness and no third-party clean-room."
+}

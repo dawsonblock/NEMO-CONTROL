@@ -1,0 +1,8 @@
+# RC8.4 PR-05 green run — deterministic schedules
+# generated: 2026-10-27T08:49:37Z
+# source commit: 192026b4ac590b252e97bc37dac18745edbfa3a1
+# command: GOTOOLCHAIN=go1.26.5 go test -race -count=1 ./internal/witness/ ./internal/custody/ ./cmd/custodyctl/
+
+ok  	github.com/openclaw/crabbox/internal/witness	7.725s
+ok  	github.com/openclaw/crabbox/internal/custody	1.044s
+ok  	github.com/openclaw/crabbox/cmd/custodyctl	8.264s
