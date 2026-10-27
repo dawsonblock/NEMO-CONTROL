@@ -139,18 +139,6 @@ func (c *Client) EndFence(ctx context.Context, req *FenceRequest) (*FenceReceipt
 	return c.fenceCall(ctx, req.Op, req)
 }
 
-// ActiveFence reports the open migration epoch, or nil.
-func (c *Client) ActiveFence(ctx context.Context, deploymentID string) (*FenceReceipt, error) {
-	resp, err := c.call(ctx, Request{Op: OpFenceStatus, DeploymentID: deploymentID})
-	if err != nil {
-		return nil, err
-	}
-	if !resp.OK {
-		return nil, fmt.Errorf("witness fence status refused: %s", resp.Error)
-	}
-	return resp.Fence, nil
-}
-
 func (c *Client) fenceCall(ctx context.Context, op string, req *FenceRequest) (*FenceReceipt, error) {
 	if req == nil {
 		return nil, fmt.Errorf("witness %s: no fence request", op)

@@ -96,15 +96,6 @@ func OpenLedger(path string) (*Ledger, error) {
 // Close releases the ledger.
 func (l *Ledger) Close() error { return l.db.Close() }
 
-func (l *Ledger) meta(ctx context.Context, key string) (string, error) {
-	var v string
-	err := l.db.QueryRowContext(ctx, `SELECT value FROM witness_meta WHERE key = $1`, key).Scan(&v)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	return v, err
-}
-
 func (l *Ledger) setMeta(ctx context.Context, key, value string) error {
 	_, err := l.db.ExecContext(ctx, `INSERT INTO witness_meta (key, value) VALUES ($1, $2)
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
@@ -149,12 +140,8 @@ func (l *Ledger) AdvanceSignerEpoch(ctx context.Context) (int64, error) {
 	return epoch, nil
 }
 
-// MaxEnvelopeEpoch is the highest subject-sequence epoch custodied —
-// prior-epoch replays are refused below it.
-func (l *Ledger) MaxEnvelopeEpoch(ctx context.Context, deploymentID string) (int64, error) {
-	return maxEnvelopeEpochFrom(ctx, l.db, deploymentID)
-}
-
+// maxEnvelopeEpochFrom is the highest subject-sequence epoch custodied
+// — prior-epoch replays are refused below it.
 func maxEnvelopeEpochFrom(ctx context.Context, q fenceQueryer, deploymentID string) (int64, error) {
 	var v sql.NullInt64
 	err := q.QueryRowContext(ctx, `
@@ -190,11 +177,7 @@ func (l *Ledger) Records(ctx context.Context, deploymentID string) (int64, error
 	return n, err
 }
 
-// Stored returns the custody row for (deployment, seq) or nil.
-func (l *Ledger) Stored(ctx context.Context, deploymentID string, seq int64) (*CustodyRow, error) {
-	return storedFrom(ctx, l.db, deploymentID, seq)
-}
-
+// storedFrom returns the custody row for (deployment, seq) or nil.
 func storedFrom(ctx context.Context, q fenceQueryer, deploymentID string, seq int64) (*CustodyRow, error) {
 	var row CustodyRow
 	var envJSON, ackJSON, receivedAt string

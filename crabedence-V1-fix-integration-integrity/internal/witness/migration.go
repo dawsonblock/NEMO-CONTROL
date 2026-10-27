@@ -1440,13 +1440,6 @@ func (o *Outbox) VerifyMigrationProofAgainstChain(ctx context.Context, entry Mig
 	return nil
 }
 
-// CompensateLegacyRow is the single-row compatibility entry point. It
-// is only safe when the row has no successors; MigrateLegacySuffix is
-// the general path and the one custodyctl uses.
-func (o *Outbox) CompensateLegacyRow(ctx context.Context, p Producer, req MigrationRequest) (MigrationResult, error) {
-	return o.MigrateLegacySuffix(ctx, p, req)
-}
-
 // JournalLegacyWitnessed records the operator-approved classification
 // of an acknowledged empty-payload row: bytes untouched, divergence
 // recorded, and coverage later requires the acknowledgement to verify.
