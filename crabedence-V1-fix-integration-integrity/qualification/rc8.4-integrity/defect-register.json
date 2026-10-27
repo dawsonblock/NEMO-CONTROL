@@ -248,7 +248,7 @@
       "id": "D-RC84-13",
       "plan_id": "F6",
       "severity": "P2",
-      "status": "RED",
+      "status": "GREEN",
       "title": "The qualification matrix uses PARTIAL outside the declared status enum",
       "invariant": "I-10",
       "detail": "qualification-matrix.json declares PASS/FAIL/NOT_RUN/BLOCKED in the release record, but gate G0-source-identity carries status PARTIAL. A verifier that only allows the declared enum would reject the baseline; one that allows PARTIAL silently accepts an undeclared status.",
@@ -257,13 +257,16 @@
         "release-out/GO-NO-GO.md states gate statuses are only PASS / FAIL / NOT_RUN / BLOCKED"
       ],
       "red_test": "qualification/rc8.4-integrity/tools/test-qualification-schema.py",
-      "planned_pr": "PR-06"
+      "planned_pr": "PR-06",
+      "closed_by": "PR-06",
+      "green_evidence": "qualification/rc8.4-integrity/tools/test-verify-qualification.py",
+      "resolution_note": "The strict validator rejects PARTIAL as an undeclared status. Applied to the RC8.3 matrix it reports 40 findings, not one: most PASS lanes carry no evidence path and several carry no command, so the matrix could not have supported a release decision even after the enum was fixed."
     },
     {
       "id": "D-RC84-14",
       "plan_id": "E1",
       "severity": "P2",
-      "status": "DEFERRED",
+      "status": "GREEN",
       "title": "The detached evidence bundle has no verifier that runs from shipped files only",
       "invariant": "I-10",
       "detail": "cleanroom-verify.sh builds and vets the tree but is executed on the same host under the same operator, and it does not assert that every declared gate belongs to the candidate digest. There is no negative test that a bundle missing a referenced log, carrying a foreign-commit log, or containing an unallowlisted status fails.",
@@ -271,7 +274,10 @@
         "release-out/logs/cleanroom.log",
         "qualification/rc8.3-integrity/tools/verify-evidence-bundle.py"
       ],
-      "planned_pr": "PR-06"
+      "planned_pr": "PR-06",
+      "closed_by": "PR-06",
+      "green_evidence": "qualification/rc8.4-integrity/tools/test-verify-bundle.py",
+      "resolution_note": "The bundle verifier proves every shipped file is listed and matches, from the bundle alone. Applied to release-out it finds four unaccounted bytes: GO-NO-GO.md, RELEASE-RECORD.json, release-root/key-id.txt and release-root/release-root.pub are shipped but absent from SHA256SUMS."
     },
     {
       "id": "D-RC84-15",

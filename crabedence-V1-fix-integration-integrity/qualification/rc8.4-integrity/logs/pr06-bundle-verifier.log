@@ -1,0 +1,24 @@
+# RC8.4 PR-06 — detached bundle verifier
+# generated: 2026-10-27T08:48:46Z
+
+## unit tests
+test_accepts_a_complete_bundle (__main__.BundleTests.test_accepts_a_complete_bundle) ... ok
+test_accepts_manifest_prefixed_with_bundle_name (__main__.BundleTests.test_accepts_manifest_prefixed_with_bundle_name) ... ok
+test_rejects_artifact_digest_mismatch (__main__.BundleTests.test_rejects_artifact_digest_mismatch) ... ok
+test_rejects_missing_listed_file (__main__.BundleTests.test_rejects_missing_listed_file) ... ok
+test_rejects_missing_manifest (__main__.BundleTests.test_rejects_missing_manifest) ... ok
+test_rejects_path_traversal (__main__.BundleTests.test_rejects_path_traversal) ... ok
+test_rejects_tampered_bytes (__main__.BundleTests.test_rejects_tampered_bytes) ... ok
+test_rejects_unlisted_file (__main__.BundleTests.test_rejects_unlisted_file) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.007s
+
+OK
+
+## RC8.3 release-out under the strict verifier
+FAIL: GO-NO-GO.md: shipped but not listed in SHA256SUMS
+FAIL: RELEASE-RECORD.json: shipped but not listed in SHA256SUMS
+FAIL: release-root/key-id.txt: shipped but not listed in SHA256SUMS
+FAIL: release-root/release-root.pub: shipped but not listed in SHA256SUMS
+exit=1

@@ -1,0 +1,63 @@
+# RC8.4 PR-06 — qualification matrix validator
+# generated: 2026-10-27T08:48:46Z
+# python: Python 3.12.0
+
+## unit tests
+test_rc83_matrix_is_rejected (__main__.RealMatrixTests.test_rc83_matrix_is_rejected) ... ok
+test_accepts_a_well_formed_matrix (__main__.ValidateTests.test_accepts_a_well_formed_matrix) ... ok
+test_accepts_not_run_with_reason (__main__.ValidateTests.test_accepts_not_run_with_reason) ... ok
+test_rejects_duplicate_lane_ids (__main__.ValidateTests.test_rejects_duplicate_lane_ids) ... ok
+test_rejects_empty_lane_list (__main__.ValidateTests.test_rejects_empty_lane_list) ... ok
+test_rejects_not_run_without_reason (__main__.ValidateTests.test_rejects_not_run_without_reason) ... ok
+test_rejects_pass_with_nonzero_exit (__main__.ValidateTests.test_rejects_pass_with_nonzero_exit) ... ok
+test_rejects_pass_without_command (__main__.ValidateTests.test_rejects_pass_without_command) ... ok
+test_rejects_pass_without_evidence_file (__main__.ValidateTests.test_rejects_pass_without_evidence_file) ... ok
+test_rejects_undeclared_status (__main__.ValidateTests.test_rejects_undeclared_status) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.003s
+
+OK
+
+## RC8.3 matrix under the strict enum
+FAIL: lane 'G0-source-identity': status 'PARTIAL' is not one of PASS, FAIL, NOT_RUN, BLOCKED
+FAIL: lane 'G1-go-build': PASS carries no evidence path
+FAIL: lane 'G2-go-vet': PASS carries no evidence path
+FAIL: lane 'G3-targeted-race': PASS carries no evidence path
+FAIL: lane 'G4b-requalified-full-race': PASS carries no evidence path
+FAIL: lane 'G5-migration-crash-replay': PASS carries no command
+FAIL: lane 'G5-migration-crash-replay': PASS carries exit_code None, want 0
+FAIL: lane 'G5-migration-crash-replay': PASS carries no evidence path
+FAIL: lane 'G6-witness-identity-replay': PASS carries no command
+FAIL: lane 'G6-witness-identity-replay': PASS carries exit_code None, want 0
+FAIL: lane 'G6-witness-identity-replay': PASS carries no evidence path
+FAIL: lane 'G7-sqlite-durability': PASS carries exit_code None, want 0
+FAIL: lane 'G7-sqlite-durability': PASS carries no evidence path
+FAIL: lane 'G8-live-postgresql': PASS carries no evidence path
+FAIL: lane 'G9-apple-silicon-hvf': PASS carries no evidence path
+FAIL: lane 'G11-independent-witness-g8': PASS carries no evidence path
+FAIL: lane 'G12-abi-differential': PASS carries no evidence path
+FAIL: lane 'G13-worker-typescript': PASS carries no evidence path
+FAIL: lane 'G14-python': PASS carries no evidence path
+FAIL: lane 'G15-rust': PASS carries no evidence path
+FAIL: lane 'G16-node-binding': PASS carries no evidence path
+FAIL: lane 'G17-nemo-typescript': PASS carries no evidence path
+FAIL: lane 'G18-deterministic-packaging': PASS carries exit_code None, want 0
+FAIL: lane 'G18-deterministic-packaging': evidence 'detached rc8.3-integrity-release/packaging.json (two byte-identical archives, 4382 entries)' does not exist
+FAIL: lane 'G19-signed-attestation': evidence 'detached attestation.json + attestation.sig + verify-attestation.log' does not exist
+FAIL: lane 'G20-archive-tamper-rejection': PASS carries exit_code None, want 0
+FAIL: lane 'G20-archive-tamper-rejection': evidence 'detached verify-attestation-{modified,badsig,swapped,tampered,wrongroot}.log' does not exist
+FAIL: lane 'G21-third-party-cleanroom': evidence 'detached cleanroom.log' does not exist
+FAIL: lane 'G22-evidence-bundle': PASS carries exit_code None, want 0
+FAIL: lane 'G22-evidence-bundle': evidence 'detached verify-bundle.log' does not exist
+FAIL: lane 'G23-audit-closures': PASS carries no command
+FAIL: lane 'G23-audit-closures': PASS carries exit_code None, want 0
+FAIL: lane 'G23-audit-closures': PASS carries no evidence path
+FAIL: lane 'G24-fence-library-boundary': PASS carries no evidence path
+FAIL: lane 'G25-fence-inflight-submission': PASS carries no evidence path
+FAIL: lane 'G26-fence-crash-recovery': PASS carries no evidence path
+FAIL: lane 'G27-migration-proof-binding': PASS carries no evidence path
+FAIL: lane 'G28-role-separated-trust': PASS carries no evidence path
+FAIL: lane 'G29-end-to-end-fenced-migration': PASS carries no evidence path
+FAIL: lane 'G30-formal-race-gate': PASS carries no evidence path
+exit=1
