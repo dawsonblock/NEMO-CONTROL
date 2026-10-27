@@ -206,14 +206,12 @@ func (t *TrustSet) Resolve(role, deploymentID, keyID string, index int64) (ed255
 	return found.PublicKey, nil
 }
 
-// ResolveCurrent answers "is this key authorized now" — used for live
-// reports (checkpoint heads), which are statements at report time, not
-// record attestations at a sequence index. A retired key fails here:
-// its window has closed, so it cannot sign new reports; a key whose
-// window has not yet opened also fails.
-func (t *TrustSet) ResolveCurrent(role, deploymentID, keyID string) (ed25519.PublicKey, error) {
-	return t.Resolve(role, deploymentID, keyID, 1<<62)
-}
+// There is deliberately no "resolve the current key" helper here.
+// "Current" cannot be answered from the trust set alone: a key that is
+// still the incumbent may already have a declared successor, and a
+// successor may not have started yet. Live authority is therefore
+// resolved with Resolve at the index the record authorizes next, which
+// is a question the record itself can answer.
 
 // ResolveAny returns the pinned key for (role, key_id) scoped to the
 // deployment regardless of sequence window — for live reports whose

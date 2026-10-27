@@ -663,6 +663,21 @@ func mustPermitDigest(p *FencePermit) string {
 	return d
 }
 
+// MarkRecoveryRequired quarantines an epoch whose outcome the ordinary
+// path cannot reconcile. It never releases the submission barrier: the
+// state is non-terminal on purpose, so custody stays frozen until an
+// authorized recovery resolves it.
+func (l *Ledger) MarkRecoveryRequired(ctx context.Context, deploymentID, fenceID, reason string) error {
+	_, err := l.db.ExecContext(ctx,
+		`UPDATE custody_fence SET state = $1 WHERE deployment_id = $2 AND fence_id = $3
+		 AND state NOT IN ($4, $5)`,
+		FenceRecoveryRequired, deploymentID, fenceID, FenceClosed, FenceAborted)
+	if err != nil {
+		return fmt.Errorf("fence recovery marker: %w", err)
+	}
+	return nil
+}
+
 // FinalizeMigration records one transaction's committed local outcome
 // and returns the signed terminal result. It is idempotent for the same
 // journal binding and a contradiction for a different one.

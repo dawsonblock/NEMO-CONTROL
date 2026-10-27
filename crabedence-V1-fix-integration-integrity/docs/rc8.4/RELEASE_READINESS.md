@@ -76,6 +76,13 @@ does not qualify a release.
 - **The witness never verifies the operator grant** on close or abort: it
   compares grant digests. Any holder of the kernel-relay key can release
   an epoch. Recorded as `D-RC84-08`.
+- **The v2 transaction model changes epoch granularity.** One epoch still
+  covers N targets, but each target is now a separate admitted
+  transaction with two extra RPCs inside the frozen window. Recorded as
+  `D-RC84-16`.
+
+Two register entries remain OPEN: `D-RC84-08` and `D-RC84-16`. Both are
+recorded rather than closed, and neither is a reason to relax a gate.
 
 ## Defect register
 

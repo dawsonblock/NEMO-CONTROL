@@ -246,6 +246,14 @@ func (s *Service) handleFinalize(ctx context.Context, signer *evidence.Signer, s
 	}
 	result, err := s.ledger.FinalizeMigration(ctx, signer, signerEpoch, req)
 	if err != nil {
+		if errors.Is(err, ErrMigrationOutcomeUnknown) || errors.Is(err, ErrContradiction) {
+			// An outcome the ordinary path cannot reconcile is an
+			// escalation, not a retry: quarantine the epoch so custody
+			// stays frozen until an authorized recovery resolves it.
+			if merr := s.ledger.MarkRecoveryRequired(ctx, s.deploymentID, req.FenceID, err.Error()); merr != nil {
+				s.log.Error("fence recovery marker failed", "fence", req.FenceID, "error", merr)
+			}
+		}
 		s.log.Warn("fence finalize refused", "tx", req.TxID, "error", err)
 		return Response{Error: err.Error(), Code: refusalCode(err)}
 	}
@@ -262,6 +270,11 @@ func (s *Service) handleAbortTx(ctx context.Context, signer *evidence.Signer, si
 	}
 	rec, err := s.ledger.AbortMigration(ctx, req)
 	if err != nil {
+		if errors.Is(err, ErrMigrationOutcomeUnknown) || errors.Is(err, ErrContradiction) {
+			if merr := s.ledger.MarkRecoveryRequired(ctx, s.deploymentID, req.FenceID, err.Error()); merr != nil {
+				s.log.Error("fence recovery marker failed", "fence", req.FenceID, "error", merr)
+			}
+		}
 		s.log.Warn("fence abort refused", "tx", req.TxID, "error", err)
 		return Response{Error: err.Error(), Code: refusalCode(err)}
 	}
