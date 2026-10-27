@@ -1,0 +1,8 @@
+# RC8.4 PR-03 green run — authenticated recovery
+# generated: 2026-10-27T08:48:06Z
+# source commit: e7939681747fac314820fcbbe4e4421c4b6731aa
+# command: GOTOOLCHAIN=go1.26.5 go test -race -count=1 ./internal/witness/ ./internal/custody/ ./cmd/custodyctl/
+
+ok  	github.com/openclaw/crabbox/internal/witness	7.593s
+ok  	github.com/openclaw/crabbox/internal/custody	1.042s
+ok  	github.com/openclaw/crabbox/cmd/custodyctl	8.277s

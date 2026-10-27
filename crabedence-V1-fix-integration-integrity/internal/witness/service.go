@@ -156,14 +156,33 @@ func (s *Service) Handle(ctx context.Context, req Request) Response {
 	case OpFenceAbortTx:
 		return s.handleAbortTx(ctx, signer, signerEpoch, req.Finalize)
 	case OpFenceStatus:
-		fence, err := s.ledger.ActiveFence(ctx, s.deploymentID)
-		if err != nil {
-			return Response{Error: fmt.Sprintf("fence status: %v", err)}
+		var fence *FenceRecord
+		if req.Fence != nil && req.Fence.FenceID != "" {
+			rec, err := s.ledger.Fence(ctx, s.deploymentID, req.Fence.FenceID)
+			if err != nil {
+				return Response{Error: fmt.Sprintf("fence status: %v", err)}
+			}
+			fence = rec
+		} else {
+			rec, err := s.ledger.ActiveFence(ctx, s.deploymentID)
+			if err != nil {
+				return Response{Error: fmt.Sprintf("fence status: %v", err)}
+			}
+			fence = rec
 		}
 		if fence == nil {
 			return Response{OK: true, WitnessFP: signer.Fingerprint(), DeploymentID: s.deploymentID}
 		}
-		return Response{OK: true, Fence: fence.receipt(), WitnessFP: signer.Fingerprint()}
+		receipt := fence.receipt()
+		// An inspection reply names the admitted transaction so an
+		// operator can reconcile it. It carries no signature: it is a
+		// statement for inspection, never an authority.
+		if live, ok, err := liveFenceTxFrom(ctx, s.ledger.db, s.deploymentID); err != nil {
+			return Response{Error: fmt.Sprintf("fence status: %v", err)}
+		} else if ok && live.FenceID == fence.FenceID {
+			receipt.LiveTxID = live.TxID
+		}
+		return Response{OK: true, Fence: receipt, WitnessFP: signer.Fingerprint()}
 	default:
 		return Response{Error: fmt.Sprintf("unknown op %q", req.Op)}
 	}

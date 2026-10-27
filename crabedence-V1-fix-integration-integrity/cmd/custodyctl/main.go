@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"hash"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/openclaw/crabbox/internal/custody"
@@ -55,6 +56,8 @@ func usage() {
   custodyctl preflight -outbox <path> [-page-size N] [-json]
   custodyctl fence     status -outbox <path> [-json]
   custodyctl fence     abort  (same authority flags as migrate)
+  custodyctl fence     recover -outbox <path> -fence <id> -authorization <file>
+                       (same trust/transport flags as migrate) [-dry-run] [-json]
   custodyctl migrate   -outbox <path> -effect-store <path> -deployment <id>
                        -signer-key <pem> -operator-token <json>
                        -custodian-trust-roots <file> -kernel-trust-roots <file>
@@ -127,6 +130,8 @@ func runFence(args []string) {
 		}
 	case "abort":
 		runMutating("fence-abort", args[1:])
+	case "recover":
+		runRecover(parseMutateFlags("fence recover", args[1:]))
 	default:
 		usage()
 		os.Exit(2)
@@ -422,6 +427,8 @@ type mutateFlags struct {
 	storePath     string
 	release       string
 	operatorToken string
+	recoveryAuth  string
+	fenceID       string
 	actor         string
 	reason        string
 	jsonOut       bool
@@ -448,6 +455,8 @@ func parseMutateFlags(op string, args []string) mutateFlags {
 	fs.StringVar(&f.storePath, "effect-store", os.Getenv("CRABEDENCE_EFFECT_STORE"), "authoritative effect store sqlite path")
 	fs.StringVar(&f.release, "release-version", "", "release identity version bound into envelopes")
 	fs.StringVar(&f.operatorToken, "operator-token", "", "signed operator grant JSON — REQUIRED for mutation")
+	fs.StringVar(&f.recoveryAuth, "authorization", "", "signed recovery grant JSON — REQUIRED for fence recover")
+	fs.StringVar(&f.fenceID, "fence", "", "migration epoch identity — REQUIRED for fence recover")
 	fs.StringVar(&f.actor, "actor", os.Getenv("USER"), "operator identity — must match the signed grant subject")
 	fs.StringVar(&f.reason, "reason", "", "operator reason — REQUIRED for repair")
 	fs.BoolVar(&f.jsonOut, "json", false, "machine-readable JSON output")
@@ -715,6 +724,96 @@ func runMutating(op string, args []string) {
 	case "migrate":
 		runMigrate(ctx, outbox, store, producer, policy, f, auth, grant, grantDigest, client)
 	}
+}
+
+// runRecover resolves an epoch that the ordinary path cannot: an
+// expired initiating grant, a crash between the local commit and the
+// finalize, or a kernel that died holding an admitted permit. It
+// derives the only safe action from the local outbox and the
+// custodian's view, then executes it under a separate recovery
+// authorization — never by forcing the epoch open on a timeout.
+func runRecover(f mutateFlags) {
+	if f.fenceID == "" {
+		fatalf("fence recover: -fence is required")
+	}
+	if f.socket == "" && f.tlsAddr == "" {
+		fatalf("fence recover: -witness-socket or -witness-tls is required — an epoch is resolved at the custodian, never locally")
+	}
+	outbox, err := witness.OpenOutbox(f.outbox)
+	if err != nil {
+		fatalf("outbox: %v", err)
+	}
+	defer outbox.Close()
+	rawKey, err := os.ReadFile(f.signerKey)
+	if err != nil {
+		fatalf("signer key: %v", err)
+	}
+	signer, err := evidence.ParseSignerPEM(rawKey)
+	if err != nil {
+		fatalf("signer key: %v", err)
+	}
+	client, err := witnessClient(f, signer)
+	if err != nil {
+		fatalf("fence recover: %v", err)
+	}
+	ctx := context.Background()
+	plan, err := witness.PlanRecovery(ctx, outbox, client, f.deployment, f.fenceID)
+	if err != nil {
+		fatalf("fence recover: %v", err)
+	}
+	if plan.Quarantined {
+		if f.jsonOut {
+			writeJSON(map[string]any{"operation": "fence-recover", "plan": plan, "result": "QUARANTINED"})
+		} else {
+			fmt.Fprintf(os.Stderr, "custodyctl: fence %s is quarantined: %s\n", plan.FenceID, strings.Join(plan.Findings, "; "))
+		}
+		os.Exit(3)
+	}
+	if f.dryRun {
+		if f.jsonOut {
+			writeJSON(map[string]any{"operation": "fence-recover", "dry_run": true, "plan": plan})
+		} else {
+			fmt.Printf("fence recover dry-run: fence=%s action=%s tx=%s local=%s witness=%s — %s\n",
+				plan.FenceID, plan.Action, plan.TxID, plan.LocalState, plan.WitnessState, plan.Reason)
+		}
+		return
+	}
+	if f.recoveryAuth == "" {
+		fatalf("fence recover: -authorization is required to commit")
+	}
+	rawAuth, err := os.ReadFile(f.recoveryAuth)
+	if err != nil {
+		fatalf("recovery authorization: %v", err)
+	}
+	var grant witness.RecoveryGrant
+	if err := json.Unmarshal(rawAuth, &grant); err != nil {
+		fatalf("recovery authorization: %v", err)
+	}
+	repairTrust, err := custody.LoadTrustSetForRole(f.repairTrust, custody.RoleRepairAuthority)
+	if err != nil {
+		fatalf("repair trust: %v", err)
+	}
+	custodianTrust, err := custody.LoadTrustSetForRole(f.trustRoots, custody.RoleCustodian)
+	if err != nil {
+		fatalf("custodian trust: %v", err)
+	}
+	kernelTrust, err := custody.LoadTrustSetForRole(f.kernelTrust, custody.RoleKernelRelay)
+	if err != nil {
+		fatalf("kernel trust: %v", err)
+	}
+	fc := &witness.FenceClient{
+		Client: client, Signer: signer, DeploymentID: f.deployment,
+		GrantDigest: plan.GrantDigest, KernelTrust: kernelTrust, CustodianTrust: custodianTrust,
+	}
+	out, err := witness.ExecuteRecovery(ctx, outbox, fc, repairTrust, &grant, plan, time.Now())
+	if err != nil {
+		fatalf("fence recover: %v", err)
+	}
+	if f.jsonOut {
+		writeJSON(map[string]any{"operation": "fence-recover", "plan": plan, "result": out})
+		return
+	}
+	fmt.Printf("fence recover: fence=%s action=%s tx=%s state=%v\n", plan.FenceID, plan.Action, plan.TxID, out["state"])
 }
 
 // runFenceAbort releases a migration epoch whose rewrite will never

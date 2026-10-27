@@ -215,7 +215,12 @@ type FenceReceipt struct {
 	SignerEpoch  int64  `json:"signer_epoch"`
 	OpenedAt     string `json:"opened_at"`
 	ClosedAt     string `json:"closed_at,omitempty"`
-	Signature    string `json:"signature,omitempty"`
+	// LiveTxID is set only on an inspection response: it names the
+	// transaction currently admitted in the epoch, if any. It is not
+	// covered by the receipt signature because a status reply is not an
+	// authority.
+	LiveTxID  string `json:"live_tx_id,omitempty"`
+	Signature string `json:"signature,omitempty"`
 }
 
 func fenceReceiptFields(r *FenceReceipt) []string {

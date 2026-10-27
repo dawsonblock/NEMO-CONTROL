@@ -124,7 +124,7 @@
       "id": "D-RC84-06",
       "plan_id": "F2",
       "severity": "P0",
-      "status": "DEFERRED",
+      "status": "GREEN",
       "title": "An expired grant strands an open epoch; there is no recovery grant type",
       "invariant": "I-06, I-07",
       "detail": "Resume re-verifies the initiating grant against time.Now() on every call, and PendingFenceIntent filters on grant_digest, so a replacement grant cannot even find the epoch. No recovery authorization type exists. Note that the witness itself does not verify any grant: FenceClient.Abort needs only the kernel-relay key, so the stranding is enforced by the CLI's grant policy rather than by the custodian.",
@@ -135,13 +135,16 @@
       ],
       "red_test": "TestRC84ExpiredGrantRecoveryAfterWitnessRestart",
       "red_test_status": "requires the Phase 2 recovery API; recorded as a red test in the PR-03 commit that introduces it, not in PR-00",
-      "planned_pr": "PR-03"
+      "planned_pr": "PR-03",
+      "closed_by": "PR-03",
+      "green_evidence": "TestRC84ExpiredGrantRecoveryAfterWitnessRestart",
+      "resolution_note": "Recovery is a separate repair-authority grant bound to the fence, epoch, transaction, original grant digest, base and the observed local state; the CLI resolves by -fence so a replacement authorization does not need the expired digest to find the epoch."
     },
     {
       "id": "D-RC84-07",
       "plan_id": null,
       "severity": "P0",
-      "status": "OPEN",
+      "status": "GREEN",
       "title": "Abort has no enforceable no-commit proof and no local permit-revocation ordering",
       "invariant": "I-05",
       "detail": "The witness cannot inspect the local database, so 'no local commit occurred' is a kernel attestation, not a verified fact. The plan states this as an invariant while conceding the equivalent limit for finalize. A resumed kernel can also commit between the recovery inspection and the abort RPC unless the permit is durably revoked locally first.",
@@ -150,7 +153,10 @@
         "plan section D5 derives an authenticated abort from local state without a revocation step"
       ],
       "resolution": "Demote I-05 to a trust assumption plus a mandatory durable local permit revocation that precedes every abort RPC.",
-      "planned_pr": "PR-03"
+      "planned_pr": "PR-03",
+      "closed_by": "PR-03",
+      "green_evidence": "TestRC84RecoveryAbortRevokesPermitBeforeRelease",
+      "resolution_note": "I-05 restated: the abort is preceded by a durable local RevokePermit, and the no-commit claim stays kernel-attested. The witness still cannot inspect the remote database."
     },
     {
       "id": "D-RC84-08",
@@ -206,7 +212,7 @@
       "id": "D-RC84-11",
       "plan_id": null,
       "severity": "P2",
-      "status": "OPEN",
+      "status": "GREEN",
       "title": "Crash between witness close and CompleteFenceIntent leaves an unrecoverable local/witness disagreement",
       "invariant": "I-06",
       "detail": "The local intent stays OPEN while the witness is CLOSED. Reenter fails with ErrFenceState, Plan recomputes the same fence identity because the grant and base are unchanged, and OpenFence refuses a CLOSED fence. Re-enter, open and abort are all refused, and no supported CLI path reconciles the local record.",
@@ -215,13 +221,16 @@
         "internal/witness/fence.go:433 OpenFence refuses a non-OPEN existing fence",
         "internal/witness/fence.go:131 FenceIDFor is deterministic on grant and base"
       ],
-      "planned_pr": "PR-03"
+      "planned_pr": "PR-03",
+      "closed_by": "PR-03",
+      "green_evidence": "TestRC84ExpiredGrantRecoveryAfterWitnessRestart",
+      "resolution_note": "PlanRecovery derives COMPLETE when the witness already closed and the local journal records the commit."
     },
     {
       "id": "D-RC84-12",
       "plan_id": null,
       "severity": "P2",
-      "status": "OPEN",
+      "status": "GREEN",
       "title": "fence abort relies on a client-side timestamp count outside any transaction",
       "invariant": "I-04",
       "detail": "JournalSince compares created_at strings against the fence intent's opened_at and is read before the abort RPC with no transaction spanning the two. A concurrent migrate can commit in that window. The check is also the only thing standing between an operator and the defect in D-RC84-02.",
@@ -230,7 +239,10 @@
         "cmd/custodyctl/main.go:753 call site before fc.Abort"
       ],
       "resolution": "Superseded by the witness-side prepared/committing guard; retain as a defence-in-depth report only.",
-      "planned_pr": "PR-03"
+      "planned_pr": "PR-03",
+      "closed_by": "PR-03",
+      "green_evidence": "TestRC84AbortRefusedOverCommittedRewrite",
+      "resolution_note": "The witness-side guard is now authoritative; JournalSince remains a defence-in-depth report only."
     },
     {
       "id": "D-RC84-13",
