@@ -10,6 +10,10 @@ no verdict of its own.
 
 Usage: write-attestation.py <source-commit> <inventory> <artifact>
                              <logs-dir> <output.json> <verdict>
+
+The release name defaults to the integrity-closure candidate and is
+overridden by $RC83_RELEASE so a later candidate cannot be attested
+under the wrong identity.
 """
 
 import hashlib
@@ -36,7 +40,7 @@ def main() -> int:
             logs[name] = {"path": "logs/" + name, "sha256": sha256(path), "size": os.path.getsize(path)}
     doc = {
         "schema": "rc83-integrity-attestation-v1",
-        "release": "0.55.0-rc8.3-integrity-closure",
+        "release": os.environ.get("RC83_RELEASE", "0.55.0-rc8.3-integrity-closure"),
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "source_commit": commit,
         "source_inventory": {
