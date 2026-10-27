@@ -16,9 +16,22 @@ env:
 
 jobs:
   go-test:
-    name: Go test
+    name: Go test (${{ matrix.group }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The CLI suite is measured at ~13 minutes on a 16 GiB host and
+        # ~20-22 minutes when it shares the machine with the rest of the
+        # tree under -race. `-timeout` is a per-test-binary budget, so
+        # running it concurrently with ~110 other packages spent that
+        # budget on CPU contention rather than on the suite — the gate
+        # failed for a reason that had nothing to do with the code it
+        # gates. Two shards, same budget, same coverage: the CLI is
+        # alone in its own runner and the rest of the tree is not
+        # starved by it.
+        group: [core, cli]
 
     steps:
       - name: Check out
@@ -31,6 +44,7 @@ jobs:
           cache: false
 
       - name: Check formatting
+        if: matrix.group == 'core'
         shell: bash
         run: |
           mapfile -t files < <(git ls-files '*.go')
@@ -43,9 +57,11 @@ jobs:
           fi
 
       - name: Vet
+        if: matrix.group == 'core'
         run: go vet ./...
 
       - name: Deadcode
+        if: matrix.group == 'core'
         run: |
           output_file=$(mktemp)
           go run golang.org/x/tools/cmd/deadcode@v0.45.0 -test ./... > "$output_file"
@@ -56,9 +72,19 @@ jobs:
 
       - name: Test
         # Leave room for the CLI suite's final parallel timeout fixtures.
-        run: go test -race -timeout=20m ./...
+        shell: bash
+        run: |
+          if [ "${{ matrix.group }}" = "cli" ]; then
+            go test -race -timeout=20m ./internal/cli/
+          else
+            # Every package except the CLI shard. Computed rather than
+            # listed so a new package is covered by default.
+            mapfile -t pkgs < <(go list ./... | grep -v '^github.com/openclaw/crabbox/internal/cli$')
+            go test -race -timeout=20m "${pkgs[@]}"
+          fi
 
       - name: Require executed Linux supervision fixtures
+        if: matrix.group == 'cli'
         shell: bash
         run: |
           go test ./internal/cli -run '^(TestWorkspaceOwnerWSL2Watchdog.*|TestWSL2(OrdinaryShortFrameWatchdogCleansState|MarkerPublicationFailureLeavesUnarmedDiagnosticState|GuardSurvivesPublishedMarkerBeforeArm|ProductionCleanup.*))$' -count=1 -json | tee "$RUNNER_TEMP/wsl-linux-tests.jsonl"
