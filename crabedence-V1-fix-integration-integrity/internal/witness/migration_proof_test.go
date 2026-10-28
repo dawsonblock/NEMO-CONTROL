@@ -58,6 +58,17 @@ func proofTrust(h *harness) MigrationProofTrust {
 	return MigrationProofTrust{DeploymentID: h.dep, ProofTrust: h.ktrust, CustodianTrust: h.ctrust}
 }
 
+// resignPermit re-countersigns a permit the test has altered, under the
+// real custodian key, so the adversarial proof differs from the journal
+// in the one dimension the test names rather than in its signature.
+func resignPermit(t *testing.T, h *harness, permit *FencePermit) {
+	t.Helper()
+	permit.Signature = ""
+	if _, err := SignFencePermit(h.wsigner, permit.SignerEpoch, permit); err != nil {
+		t.Fatalf("re-sign permit: %v", err)
+	}
+}
+
 func TestMigrationProofRejectsAlteredRows(t *testing.T) {
 	h := newHarness(t, true)
 	defer h.cancel()
@@ -107,8 +118,10 @@ func TestMigrationProofRejectsForeignPermitTarget(t *testing.T) {
 
 	// Re-sign a proof whose admission names a different target than the
 	// journal row it claims to describe: the custodian never admitted a
-	// rewrite there.
+	// rewrite there. The permit is re-signed by the real custodian key,
+	// so signature validity cannot be what refuses it.
 	proof.Permit.TargetSeq = base.RowSeq + 7
+	resignPermit(t, h, proof.Permit)
 	entry := signedProofEntry(t, h, base, proof)
 	if err := VerifyMigrationProof(entry, proofTrust(h)); err == nil {
 		t.Fatal("proof whose permit admits a foreign target verified")
@@ -147,8 +160,10 @@ func TestMigrationProofRejectsPermitFromAnotherGrant(t *testing.T) {
 
 	// A permit that verifies but admits a different grant is not this
 	// rewrite's authority: the journal still records the grant the
-	// rewrite actually ran under.
+	// rewrite actually ran under. The permit is re-signed by the real
+	// custodian key, so the grant binding is what refuses it.
 	proof.Permit.GrantDigest = "different-grant"
+	resignPermit(t, h, proof.Permit)
 	entry := signedProofEntry(t, h, base, proof)
 	if err := VerifyMigrationProof(entry, proofTrust(h)); err == nil {
 		t.Fatal("proof bound to another grant's admission verified")

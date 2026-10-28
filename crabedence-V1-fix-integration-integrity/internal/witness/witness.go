@@ -60,13 +60,13 @@ type Request struct {
 // Response codes let the kernel distinguish a refusal it must escalate
 // from one it must simply wait out (a fence) without parsing prose.
 const (
-	CodeFenced        = "fenced"
-	CodeFenceActive   = "fence-active"
-	CodeStaleFence    = "stale-fence-base"
-	CodeFenceState    = "fence-state"
-	CodeContradiction = "contradiction"
-	CodePermitMissing = "permit-missing"
-	CodePermitUsed    = "permit-consumed"
+	CodeFenced         = "fenced"
+	CodeFenceActive    = "fence-active"
+	CodeStaleFence     = "stale-fence-base"
+	CodeFenceState     = "fence-state"
+	CodeContradiction  = "contradiction"
+	CodePermitMissing  = "permit-missing"
+	CodePermitUsed     = "permit-consumed"
 	CodeOutcomeUnknown = "migration-outcome-unknown"
 	CodeRecoveryNeeded = "fence-recovery-required"
 	CodeWrongTerminal  = "wrong-terminal-receipt"

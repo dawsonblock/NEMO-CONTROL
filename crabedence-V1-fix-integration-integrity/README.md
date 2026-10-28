@@ -381,6 +381,51 @@ and failure bundles are not automatically scrubbed; review them before
 sharing. See [Operational security](docs/security.md) and
 [Artifacts](docs/features/artifacts.md).
 
+### Custody migration fence
+
+The evidence custody witness can be asked to freeze a deployment while a
+legacy suffix is rebuilt. That rewrite is authority-bound, not
+receipt-bound: `PrepareMigration` admits exactly one transaction against the
+frozen head and returns a `custody-fence-permit-v2` naming its target and
+preimage, the kernel marks the permit consumed in the same SQL transaction
+that rewrites the suffix, writes the journal entry and signs the proof, and
+`FinalizeMigration` binds the witness record to that journal digest. A permit
+is redeemable exactly once; a saved receipt is historical evidence and
+authorizes nothing.
+
+Each invariant below is pinned by a regression test rather than asserted in
+prose:
+
+- **One live epoch and one live transaction per deployment.** Partial unique
+  indexes and exhaustive transition switches make a state added later closed
+  by default.
+- **An epoch cannot be released over a committed rewrite.** Close refuses
+  while a transaction is admitted, and both the epoch abort and the
+  per-transaction abort refuse while any transaction in that epoch has
+  committed a local rewrite — the batch case, where one epoch covers several
+  targets, included.
+- **A quarantined epoch mints nothing.** `RECOVERY_REQUIRED` blocks new
+  admissions and cannot be cleared by the ordinary path; only a request
+  carrying an authorized recovery marker releases it.
+- **Recovery is a separate authority.** A `custody-recovery-grant-v1` signed
+  by the pinned repair authority names one fence, one transaction and one
+  action (`RECOVER_FINALIZE`, `RECOVER_ABORT`, `RECOVER_COMPLETE`), binds the
+  original grant digest and the observed local state, and is single-use. It
+  can finish work an expired grant started; it cannot start anything new.
+
+The witness cannot inspect the remote database, so "no local commit" remains a
+kernel attestation. What makes it meaningful is the ordering: the local permit
+is revoked durably before the abort RPC, so a resumed kernel finds it dead
+rather than racing the release. A crash between the witness admitting a permit
+and the local row being written leaves no permit to revoke; that admission is
+aborted at the witness directly, and a resumed kernel's `Prepare` is refused
+because the transaction is already `ABORTED`.
+
+See [RC8.4 release readiness](docs/rc8.4/RELEASE_READINESS.md) for the
+decision and the gates that remain blocked, and the
+[defect register](qualification/rc8.4-integrity/defect-register.json) for the
+entries this protocol closes and the ones it does not.
+
 ### Release authorization
 
 Releases follow [Release engineering](docs/RELEASING.md) exactly. One explicit
@@ -895,6 +940,7 @@ Fargate path is documented in
 - **Interactive QA:** [Interactive Desktop and VNC](docs/features/interactive-desktop-vnc.md), [Artifacts](docs/features/artifacts.md), [Portal](docs/features/portal.md)
 - **Integrate infrastructure:** [Bring Your Own Infrastructure](docs/features/bring-your-own-infrastructure.md), [Portable Coordinator](docs/features/portable-coordinator.md), [Private AWS Workspaces](docs/features/aws-private-workspaces.md), [External Provider](docs/providers/external.md)
 - **Release engineering:** [Release qualification](.github/workflows/release-qualification.yml), [Release RC](.github/workflows/release-rc.yml), [VERIFY-RELEASE.md](VERIFY-RELEASE.md), [Release engineering](docs/RELEASING.md)
+- **Custody and migration:** [RC8.4 release readiness](docs/rc8.4/RELEASE_READINESS.md), [RC8.4 defect register](qualification/rc8.4-integrity/defect-register.json), [Security invariants](docs/rc8.3/SECURITY_INVARIANTS.md)
 - **Operate it:** [Operations](docs/operations.md), [Observability](docs/observability.md), [Troubleshooting](docs/troubleshooting.md), [Performance](docs/performance.md)
 - **Set it up or audit it:** [Infrastructure](docs/infrastructure.md), [Security Policy](SECURITY.md), [Operational Security](docs/security.md), [Getting Started](docs/getting-started.md), [Source Map](docs/source-map.md)
 - **Changes:** [CHANGELOG.md](CHANGELOG.md)

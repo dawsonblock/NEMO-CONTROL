@@ -673,6 +673,11 @@ type FenceClient struct {
 	// fenced because submissions never stop is reported, not waited
 	// out.
 	MaxBaseRetries int
+	// Recovery marks every finalize/abort this client issues as coming
+	// from an authorized recovery rather than the ordinary migration
+	// path, so the witness will let it resolve a quarantined epoch.
+	// custodyctl sets it only after a recovery grant has been verified.
+	Recovery bool
 }
 
 func (f *FenceClient) retries() int {

@@ -33,9 +33,9 @@ package witness
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -55,14 +55,14 @@ const (
 // v1 record can never be presented as a v2 permit or a v2 terminal
 // result.
 const (
-	FencePermitSchema        = "custody-fence-permit-v2"
-	FencePrepareSchema       = "custody-fence-prepare-v2"
-	FenceFinalizeSchema      = "custody-fence-finalize-v2"
-	FenceResultSchema        = "custody-fence-result-v2"
-	FencePermitDomain        = "custody-witness-fence-permit-v2\x00"
-	FencePrepareDomain       = "custody-witness-fence-prepare-v2\x00"
-	FenceFinalizeDomain      = "custody-witness-fence-finalize-v2\x00"
-	FenceResultDomain        = "custody-witness-fence-result-v2\x00"
+	FencePermitSchema   = "custody-fence-permit-v2"
+	FencePrepareSchema  = "custody-fence-prepare-v2"
+	FenceFinalizeSchema = "custody-fence-finalize-v2"
+	FenceResultSchema   = "custody-fence-result-v2"
+	FencePermitDomain   = "custody-witness-fence-permit-v2\x00"
+	FencePrepareDomain  = "custody-witness-fence-prepare-v2\x00"
+	FenceFinalizeDomain = "custody-witness-fence-finalize-v2\x00"
+	FenceResultDomain   = "custody-witness-fence-result-v2\x00"
 )
 
 // Fence transaction states. ADMITTED is the only state that authorizes
@@ -379,14 +379,20 @@ type FinalizeRequest struct {
 	GrantDigest   string `json:"grant_digest"`
 	BaseSeq       int64  `json:"base_seq"`
 	NoLocalCommit bool   `json:"no_local_commit,omitempty"`
-	ProofDigest   string `json:"proof_digest,omitempty"`
-	JournalSeq    int64  `json:"journal_seq,omitempty"`
-	BeforeDigest  string `json:"before_digest,omitempty"`
-	AfterDigest   string `json:"after_digest,omitempty"`
-	ResultDigest  string `json:"result_digest,omitempty"`
-	KernelFP      string `json:"kernel_fp"`
-	IssuedAt      string `json:"issued_at"`
-	Signature     string `json:"signature,omitempty"`
+	// Recovery marks a request issued under a recovery authorization
+	// rather than the ordinary migration path. It is the caller's
+	// acknowledgement that a quarantined epoch is being resolved; the
+	// witness has no repair-authority trust, so it can enforce the
+	// distinction but not the grant behind it.
+	Recovery     bool   `json:"recovery,omitempty"`
+	ProofDigest  string `json:"proof_digest,omitempty"`
+	JournalSeq   int64  `json:"journal_seq,omitempty"`
+	BeforeDigest string `json:"before_digest,omitempty"`
+	AfterDigest  string `json:"after_digest,omitempty"`
+	ResultDigest string `json:"result_digest,omitempty"`
+	KernelFP     string `json:"kernel_fp"`
+	IssuedAt     string `json:"issued_at"`
+	Signature    string `json:"signature,omitempty"`
 }
 
 func finalizeRequestFields(r *FinalizeRequest) []string {
@@ -394,9 +400,14 @@ func finalizeRequestFields(r *FinalizeRequest) []string {
 	if r.NoLocalCommit {
 		noCommit = "1"
 	}
+	recovery := "0"
+	if r.Recovery {
+		recovery = "1"
+	}
 	return []string{
 		r.Schema, r.DeploymentID, r.FenceID, strconv.FormatInt(r.Epoch, 10), r.TxID,
-		r.GrantDigest, strconv.FormatInt(r.BaseSeq, 10), noCommit, r.ProofDigest, strconv.FormatInt(r.JournalSeq, 10),
+		r.GrantDigest, strconv.FormatInt(r.BaseSeq, 10), noCommit, recovery,
+		r.ProofDigest, strconv.FormatInt(r.JournalSeq, 10),
 		r.BeforeDigest, r.AfterDigest, r.ResultDigest, r.KernelFP, r.IssuedAt,
 	}
 }
@@ -558,6 +569,14 @@ func (l *Ledger) PrepareMigration(ctx context.Context, signer *evidence.Signer, 
 	}
 	if terminalFenceState(rec.State) {
 		return nil, fmt.Errorf("%w: fence %s is %s", ErrFenceState, req.FenceID, rec.State)
+	}
+	// A quarantined epoch mints nothing. The prepare transition below
+	// writes PREPARED, so admitting here would silently clear the marker
+	// that keeps custody frozen until an authorized recovery resolves
+	// the unreconciled outcome.
+	if rec.State == FenceRecoveryRequired {
+		return nil, fmt.Errorf("%w: fence %s is %s — an authorized recovery must resolve it before any new transaction",
+			ErrFenceRecoveryRequired, req.FenceID, rec.State)
 	}
 	if rec.GrantDigest != req.GrantDigest {
 		return nil, fmt.Errorf("%w: fence %s was opened under a different grant", ErrContradiction, req.FenceID)
@@ -779,6 +798,14 @@ func (l *Ledger) AbortMigration(ctx context.Context, req *FinalizeRequest) (Fenc
 	if terminalFenceState(rec.State) {
 		return FenceRecord{}, fmt.Errorf("%w: fence %s is %s", ErrFenceState, req.FenceID, rec.State)
 	}
+	// Aborting here releases the submission barrier for the whole
+	// epoch, so a quarantine is not the ordinary path's to resolve.
+	// Only an acknowledged recovery may, and it is a signed field on
+	// the request rather than an inference from the epoch's state.
+	if rec.State == FenceRecoveryRequired && !req.Recovery {
+		return FenceRecord{}, fmt.Errorf("%w: fence %s is %s — resolving it requires an authorized recovery",
+			ErrFenceRecoveryRequired, req.FenceID, rec.State)
+	}
 	if rec.GrantDigest != req.GrantDigest {
 		return FenceRecord{}, fmt.Errorf("%w: fence %s was opened under a different grant", ErrFenceState, req.FenceID)
 	}
@@ -793,6 +820,20 @@ func (l *Ledger) AbortMigration(ctx context.Context, req *FinalizeRequest) (Fenc
 		return FenceRecord{}, fmt.Errorf("%w: transaction %s committed a local rewrite — close the epoch, never abort it",
 			ErrMigrationOutcomeUnknown, req.TxID)
 	}
+	// The epoch is released below, so any other transaction in it that
+	// already committed a local rewrite blocks the abort exactly as a
+	// committed transaction of this identity does. AbortFence has the
+	// same rule; a batch epoch is where the two paths must agree.
+	var committed int64
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM custody_fence_tx WHERE deployment_id = $1 AND fence_id = $2 AND state = $3`,
+		req.DeploymentID, req.FenceID, MigrationTxCommitted).Scan(&committed); err != nil {
+		return FenceRecord{}, err
+	}
+	if committed > 0 {
+		return FenceRecord{}, fmt.Errorf("%w: epoch %d carries %d committed migration(s) — close it, never abort it",
+			ErrMigrationOutcomeUnknown, rec.Epoch, committed)
+	}
 	if t.State == MigrationTxAborted {
 		return rec, tx.Commit()
 	}
@@ -800,10 +841,14 @@ func (l *Ledger) AbortMigration(ctx context.Context, req *FinalizeRequest) (Fenc
 		return FenceRecord{}, fmt.Errorf("%w: abort requires the kernel's no-local-commit attestation", ErrMigrationOutcomeUnknown)
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := tx.ExecContext(ctx,
+	res, err := tx.ExecContext(ctx,
 		`UPDATE custody_fence_tx SET state = $1, updated_at = $2 WHERE tx_id = $3 AND state = $4`,
-		MigrationTxAborted, now, req.TxID, MigrationTxAdmitted); err != nil {
+		MigrationTxAborted, now, req.TxID, MigrationTxAdmitted)
+	if err != nil {
 		return FenceRecord{}, fmt.Errorf("fence abort transition: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return FenceRecord{}, fmt.Errorf("%w: transaction %s was not ADMITTED at abort time", ErrPermitConsumed, req.TxID)
 	}
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE custody_fence SET state = $1, closed_at = $2 WHERE deployment_id = $3 AND fence_id = $4`,
@@ -1069,7 +1114,7 @@ func (f *FenceClient) Finalize(ctx context.Context, permit FencePermit, in Final
 		TxID: permit.TxID, GrantDigest: permit.GrantDigest, BaseSeq: permit.BaseSeq,
 		ProofDigest: in.ProofDigest, JournalSeq: in.JournalSeq,
 		BeforeDigest: in.BeforeDigest, AfterDigest: in.AfterDigest,
-		ResultDigest: in.ResultDigest,
+		ResultDigest: in.ResultDigest, Recovery: f.Recovery,
 	}
 	if err := SignFinalizeRequest(f.Signer, req); err != nil {
 		return FenceResult{}, err
@@ -1118,6 +1163,7 @@ func (f *FenceClient) FinalizeLocal(ctx context.Context, tx MigrationTx) (FenceR
 		TxID: tx.TxID, GrantDigest: tx.GrantDigest, BaseSeq: tx.BaseSeq,
 		ProofDigest: tx.ProofDigest, JournalSeq: tx.JournalSeq,
 		BeforeDigest: tx.BeforeDigest, AfterDigest: tx.AfterDigest,
+		Recovery: f.Recovery,
 	}
 	if err := SignFinalizeRequest(f.Signer, req); err != nil {
 		return FenceResult{}, err
@@ -1143,7 +1189,8 @@ func (f *FenceClient) AbortMigration(ctx context.Context, permit FencePermit, re
 	}
 	req := &FinalizeRequest{
 		DeploymentID: permit.DeploymentID, FenceID: permit.FenceID, Epoch: permit.Epoch,
-		TxID: permit.TxID, GrantDigest: permit.GrantDigest, BaseSeq: permit.BaseSeq, NoLocalCommit: true,
+		TxID: permit.TxID, GrantDigest: permit.GrantDigest, BaseSeq: permit.BaseSeq,
+		NoLocalCommit: true, Recovery: f.Recovery,
 	}
 	if err := SignFinalizeRequest(f.Signer, req); err != nil {
 		return FenceReceipt{}, err

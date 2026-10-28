@@ -243,23 +243,28 @@ func (o *Outbox) ConsumeRecoveryNonce(ctx context.Context, g *RecoveryGrant) err
 // the local outbox and the custodian's view. It is advisory until a
 // recovery grant authorizes the action it names.
 type RecoveryPlan struct {
-	DeploymentID  string   `json:"deployment_id"`
-	FenceID       string   `json:"fence_id"`
-	TxID          string   `json:"tx_id"`
-	Epoch         int64    `json:"epoch"`
-	BaseSeq       int64    `json:"base_seq"`
-	BaseHash      string   `json:"base_hash"`
-	GrantDigest   string   `json:"grant_digest"`
-	LocalState    string   `json:"local_state"`
-	WitnessState  string   `json:"witness_state"`
-	Action        string   `json:"action"`
-	Reason        string   `json:"reason"`
-	JournalSeq    int64    `json:"journal_seq,omitempty"`
-	AfterDigest   string   `json:"after_digest,omitempty"`
-	ProofDigest   string   `json:"proof_digest,omitempty"`
-	BeforeDigest  string   `json:"before_digest,omitempty"`
-	Quarantined   bool     `json:"quarantined"`
-	Findings      []string `json:"findings,omitempty"`
+	DeploymentID string `json:"deployment_id"`
+	FenceID      string `json:"fence_id"`
+	TxID         string `json:"tx_id"`
+	Epoch        int64  `json:"epoch"`
+	BaseSeq      int64  `json:"base_seq"`
+	BaseHash     string `json:"base_hash"`
+	GrantDigest  string `json:"grant_digest"`
+	LocalState   string `json:"local_state"`
+	// HasLocalTx reports whether this outbox holds a row for TxID. A
+	// witness-only admission — the kernel crashed between prepare and
+	// AdmitMigration — has no local permit to revoke, and the abort
+	// path must not try.
+	HasLocalTx   bool     `json:"has_local_tx"`
+	WitnessState string   `json:"witness_state"`
+	Action       string   `json:"action"`
+	Reason       string   `json:"reason"`
+	JournalSeq   int64    `json:"journal_seq,omitempty"`
+	AfterDigest  string   `json:"after_digest,omitempty"`
+	ProofDigest  string   `json:"proof_digest,omitempty"`
+	BeforeDigest string   `json:"before_digest,omitempty"`
+	Quarantined  bool     `json:"quarantined"`
+	Findings     []string `json:"findings,omitempty"`
 }
 
 // PlanRecovery reads the local transaction and the custodian's fence
@@ -312,6 +317,7 @@ func PlanRecovery(ctx context.Context, o *Outbox, c *Client, deploymentID, fence
 	plan.TxID, plan.Epoch, plan.BaseSeq, plan.BaseHash = t.TxID, t.WitnessEpoch, t.BaseSeq, t.BaseHash
 	plan.GrantDigest = t.GrantDigest
 	plan.LocalState = t.State
+	plan.HasLocalTx = true
 	plan.JournalSeq, plan.AfterDigest, plan.ProofDigest, plan.BeforeDigest = t.JournalSeq, t.AfterDigest, t.ProofDigest, t.BeforeDigest
 
 	switch {
@@ -367,6 +373,11 @@ func ExecuteRecovery(ctx context.Context, o *Outbox, fc *FenceClient, trust *cus
 	}
 
 	out := map[string]any{"fence_id": plan.FenceID, "action": plan.Action, "tx_id": plan.TxID, "subject": g.Subject}
+	// Every request this authorization issues is a recovery request, and
+	// the witness requires the marker before it will let one resolve a
+	// quarantined epoch. The grant has been verified above, so the flag
+	// is set only on this path.
+	fc.Recovery = true
 	switch plan.Action {
 	case RecoveryFinalize:
 		tx, err := o.MigrationTx(ctx, plan.TxID)
@@ -384,11 +395,20 @@ func ExecuteRecovery(ctx context.Context, o *Outbox, fc *FenceClient, trust *cus
 		out["proof_digest"] = result.ProofDigest
 	case RecoveryAbort:
 		if plan.TxID != "" {
-			// Revoke first. This is the ordering that makes the
-			// kernel's no-commit attestation meaningful: a resumed
-			// kernel cannot commit under a permit that is already dead.
-			if err := o.RevokePermit(ctx, plan.TxID, "recovery abort: "+g.Subject); err != nil {
-				return nil, err
+			// Revoke first, but only when this outbox actually holds
+			// the permit. A witness-only admission has no local row to
+			// revoke, and requiring one here stranded exactly the
+			// crash this action exists to resolve. Nothing is lost by
+			// skipping it: the witness transition below leaves the
+			// transaction ABORTED, so a resumed kernel's Prepare is
+			// refused rather than re-admitted. This is the ordering
+			// that makes the kernel's no-commit attestation
+			// meaningful: a resumed kernel cannot commit under a
+			// permit that is already dead.
+			if plan.HasLocalTx {
+				if err := o.RevokePermit(ctx, plan.TxID, "recovery abort: "+g.Subject); err != nil {
+					return nil, err
+				}
 			}
 			permit := FencePermit{
 				DeploymentID: plan.DeploymentID, FenceID: plan.FenceID, Epoch: plan.Epoch,

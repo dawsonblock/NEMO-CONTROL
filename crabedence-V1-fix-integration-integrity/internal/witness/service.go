@@ -193,6 +193,11 @@ func (s *Service) Handle(ctx context.Context, req Request) Response {
 // the fence table — the witness does not take an unauthenticated
 // kernel's word for it that a migration is under way.
 func (s *Service) handleFence(ctx context.Context, signer *evidence.Signer, signerEpoch int64, req *FenceRequest) Response {
+	if req == nil {
+		// A fence op with no body is refused before anything reads it:
+		// the refusal path itself must not dereference the request.
+		return Response{Error: "fence request: none supplied", Code: CodeFenceState}
+	}
 	if err := VerifyFenceRequest(req, s.deploymentID, s.kernelTrust); err != nil {
 		s.log.Warn("fence request refused", "op", req.Op, "error", err)
 		return Response{Error: err.Error(), Code: CodeFenceState}
